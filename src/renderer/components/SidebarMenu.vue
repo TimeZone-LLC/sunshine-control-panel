@@ -155,6 +155,7 @@
           v-if="router.isRoute(ROUTES.CONTROLLERS) || router.isRoute(ROUTES.DUALSENSE) || router.isRoute(ROUTES.CONTROLLERS_HUB)"
           @close="goHome"
           @open-controller-meta="openGamepadTest"
+          @open-stylus-input-probe="openStylusInputProbe"
         />
 
         <!-- 默认内容 (slot) -->

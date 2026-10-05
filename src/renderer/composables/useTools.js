@@ -106,6 +106,45 @@ export function useTools() {
     })
   }
 
+  /** Open the bundled native stylus diagnostics tool. */
+  const openStylusInputProbe = async () => {
+    try {
+      await tools.openNativeTool('alkaidlab.stylus')
+      ElMessage.success(t.value.tools.stylusInputProbeStarted)
+    } catch (error) {
+      const errorCode = String(error || '')
+      const missing = errorCode.includes('NATIVE_PLUGIN_NOT_FOUND')
+      const incompatible = [
+        'NATIVE_PLUGIN_PATH_INVALID',
+        'NATIVE_PLUGIN_LOAD_FAILED',
+        'NATIVE_PLUGIN_ENTRY_MISSING',
+        'NATIVE_PLUGIN_ABI_MISMATCH',
+        'NATIVE_PLUGIN_ID_MISMATCH',
+        'NATIVE_PLUGIN_INIT_FAILED',
+      ].some(code => errorCode.includes(code))
+      console.error('[StylusInputProbe] launch failed:', errorCode)
+      try {
+        await ElMessageBox.alert(
+          missing
+            ? t.value.tools.stylusInputProbeMissing
+            : incompatible
+              ? t.value.tools.stylusInputProbeUntrusted
+              : t.value.tools.stylusInputProbeLaunchFailed,
+          t.value.tools.stylusInputProbeErrorTitle,
+          {
+            confirmButtonText: t.value.systemTools.confirm,
+            type: 'error',
+            showClose: false,
+            closeOnClickModal: false,
+            closeOnPressEscape: false,
+          }
+        )
+      } catch {
+        // The launch failure has already been handled.
+      }
+    }
+  }
+
   /**
    * 打开外部 URL
    * @param {string} url - 要打开的URL
@@ -528,6 +567,7 @@ export function useTools() {
     restartDriver,
     restartSunshine,
     restartSunshineInUserMode,
+    openStylusInputProbe,
     openTimer,
     openUrl,
     cleanupCovers,
