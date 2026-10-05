@@ -234,6 +234,37 @@
   min-height: 72px;
 }
 
+.chub-backend-settings {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(220px, 1fr);
+  gap: var(--space-2) var(--space-3);
+  align-items: center;
+  margin-bottom: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  background: var(--bg-panel-soft);
+
+  > .chub-hint {
+    grid-column: 2;
+    margin: 0;
+  }
+}
+
+.chub-field-label {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.chub-identity-setting {
+  grid-column: 1 / -1;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-soft);
+
+  .chub-hint {
+    margin-left: var(--space-4);
+  }
+}
+
 .chub-mode-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -405,8 +436,14 @@
   .chub-mode-list,
   .chub-cards,
   .chub-runtime-grid,
-  .chub-usb-discovery {
+  .chub-usb-discovery,
+  .chub-backend-settings {
     grid-template-columns: 1fr;
+  }
+
+  .chub-backend-settings > .chub-hint,
+  .chub-identity-setting {
+    grid-column: 1;
   }
 
   .chub-app-row,

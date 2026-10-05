@@ -101,16 +101,25 @@ export const vigem = {
   uninstall: () => wrapResult('uninstall_vigem_driver'),
 }
 
-export const controllerHub = {
-  getConfig: () => wrapResult('get_controller_hub_config'),
-  saveConfig: (patch = {}) => wrapResult('save_controller_hub_config', {
+export function controllerHubCommandArgs(patch = {}) {
+  return {
     gamepad: patch.gamepad,
+    gamepadDriver: patch.gamepad_driver,
     motionAsDs4: patch.motion_as_ds4,
     touchpadAsDs4: patch.touchpad_as_ds4,
     ds4BackAsTouchpadClick: patch.ds4_back_as_touchpad_click,
+    ds5InputtinoRandomizeMac: patch.ds5_inputtino_randomize_mac,
     enableDsuServer: patch.enable_dsu_server,
     dsuServerPort: patch.dsu_server_port,
-  }),
+  }
+}
+
+export const controllerHub = {
+  getConfig: () => wrapResult('get_controller_hub_config'),
+  saveConfig: (patch = {}) => wrapResult(
+    'save_controller_hub_config',
+    controllerHubCommandArgs(patch),
+  ),
 }
 
 export const virtualMicrophone = {

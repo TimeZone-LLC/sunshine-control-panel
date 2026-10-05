@@ -15,7 +15,41 @@
       </el-button>
     </el-alert>
 
-    <div v-else v-loading="loading" class="chub-picker-row">
+    <div v-if="!unreachable" v-loading="loading" class="chub-backend-settings">
+      <label class="chub-field-label" for="controller-backend">
+        {{ t.controllersHub.emulation.backendTitle }}
+      </label>
+      <el-select
+        id="controller-backend"
+        :model-value="config.gamepad_driver"
+        :disabled="busyKey !== ''"
+        @change="saveDriver"
+      >
+        <el-option
+          v-for="option in driverOptions"
+          :key="option.value"
+          :value="option.value"
+          :label="option.label"
+        />
+      </el-select>
+      <p class="chub-hint">{{ t.controllersHub.emulation.backendHint }}</p>
+      <div v-if="config.gamepad_driver !== 'vigembus'" class="chub-identity-setting">
+        <el-checkbox
+          :model-value="config.ds5_inputtino_randomize_mac"
+          :disabled="busyKey !== ''"
+          @change="(value) => saveKey(
+            'ds5_inputtino_randomize_mac',
+            value,
+            t.controllersHub.emulation.identitySaveSuccess,
+          )"
+        >
+          {{ t.controllersHub.emulation.randomizeIdentity }}
+        </el-checkbox>
+        <p class="chub-hint">{{ t.controllersHub.emulation.randomizeIdentityHint }}</p>
+      </div>
+    </div>
+
+    <div v-if="!unreachable" v-loading="loading" class="chub-picker-row">
       <div class="chub-mode-list" role="radiogroup" :aria-label="t.controllersHub.emulation.typeQuestion">
         <button
           v-for="option in modeOptions"
@@ -86,6 +120,10 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { controllerHub, sunshine } from '../../tauri-adapter.js'
+import {
+  availableGamepadProfiles,
+  reconcileGamepadProfile,
+} from '../../composables/controllerProfiles.js'
 import { useI18n } from '../../desktop/i18n/index.js'
 
 const { t } = useI18n()
@@ -93,7 +131,11 @@ const emit = defineEmits(['ds5-selection-change'])
 
 const APPS_TIMEOUT_MS = 8000
 
-const config = ref({ gamepad: 'auto' })
+const config = ref({
+  gamepad: 'auto',
+  gamepad_driver: 'vigembus',
+  ds5_inputtino_randomize_mac: true,
+})
 const loading = ref(false)
 const unreachable = ref(false)
 
@@ -106,14 +148,34 @@ let appsRequestId = 0
 
 const busyKey = ref('')
 
-const modeOptions = computed(() => {
+const driverOptions = computed(() => {
   const e = t.value.controllersHub.emulation
   return [
-    { value: 'auto', label: e.familyAuto, hint: e.familyAutoHint },
-    { value: 'x360', label: e.xbox360, hint: e.xbox360Hint },
-    { value: 'ds4', label: 'DualShock 4', hint: e.ds4ModeHint },
-    { value: 'ds5', label: e.ds5Variant, hint: e.ds5ModeHint },
+    { value: 'vigembus', label: e.backendVigem },
+    { value: 'virtualhid', label: e.backendVirtualHid },
+    { value: 'all', label: e.backendAll },
   ]
+})
+
+const profileCopy = computed(() => {
+  const e = t.value.controllersHub.emulation
+  return {
+    auto: { label: e.familyAuto, hint: e.familyAutoHint },
+    generic: { label: e.genericController, hint: e.genericControllerHint },
+    x360: { label: e.xbox360, hint: e.xbox360Hint },
+    xone: { label: e.xboxOne, hint: e.xboxOneHint },
+    xseries: { label: e.xboxSeries, hint: e.xboxSeriesHint },
+    ds4: { label: 'DualShock 4', hint: e.ds4ModeHint },
+    ds5: { label: e.ds5Variant, hint: e.ds5ModeHint },
+    switch: { label: e.switchPro, hint: e.switchProHint },
+  }
+})
+
+const modeOptions = computed(() => {
+  return availableGamepadProfiles(config.value.gamepad_driver).map((value) => ({
+    value,
+    ...profileCopy.value[value],
+  }))
 })
 
 const selectedMode = computed({
@@ -125,10 +187,10 @@ const appModeOptions = computed(() => {
   const e = t.value.controllersHub.emulation
   return [
     { value: '', label: e.followGlobal },
-    { value: 'auto', label: e.familyAuto },
-    { value: 'x360', label: e.xbox360 },
-    { value: 'ds4', label: 'DualShock 4' },
-    { value: 'ds5', label: e.ds5Variant },
+    ...availableGamepadProfiles(config.value.gamepad_driver).map((value) => ({
+      value,
+      label: profileCopy.value[value].label,
+    })),
   ]
 })
 
@@ -143,7 +205,7 @@ async function loadConfig() {
   try {
     const result = await controllerHub.getConfig()
     if (result?.success) {
-      config.value.gamepad = result.data.gamepad
+      Object.assign(config.value, result.data)
     } else {
       unreachable.value = true
     }
@@ -154,25 +216,37 @@ async function loadConfig() {
   }
 }
 
-async function saveKey(key, value) {
-  if (busyKey.value !== '' || config.value[key] === value) return
-  const prev = config.value[key]
-  config.value[key] = value
-  busyKey.value = key
+async function savePatch(patch, successMessage) {
+  const keys = Object.keys(patch)
+  if (busyKey.value !== '' || keys.every((key) => config.value[key] === patch[key])) return
+  const previous = Object.fromEntries(keys.map((key) => [key, config.value[key]]))
+  Object.assign(config.value, patch)
+  busyKey.value = keys.join(',')
   try {
-    const result = await controllerHub.saveConfig({ [key]: value })
+    const result = await controllerHub.saveConfig(patch)
     if (result?.success) {
-      ElMessage.success(t.value.controllersHub.emulation.saveSuccess)
+      ElMessage.success(successMessage)
     } else {
-      config.value[key] = prev
+      Object.assign(config.value, previous)
       ElMessage.error(result?.message || t.value.controllersHub.emulation.saveFailed)
     }
   } catch (error) {
-    config.value[key] = prev
+    Object.assign(config.value, previous)
     ElMessage.error(String(error))
   } finally {
     busyKey.value = ''
   }
+}
+
+function saveKey(key, value, successMessage = t.value.controllersHub.emulation.saveSuccess) {
+  return savePatch({ [key]: value }, successMessage)
+}
+
+function saveDriver(driver) {
+  const nextMode = reconcileGamepadProfile(config.value.gamepad, driver)
+  const patch = { gamepad_driver: driver }
+  if (nextMode !== config.value.gamepad) patch.gamepad = nextMode
+  return savePatch(patch, t.value.controllersHub.emulation.backendSaveSuccess)
 }
 
 async function loadApps() {
