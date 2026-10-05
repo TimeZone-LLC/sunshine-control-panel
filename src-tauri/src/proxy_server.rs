@@ -1111,7 +1111,7 @@ async fn build_filtered_proxy_response(response: reqwest::Response) -> Response 
     builder.body(body).unwrap_or_else(|_| {
         (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            "构建响应失败",
+            "Failed to build proxy response",
         )
             .into_response()
     })
