@@ -8,9 +8,9 @@ mod clipboard;
 mod commands;
 mod controller_hub;
 mod controller_input;
-mod device_config;
 mod controllermeta;
 mod desktop_settings;
+mod device_config;
 mod dualsense;
 #[cfg(target_os = "windows")]
 mod elevation;
@@ -175,7 +175,7 @@ fn main() {
             // 初始化日志系统（需要在 setup 中获取 app handle）
             logger::init_logger(app.handle().clone());
             client_fingerprint_rules::start();
-            info!("🚀 Sunshine Control Panel 启动中...");
+            info!("Starting Sunshine Control Panel");
 
             app::setup_application(app)
         })
@@ -280,7 +280,6 @@ fn main() {
             usbip::usbip_detach,
             fs_utils::get_icc_file_list,
             fs_utils::read_directory,
-            fs_utils::read_image_as_data_url,
             fs_utils::copy_image_to_assets,
             fs_utils::cleanup_unused_covers,
             fs_utils::resolve_lnk_target,

@@ -78,10 +78,6 @@
       document.documentElement.setAttribute('data-bs-theme', theme)
       localStorage.setItem('theme', theme)
     },
-    'set-background': ({ dataUrl, filePath }) => {
-      document.body.style.backgroundImage = `url("${dataUrl}")`
-      filePath && localStorage.setItem('WEBUI-BGSRC-PATH', filePath)
-    },
   }
 
   // 消息监听器

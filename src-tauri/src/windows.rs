@@ -226,7 +226,7 @@ const WEBVIEW_VISIBILITY_INIT_SCRIPT: &str = r#"
         var wasHidden = _hidden;
         _hidden = !visible;
         if (wasHidden !== _hidden) {
-            console.log('[WebView Visibility] ' + (_hidden ? '进入休眠' : '恢复活跃'));
+            console.log('[WebView Visibility] ' + (_hidden ? 'suspended' : 'active'));
             if (_hidden) {
                 pauseAnimations();
             } else {
@@ -275,8 +275,8 @@ pub fn disable_context_menu<R: Runtime>(window: &WebviewWindow<R>) {
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         match window_clone.eval(DISABLE_CONTEXT_MENU_SCRIPT) {
-            Ok(_) => debug!("✅ 已禁用右键菜单（生产环境）"),
-            Err(e) => debug!("⚠️ 禁用右键菜单脚本注入失败: {}", e),
+            Ok(_) => debug!("Disabled the context menu in the production build"),
+            Err(e) => debug!("Failed to inject the context-menu suppression script: {}", e),
         }
     });
 }
@@ -439,8 +439,8 @@ fn reload_webview_via_com<R: Runtime>(window: &WebviewWindow<R>) {
         unsafe {
             if let Ok(core_webview) = controller.CoreWebView2() {
                 match core_webview.Reload() {
-                    Ok(_) => log::info!("🔄 WebView 渲染进程恢复：已触发重新加载 [{}]", label),
-                    Err(e) => log::warn!("⚠️ WebView 重新加载失败 [{}]: {:?}", label, e),
+                    Ok(_) => log::info!("Triggered a reload to recover the WebView renderer [{}]", label),
+                    Err(e) => log::warn!("Failed to reload the WebView [{}]: {:?}", label, e),
                 }
             }
         }
@@ -465,7 +465,7 @@ fn check_and_recover_webview<R: Runtime>(window: &WebviewWindow<R>) {
 
     if is_stale {
         warn!(
-            "💀 WebView 心跳超时 [{}]，渲染进程可能已崩溃，尝试恢复...",
+            "WebView heartbeat timed out [{}]; attempting renderer recovery",
             label
         );
         reload_webview_via_com(window);
@@ -550,22 +550,22 @@ fn force_activate_window_win32<R: Runtime>(window: &WebviewWindow<R>) {
         Ok(handle) => match handle.as_raw() {
             RawWindowHandle::Win32(win32_handle) => HWND(win32_handle.hwnd.get() as *mut _),
             _ => {
-                error!("❌ 无法获取 Win32 窗口句柄：不是 Win32 窗口");
+                error!("Could not get a Win32 window handle: this is not a Win32 window");
                 return;
             }
         },
         Err(e) => {
-            error!("❌ 获取窗口句柄失败: {:?}", e);
+            error!("Failed to get the window handle: {:?}", e);
             return;
         }
     };
 
     if hwnd.0.is_null() {
-        error!("❌ 窗口句柄为空");
+        error!("The window handle is null");
         return;
     }
 
-    debug!("✅ 获取到窗口句柄: {:?}", hwnd);
+    debug!("Obtained the window handle: {:?}", hwnd);
 
     unsafe {
         // 获取目标窗口的线程ID用于诊断
@@ -573,7 +573,7 @@ fn force_activate_window_win32<R: Runtime>(window: &WebviewWindow<R>) {
         let target_tid = GetWindowThreadProcessId(hwnd, Some(&mut target_pid));
         let current_tid = GetCurrentThreadId();
         debug!(
-            "📊 当前线程: {}, 目标线程: {}, 目标进程: {}",
+            "Current thread: {}, target thread: {}, target process: {}",
             current_tid, target_tid, target_pid
         );
 
@@ -589,17 +589,16 @@ fn force_activate_window_win32<R: Runtime>(window: &WebviewWindow<R>) {
         let result = SetForegroundWindow(hwnd);
 
         if result.as_bool() {
-            debug!("✅ 已使用 Windows API 强制激活窗口");
+            debug!("Activated the window with the Windows API");
         } else {
-            warn!("⚠️ SetForegroundWindow 返回 FALSE，窗口可能未能激活到前台");
+            warn!("SetForegroundWindow returned FALSE; the window may not be in the foreground");
         }
     }
 }
 
-/// 为窗口设置 DWM 圆角（仅 Windows 11+ 生效）
-/// 让系统在 DWM 层面裁剪窗口圆角，无需 WebView2 透明合成，大幅降低 GPU 开销
+/// Keep native windows square on Windows 11 without transparent WebView composition.
 #[cfg(target_os = "windows")]
-fn apply_dwm_rounded_corners<R: Runtime>(window: &WebviewWindow<R>) {
+fn apply_dwm_square_corners<R: Runtime>(window: &WebviewWindow<R>) {
     use raw_window_handle::{HasWindowHandle, RawWindowHandle};
     use windows::Win32::Foundation::HWND;
     use windows::Win32::Graphics::Dwm::DwmSetWindowAttribute;
@@ -613,9 +612,8 @@ fn apply_dwm_rounded_corners<R: Runtime>(window: &WebviewWindow<R>) {
     };
 
     unsafe {
-        // DWMWA_WINDOW_CORNER_PREFERENCE = 33
-        // DWMWCP_ROUND = 2  (标准圆角，约 8px)
-        let preference: u32 = 2;
+        // DWMWA_WINDOW_CORNER_PREFERENCE = 33; DWMWCP_DONOTROUND = 1.
+        let preference: u32 = 1;
         let attr = windows::Win32::Graphics::Dwm::DWMWINDOWATTRIBUTE(33i32);
         match DwmSetWindowAttribute(
             hwnd,
@@ -623,8 +621,8 @@ fn apply_dwm_rounded_corners<R: Runtime>(window: &WebviewWindow<R>) {
             &preference as *const u32 as *const std::ffi::c_void,
             std::mem::size_of::<u32>() as u32,
         ) {
-            Ok(_) => debug!("✅ 已设置 DWM 圆角 (DWMWCP_ROUND)"),
-            Err(e) => debug!("⚠️ DWM 圆角设置失败（Windows 10 不支持）: {:?}", e),
+            Ok(_) => debug!("Applied square DWM corners"),
+            Err(e) => debug!("Could not apply square DWM corners: {:?}", e),
         }
     }
 }
@@ -659,7 +657,7 @@ pub fn open_about_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
             ABOUT_WINDOW_ID,
             tauri::WebviewUrl::App("about/index.html".into()),
         )
-        .title("关于 Sunshine Control Panel")
+        .title("About Sunshine Control Panel")
         .inner_size(540.0, 620.0)
         .resizable(false)
         .maximizable(false)
@@ -673,7 +671,7 @@ pub fn open_about_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     configure_webview_security(&window);
 
     disable_context_menu(&window);
-    debug!("✅ 关于窗口已打开");
+    debug!("Opened the About window");
     Ok(())
 }
 
@@ -685,7 +683,7 @@ pub fn open_log_console<R: Runtime>(app: &AppHandle<R>) {
             LOG_CONSOLE_WINDOW_ID,
             tauri::WebviewUrl::App("console/index.html".into()),
         )
-        .title("日志控制台")
+        .title("Log console")
         .inner_size(1000.0, 700.0)
         .resizable(true)
         .maximizable(true)
@@ -698,9 +696,9 @@ pub fn open_log_console<R: Runtime>(app: &AppHandle<R>) {
             #[cfg(target_os = "windows")]
             configure_webview_security(&window);
             disable_context_menu(&window);
-            debug!("✅ 日志控制台窗口已打开");
+            debug!("Opened the log console window");
         }
-        Err(e) => error!("❌ {}", e),
+        Err(e) => error!("{}", e),
     }
 }
 
@@ -709,7 +707,7 @@ pub fn open_pin_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std
         let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
-        debug!("✅ PIN 窗口已激活");
+        debug!("Activated the PIN window");
         crate::power::refresh_ecoqos_state(app);
         return Ok(());
     }
@@ -719,7 +717,7 @@ pub fn open_pin_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std
         PIN_WINDOW_ID,
         tauri::WebviewUrl::App("pin/index.html".into()),
     )
-    .title("PIN 配对")
+    .title("PIN pairing")
     .fullscreen(true)
     .decorations(false)
     .transparent(true)
@@ -727,7 +725,7 @@ pub fn open_pin_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std
     .skip_taskbar(true)
     .visible(false)
     .build()
-    .map_err(|e| format!("创建 PIN 窗口失败: {}", e))?;
+    .map_err(|e| format!("Failed to create the PIN window: {}", e))?;
 
     disable_context_menu(&window);
 
@@ -740,7 +738,7 @@ pub fn open_pin_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std
         let _ = window.show();
     });
 
-    debug!("✅ PIN 配对窗口创建成功");
+    debug!("Created the PIN pairing window");
     crate::power::refresh_ecoqos_state(app);
     Ok(())
 }
@@ -754,7 +752,7 @@ pub fn open_debug_page<R: Runtime>(app: &AppHandle<R>) {
             DEBUG_PAGE_WINDOW_ID,
             tauri::WebviewUrl::App("console/drag-drop-demo.html".into()),
         )
-        .title("调试页面 - 拖拽测试")
+        .title("Debug page - drag test")
         .inner_size(1200.0, 800.0)
         .resizable(true)
         .maximizable(true)
@@ -764,8 +762,8 @@ pub fn open_debug_page<R: Runtime>(app: &AppHandle<R>) {
         .center()
         .build()
     }) {
-        Ok(_) => debug!("✅ 调试页面窗口已打开"),
-        Err(e) => error!("❌ {}", e),
+        Ok(_) => debug!("Opened the debug page window"),
+        Err(e) => error!("{}", e),
     }
 }
 
@@ -789,12 +787,12 @@ fn create_main_window_internal<R: Runtime>(
 ) -> Result<(), Box<dyn std::error::Error>> {
     proxy_server::ensure_started();
     if app.get_webview_window(MAIN_WINDOW_ID).is_some() {
-        debug!("主窗口已存在，跳过创建");
+        debug!("The main window already exists; skipping creation");
         return Ok(());
     }
 
-    let visibility_desc = if visible { "" } else { "隐藏的" };
-    info!("🪟 创建{}主窗口...", visibility_desc);
+    let visibility_desc = if visible { "visible" } else { "hidden" };
+    info!("Creating the {visibility_desc} main window");
 
     crate::tray::mark_main_panel_loading();
     begin_webview_heartbeat(MAIN_WINDOW_ID);
@@ -808,9 +806,14 @@ fn create_main_window_internal<R: Runtime>(
     .inner_size(1280.0, 800.0)
     .min_inner_size(1024.0, 600.0)
     .center()
-    .decorations(false)
-    // DWM clips the native window to rounded corners. Keeping WebView2
-    // opaque avoids stale transparent composition surfaces after restore.
+    // Native Windows title bar. The custom chrome this replaces needed a
+    // full-width `data-tauri-drag-region` strip across the top of the shell,
+    // which sat above the embedded web UI and swallowed clicks on its
+    // navigation links. The OS title bar also gives us correct snap, shake,
+    // double-click-to-maximise and system-menu behaviour for free.
+    .decorations(true)
+    // Keep WebView2 opaque to avoid stale transparent composition surfaces
+    // after restore.
     .transparent(false)
     .shadow(false)
     .visible(false)
@@ -830,19 +833,19 @@ fn create_main_window_internal<R: Runtime>(
     .build()
     .map_err(|e| {
         end_webview_heartbeat(MAIN_WINDOW_ID);
-        format!("创建{}主窗口失败: {}", visibility_desc, e)
+        format!("Failed to create the {visibility_desc} main window: {e}")
     })?;
 
-    // 设置 DWM 圆角，让系统级合成器裁剪窗口圆角
+    // Force square DWM corners to match the panel's visual language.
     #[cfg(target_os = "windows")]
-    apply_dwm_rounded_corners(&window);
+    apply_dwm_square_corners(&window);
 
     // 禁用自动填充和密码保存提示
     #[cfg(target_os = "windows")]
     configure_webview_security(&window);
 
     disable_context_menu(&window);
-    info!("✅ {}主窗口创建成功", visibility_desc);
+    info!("Created the {visibility_desc} main window");
     crate::power::refresh_ecoqos_state(app);
     Ok(())
 }
@@ -864,7 +867,7 @@ fn create_desktop_window_internal<R: Runtime>(
     app: &AppHandle<R>,
     visible: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    info!("🖥️ 创建桌面 UI 窗口...");
+    info!("Creating the desktop UI window");
 
     begin_webview_heartbeat(DESKTOP_WINDOW_ID);
 
@@ -887,18 +890,18 @@ fn create_desktop_window_internal<R: Runtime>(
     .build()
     .map_err(|e| {
         end_webview_heartbeat(DESKTOP_WINDOW_ID);
-        format!("创建桌面窗口失败: {}", e)
+        format!("Failed to create the desktop window: {e}")
     })?;
 
     #[cfg(target_os = "windows")]
-    apply_dwm_rounded_corners(&window);
+    apply_dwm_square_corners(&window);
 
     // 禁用自动填充和密码保存提示
     #[cfg(target_os = "windows")]
     configure_webview_security(&window);
 
     disable_context_menu(&window);
-    info!("✅ 桌面 UI 窗口创建成功");
+    info!("Created the desktop UI window");
     crate::power::refresh_ecoqos_state(app);
     Ok(())
 }
@@ -909,7 +912,7 @@ pub fn open_desktop_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String>
         let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
-        debug!("✅ 桌面 UI 窗口已激活");
+        debug!("Activated the desktop UI window");
         crate::power::refresh_ecoqos_state(app);
     } else {
         create_desktop_window(app).map_err(|e| e.to_string())?;
@@ -920,14 +923,14 @@ pub fn open_desktop_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String>
 /// 激活主窗口
 pub fn activate_main_window(app: &tauri::AppHandle, target_url: Option<String>) {
     debug!(
-        "📱 activate_main_window 被调用，target_url: {:?}",
+        "activate_main_window called with target_url: {:?}",
         target_url
     );
 
     let created = if app.get_webview_window(MAIN_WINDOW_ID).is_none() {
-        info!("主窗口尚未创建，正在从用户会话 agent 按需创建");
+        info!("The main window does not exist; creating it from the user-session agent");
         if let Err(e) = create_main_window(app) {
-            error!("❌ 按需创建主窗口失败: {}", e);
+            error!("Failed to create the main window on demand: {}", e);
             return;
         }
         true
@@ -942,11 +945,11 @@ pub fn activate_main_window(app: &tauri::AppHandle, target_url: Option<String>) 
     }
 
     let Some(window) = app.get_webview_window(MAIN_WINDOW_ID) else {
-        error!("❌ 主窗口创建后仍不可用");
+        error!("The main window is still unavailable after creation");
         return;
     };
 
-    debug!("📱 正在激活主窗口...");
+    debug!("Activating the main window");
 
     let is_visible = window.is_visible().unwrap_or(false);
     let is_minimized = window.is_minimized().unwrap_or(false);
@@ -985,15 +988,15 @@ pub fn activate_main_window(app: &tauri::AppHandle, target_url: Option<String>) 
         let _ = window_clone.set_always_on_top(false);
     });
 
-    debug!("✅ 窗口激活完成");
+    debug!("Window activation completed");
 }
 
 /// 导航到指定 URL
 fn navigate_to_url(window: &WebviewWindow, url: &str) {
-    debug!("🔄 正在导航到: {}", url);
+    debug!("Navigating to: {}", url);
 
     let Ok(parsed_url) = url::Url::parse(url) else {
-        error!("❌ URL 解析失败: {}", url);
+        error!("Failed to parse URL: {}", url);
         return;
     };
 
@@ -1007,7 +1010,7 @@ fn navigate_to_url(window: &WebviewWindow, url: &str) {
     );
 
     if path.contains("/pin") {
-        debug!("🔐 检测到 /pin 路径，跳过导航");
+        debug!("Skipping navigation for the /pin path");
         return;
     }
 
@@ -1018,7 +1021,7 @@ fn navigate_to_url(window: &WebviewWindow, url: &str) {
     );
 
     let _ = window.eval(&script);
-    debug!("✅ 已发送导航命令");
+    debug!("Sent the navigation command");
 }
 
 /// 配置 WebView2 安全设置（禁用浏览器自动填充和密码自动保存）
@@ -1037,11 +1040,11 @@ pub(crate) fn configure_webview_security<R: Runtime>(window: &WebviewWindow<R>) 
         let controller = webview.controller();
         unsafe {
             let Ok(core_webview) = controller.CoreWebView2() else {
-                log::warn!("⚠️ 无法获取 ICoreWebView2 [{}]", label);
+                log::warn!("Could not get ICoreWebView2 [{}]", label);
                 return;
             };
             let Ok(settings) = core_webview.Settings() else {
-                log::warn!("⚠️ 无法获取 ICoreWebView2Settings [{}]", label);
+                log::warn!("Could not get ICoreWebView2Settings [{}]", label);
                 return;
             };
 
@@ -1052,11 +1055,11 @@ pub(crate) fn configure_webview_security<R: Runtime>(window: &WebviewWindow<R>) 
                     let _ = settings4.SetIsGeneralAutofillEnabled(false);
                     // 禁用密码自动保存提示
                     let _ = settings4.SetIsPasswordAutosaveEnabled(false);
-                    log::debug!("🔒 已禁用 WebView2 自动填充和密码保存 [{}]", label);
+                    log::debug!("Disabled WebView2 autofill and password saving [{}]", label);
                 }
                 Err(e) => {
                     log::warn!(
-                        "⚠️ 无法获取 ICoreWebView2Settings4（WebView2 版本可能过旧）[{}]: {:?}",
+                        "Could not get ICoreWebView2Settings4; WebView2 may be outdated [{}]: {:?}",
                         label,
                         e
                     );
@@ -1222,7 +1225,7 @@ fn set_webview_window_visibility<R: Runtime>(ww: &WebviewWindow<R>, visible: boo
         visible
     );
     if let Err(e) = ww.eval(&js) {
-        debug!("⚠️ 设置 WebView 可见性失败 [{}]: {}", label, e);
+        debug!("Failed to set WebView visibility [{}]: {}", label, e);
     }
 }
 
@@ -1295,7 +1298,7 @@ pub fn handle_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
                             set_webview_window_visibility(&ww, false);
                             suspend_webview(&ww);
                             debug!(
-                                "💤 WebView 进入休眠 [{}]: minimized={}, visible={}",
+                                "WebView entered suspension [{}]: minimized={}, visible={}",
                                 label, is_minimized, is_visible
                             );
                         }

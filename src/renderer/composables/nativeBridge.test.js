@@ -9,6 +9,8 @@ import {
 test('native bridge recognizes only allowlisted control-panel requests', () => {
   assert.equal(isNativeControlPanelMessage({ type: 'native-rtx-hdr-open-request' }), true)
   assert.equal(isNativeControlPanelMessage({ type: 'native-rtx-hdr-context-request' }), true)
+  assert.equal(isNativeControlPanelMessage({ type: 'native-updater-context-request' }), false)
+  assert.equal(isNativeControlPanelMessage({ type: 'native-update-request' }), false)
   assert.equal(isNativeControlPanelMessage({ type: 'open-control-panel-page', target: 'anything' }), false)
   assert.equal(isNativeControlPanelMessage({ type: 'native-rtx-hdr-delete-request' }), false)
 })

@@ -38,7 +38,7 @@ const getToolType = () => {
   return params.get('tool') || 'dpi'
 }
 
-// ESC 键关闭
+// Close on Escape
 const handleKeyDown = (e) => {
   if (e.key === 'Escape') {
     closeWindow()
@@ -54,7 +54,7 @@ const handleOverlayClick = () => {
 onMounted(async () => {
   toolType.value = getToolType()
 
-  // 添加键盘事件监听
+  // Listen for keyboard events
   window.addEventListener('keydown', handleKeyDown)
 
   try {
@@ -77,35 +77,35 @@ onMounted(async () => {
       case 'performance':
         currentTool.value = defineAsyncComponent(() => import('./tools/HostPerformanceTool.vue'))
         break
-      case 'pet':
-        currentTool.value = defineAsyncComponent(() => import('./tools/PetSettingsTool.vue'))
+      case 'toolbar_settings':
+        currentTool.value = defineAsyncComponent(() => import('./tools/ToolbarSettingsTool.vue'))
         break
       default:
-        console.error('未知的工具类型:', toolType.value)
+        console.error('Unknown tool type:', toolType.value)
     }
   } catch (error) {
-    console.error('加载工具失败:', error)
+    console.error('Failed to load the tool:', error)
   }
 })
 
-// 清理事件监听
+// Clean up the listener
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyDown)
 })
 </script>
 
-<style scoped>
+<style lang="less" scoped>
+@import "@/components/spinner.less";
+
 .tool-window-overlay {
   width: 100vw;
   height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(10px);
+  background: var(--scrim);
   overflow: hidden;
   cursor: pointer;
-  animation: overlayIn 0.2s ease;
 }
 
 .tool-window-overlay.monitor-overlay {
@@ -114,7 +114,6 @@ onUnmounted(() => {
   padding: 0;
   box-sizing: border-box;
   background: transparent;
-  backdrop-filter: none;
   cursor: default;
 }
 
@@ -123,69 +122,38 @@ onUnmounted(() => {
   max-width: none;
   max-height: none;
   background: transparent;
-  border-radius: 0;
-  box-shadow: none;
+  border: 0;
   overflow: visible;
-  animation: none;
 }
 
-@keyframes overlayIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
+/* A solid panel with a hairline border: the tool has to stay legible on top
+   of game content, and a border is the only elevation the system allows. */
 .tool-panel {
   max-width: 96vw;
   max-height: 96vh;
-  background: linear-gradient(135deg, #2b7fd9 0%, #5a9fe6 100%);
-  border-radius: 20px;
-  box-shadow: 0 20px 60px rgba(43, 127, 217, 0.5);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-strong);
   overflow: hidden;
   cursor: default;
-  animation: panelIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-@keyframes panelIn {
-  0% {
-    opacity: 0;
-    transform: scale(0.8) translateY(30px);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
 }
 
 .loading-state {
-  padding: 60px;
+  padding: 32px;
   text-align: center;
-  color: white;
-  width: 420px;
+  color: var(--text);
+  width: 320px;
 }
 
 .spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid rgba(255, 255, 255, 0.3);
-  border-top-color: white;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 20px;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+  .gloss-spinner();
+  display: block;
+  margin: 0 auto;
 }
 
 .loading-state p {
-  margin-top: 16px;
-  font-size: 16px;
-  opacity: 0.9;
+  margin-top: 10px;
+  font-size: var(--font-size);
+  font-weight: 400;
+  color: var(--text-dim);
 }
 </style>

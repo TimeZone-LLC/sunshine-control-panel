@@ -6,22 +6,23 @@
     @webui-navigate="handleWebuiNavigate"
   >
     <div class="iframe-container">
-      <transition name="fade-loading">
-        <div v-if="loading" class="loading-overlay">
-          <div class="loading-container">
-            <img src="../public/gura-pix.png" class="loading-image" alt="Loading" />
-            <div class="loading-text">
-              <template v-if="proxyHealthFailed">
-                <p class="proxy-health-error">{{ t.sunshineFrame.proxyUnavailable }}</p>
-                <button class="proxy-health-retry" type="button" @click="retryProxyHealthCheck">
-                  {{ t.sunshineFrame.retry }}
-                </button>
-              </template>
-              <p v-else>{{ t.sunshineFrame.preparing.replace('{path}', currentPath) }}</p>
-            </div>
+      <div v-if="loading" class="loading-overlay">
+        <div class="loading-container">
+          <svg class="loading-spinner" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+            <circle class="loading-spinner-track" cx="8" cy="8" r="7.5" />
+            <path class="loading-spinner-head" d="M8 .5A7.5 7.5 0 0 1 15.5 8" />
+          </svg>
+          <div class="loading-text" role="status" aria-live="polite">
+            <template v-if="proxyHealthFailed">
+              <p class="proxy-health-error">{{ t.sunshineFrame.proxyUnavailable }}</p>
+              <button class="proxy-health-retry" type="button" @click="retryProxyHealthCheck">
+                {{ t.sunshineFrame.retry }}
+              </button>
+            </template>
+            <p v-else>{{ t.sunshineFrame.preparing.replace('{path}', currentPath) }}</p>
           </div>
         </div>
-      </transition>
+      </div>
 
       <iframe
         ref="sunshineIframe"
@@ -61,17 +62,15 @@ const proxyHealthFailed = ref(false)
 // State
 let pollTimer = null
 let unlistenVddSettings = null
-let unlistenDragDrop = null
 let messageHandler = null
 let visibilityHandlerRef = null
-let proxyBase = '' // 代理服务器基础 URL，用于恢复 iframe 到正确页面
+let proxyBase = '' // Proxy base URL, used to restore the iframe to the right page.
 let loadedFrameRevealTimer = null
 let awaitingAppReady = true
 let localProxyVerified = false
 let requestedWebuiPath = ''
 
 // Constants
-const ALLOWED_IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp']
 const POLL_INTERVAL = 3000
 const LOADED_FRAME_REVEAL_DELAY = 300
 
@@ -111,11 +110,6 @@ const extractPathFromUrl = (url) => {
   } catch {
     return '/'
   }
-}
-
-const isImageFile = (path) => {
-  const ext = path.toLowerCase().slice(path.lastIndexOf('.'))
-  return ALLOWED_IMAGE_EXTENSIONS.includes(ext)
 }
 
 const setAnimationsPaused = (paused) => {
@@ -161,7 +155,7 @@ const handleNavigateFrame = (event) => {
   if (!url) return
 
   if (isWelcomePath(url)) {
-    console.log('🔄 拦截 welcome 页面加载，打开 Vue welcome 组件')
+    console.log('Intercepted the welcome page load; opening the Vue welcome component')
     openWelcome()
     return
   }
@@ -170,9 +164,10 @@ const handleNavigateFrame = (event) => {
   sunshineUrl.value = url
 }
 
-// 路由切换：离开 HOME 时休眠 iframe，返回时恢复
+// Route changes: suspend the iframe when leaving HOME, resume on return.
 let savedIframeUrl = ''
-// 窗口隐藏/最小化时的 iframe URL 保存（与 tab 切换分开追踪）
+// iframe URL saved when the window is hidden or minimised, tracked separately
+// from tab switches.
 let windowSuspendedUrl = ''
 
 const handleWebuiNavigate = (path) => {
@@ -196,43 +191,19 @@ const handleRouteChange = ({ from, to }) => {
       clearInterval(pollTimer)
       pollTimer = null
     }
-    console.log('[SunshineFrame] iframe 休眠: 已导航到 about:blank')
+    console.log('[SunshineFrame] iframe suspended: navigated to about:blank')
   } else if (from !== 'home' && to === 'home') {
     // Resume the last page unless an explicit sidebar destination was requested.
     if (savedIframeUrl && savedIframeUrl !== 'about:blank') {
       sunshineUrl.value = savedIframeUrl
       savedIframeUrl = ''
-      console.log('[SunshineFrame] iframe 唤醒: 恢复 URL')
+      console.log('[SunshineFrame] iframe resumed: URL restored')
     }
-    // 重启窗口状态轮询
+    // Restart the window state polling.
     if (!pollTimer && checkWindowStateFn) {
       pollTimer = setInterval(checkWindowStateFn, POLL_INTERVAL)
     }
   }
-}
-
-// Background image handling
-const loadAndSetBackground = async (imagePath) => {
-  try {
-    const { invoke } = await import('@tauri-apps/api/core')
-    const dataUrl = await invoke('read_image_as_data_url', { path: imagePath })
-
-    sunshineIframe.value?.contentWindow?.postMessage(
-      {
-        type: 'set-background',
-        dataUrl,
-        filePath: imagePath,
-      },
-      '*'
-    )
-  } catch (error) {
-    console.error('❌ 读取背景图片失败:', error)
-  }
-}
-
-const handleTauriFileDrop = async (paths) => {
-  const imagePath = paths?.find(isImageFile)
-  if (imagePath) await loadAndSetBackground(imagePath)
 }
 
 // Message handling
@@ -271,7 +242,7 @@ const createMessageHandler = () => {
     'navigation-start': (data) => {
       if (data.path) {
         if (isWelcomePath(data.path) || data.path.toLowerCase().includes('welcome')) {
-          console.log('🔄 拦截导航到 welcome 页面，打开 Vue welcome 组件')
+          console.log('Intercepted navigation to the welcome page; opening the Vue welcome component')
           openWelcome()
           return
         }
@@ -280,9 +251,8 @@ const createMessageHandler = () => {
       beginLoading()
     },
     'webui-ready': finishLoading,
-    'restore-background': (data) => loadAndSetBackground(data.path),
     'show-message': (data) => {
-      // 处理来自 Web UI 的消息显示请求
+      // Handle message-display requests coming from the Web UI.
       if (data.source === 'sunshine-webui' && data.message) {
         const messageType = data.messageType || 'info'
         switch (messageType) {
@@ -299,34 +269,6 @@ const createMessageHandler = () => {
             ElMessage.info(data.message)
         }
       }
-    },
-    'native-updater-context-request': (_data, event) => {
-      replyToSunshine(event, {
-        type: 'native-updater-context',
-        source: 'sunshine-control-panel',
-        available: true,
-      })
-    },
-    'native-update-request': async (data, event) => {
-      const requestId = typeof data.requestId === 'string' ? data.requestId : ''
-      if (data.channel !== 'stable' && data.channel !== 'prerelease') {
-        replyToSunshine(event, {
-          type: 'native-update-result',
-          source: 'sunshine-control-panel',
-          requestId,
-          ok: false,
-          error: 'Unsupported update channel',
-        })
-        return
-      }
-
-      const opened = await sidebarMenuRef.value?.checkForUpdates?.(data.channel)
-      replyToSunshine(event, {
-        type: 'native-update-result',
-        source: 'sunshine-control-panel',
-        requestId,
-        ok: opened === true,
-      })
     },
     'native-rtx-hdr-context-request': (_data, event) => {
       replyToSunshine(event, {
@@ -349,14 +291,14 @@ const createMessageHandler = () => {
 
   return async (event) => {
     const { data } = event
+    if (!isTrustedSunshineEvent(event)) return
     if (
       isNativeControlPanelMessage(data)
-      && !isTrustedNativeControlPanelMessage(data, isTrustedSunshineEvent(event))
+      && !isTrustedNativeControlPanelMessage(data, true)
     ) {
       return
     }
     if (data?.type && handlers[data.type]) {
-      if (['path-update', 'navigation-start', 'webui-ready'].includes(data.type) && !isTrustedSunshineEvent(event)) return
       await handlers[data.type](data, event)
     }
   }
@@ -381,7 +323,7 @@ const setupWindowStateMonitor = async (currentWindow) => {
         setAnimationsPaused(isMinimized || !isVisible)
       }
     } catch (e) {
-      console.warn('⚠️ 检测窗口状态失败:', e)
+      console.warn('Failed to detect the window state:', e)
     }
   }
 
@@ -394,22 +336,24 @@ const setupWindowStateMonitor = async (currentWindow) => {
     setAnimationsPaused(hidden)
 
     if (hidden) {
-      // 窗口被最小化/隐藏 → 休眠 iframe（仅当 iframe 有实际内容时）
+      // Window minimised or hidden: suspend the iframe, but only when it has content.
       if (sunshineUrl.value && sunshineUrl.value !== 'about:blank') {
-        // 保存当前实际页面路径（而非初始 URL），恢复时能回到用户所在的页面
+        // Save the page the user is actually on, not the initial URL, so the
+        // restore lands in the right place.
         windowSuspendedUrl = proxyBase ? proxyBase + currentPath.value : sunshineUrl.value
         // Prepare the shell while the native window is still hidden so the
         // about:blank iframe is never exposed during the next activation.
         beginLoading()
         sunshineUrl.value = 'about:blank'
-        console.log('[SunshineFrame] 窗口隐藏 → iframe 休眠, saved:', windowSuspendedUrl)
+        console.log('[SunshineFrame] window hidden, iframe suspended, saved:', windowSuspendedUrl)
       }
       if (pollTimer) {
         clearInterval(pollTimer)
         pollTimer = null
       }
     } else {
-      // 窗口恢复 → 唤醒 iframe（仅当是窗口隐藏导致的休眠时恢复）
+      // Window restored: resume the iframe, but only if the window hiding is
+      // what suspended it.
       if (windowSuspendedUrl) {
         beginLoading()
         try {
@@ -425,7 +369,7 @@ const setupWindowStateMonitor = async (currentWindow) => {
         const resumeUrl = windowSuspendedUrl
         windowSuspendedUrl = ''
         sunshineUrl.value = resumeUrl
-        console.log('[SunshineFrame] 窗口恢复 → iframe 唤醒')
+        console.log('[SunshineFrame] window restored, iframe resumed')
       }
       if (!pollTimer && checkWindowStateFn) {
         pollTimer = setInterval(checkWindowStateFn, POLL_INTERVAL)
@@ -438,11 +382,12 @@ const setupWindowStateMonitor = async (currentWindow) => {
   return visibilityHandler
 }
 
-// 语言切换时刷新 iframe 以应用新 locale
+// Reload the iframe when the locale changes so the new language applies.
 const handleLocaleChanged = () => {
   if (sunshineUrl.value && sunshineUrl.value !== 'about:blank') {
     beginLoading()
-    // 记住当前页面路径，通过 about:blank 中转刷新（避免跨域限制）
+    // Remember the current path and reload through about:blank, which avoids
+    // the cross-origin restriction.
     const targetUrl = proxyBase ? proxyBase + currentPath.value : sunshineUrl.value
     sunshineUrl.value = 'about:blank'
     setTimeout(() => { sunshineUrl.value = targetUrl }, 50)
@@ -458,7 +403,6 @@ onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer)
   clearLoadedFrameReveal()
   unlistenVddSettings?.()
-  unlistenDragDrop?.()
 })
 
 onMounted(async () => {
@@ -489,7 +433,7 @@ onMounted(async () => {
       const fullUrl = proxyBaseUrl + targetPath
 
       if (isWelcomePath(fullUrl)) {
-        console.log('🔄 启动时检测到 welcome 页面，打开 Vue welcome 组件')
+        console.log('Welcome page detected at startup; opening the Vue welcome component')
         openWelcome()
         sunshineUrl.value = 'about:blank'
         currentPath.value = '/'
@@ -507,12 +451,6 @@ onMounted(async () => {
     const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow')
     const currentWindow = getCurrentWebviewWindow()
 
-    unlistenDragDrop = await currentWindow.onDragDropEvent((event) => {
-      if (event.payload.type === 'drop') {
-        handleTauriFileDrop(event.payload.paths)
-      }
-    })
-
     await setupWindowStateMonitor(currentWindow)
 
     unlistenVddSettings = await currentWindow.listen('open-vdd-settings', () => {
@@ -526,7 +464,7 @@ onMounted(async () => {
     await currentWindow.listen('open-welcome', openWelcome)
     await invoke('main_panel_ready')
   } catch (error) {
-    console.error('初始化失败:', error)
+    console.error('Initialisation failed:', error)
     if (!localProxyVerified) {
       proxyHealthFailed.value = true
       sunshineUrl.value = 'about:blank'
@@ -546,13 +484,13 @@ const onLoad = () => {
     const iframe = sunshineIframe.value
     const newUrl = iframe?.contentWindow?.location?.href
 
-    // 休眠导航到 about:blank 时不处理
+    // Ignore the about:blank navigation used for suspending.
     if (!newUrl || newUrl === 'about:blank') return
 
     const path = extractPathFromUrl(newUrl)
 
     if (isWelcomePath(newUrl) || path.toLowerCase().includes('welcome')) {
-      console.log('🔄 检测到 welcome 页面加载，拦截并打开 Vue welcome 组件')
+      console.log('Welcome page load detected; intercepting and opening the Vue welcome component')
       openWelcome()
       sunshineUrl.value = 'about:blank'
       currentPath.value = '/'
@@ -568,7 +506,7 @@ const onLoad = () => {
       return
     }
   } catch {
-    // 跨域时无法读取，保持当前路径
+    // Unreadable across origins; keep the current path.
   }
 
   // Prefer the WebUI ready signal, but never hold a loaded iframe behind the
@@ -578,143 +516,106 @@ const onLoad = () => {
 </script>
 
 <style scoped lang="less">
-@import '../styles/theme.less';
-
+// The embedded Web UI is already flat and square, so the frame around it adds
+// nothing: no padding, no border, no surface of its own. It is a bare viewport.
 .iframe-container {
   width: 100%;
   height: 100%;
   position: relative;
   overflow: hidden;
+  background: var(--bg);
 }
 
 .sunshine-iframe {
+  display: block;
   width: 100%;
   height: 100%;
-  border: none;
-  transition: opacity 0.3s ease;
+  border: 0;
+  background: var(--bg);
 }
 
+// A plain fill of the page ground, not a floating panel: no surface of its
+// own, no border, no elevation. It exists only to hide a half-painted iframe.
 .loading-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, @morandi-dark-bg 0%, @morandi-mid-bg 100%);
+  background: var(--bg);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 10;
-  backdrop-filter: blur(10px);
 }
 
 .loading-container {
+  max-width: 420px;
   text-align: center;
-  padding: 20px;
-  max-width: 400px;
 }
 
-.loading-image {
-  width: 60%;
-  max-width: 180px;
-  opacity: 0.85;
-  margin-bottom: 24px;
-  animation: gura 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-  position: relative;
-  left: -20%;
-  transform-style: preserve-3d;
-  filter: drop-shadow(0 4px 12px rgba(212, 165, 165, 0.3));
+// The one rotation the design system keeps: a genuine loading state. A 16px
+// hairline ring - 1px stroke, muted, with a quarter-arc head. Nothing pulses
+// and nothing is square.
+.loading-spinner {
+  display: block;
+  width: 16px;
+  height: 16px;
+  margin: 0 auto 12px;
+  color: var(--text-faint);
+  animation: brutalist-spin 0.9s linear infinite;
 }
 
-@keyframes gura {
-  0% {
-    transform: translateX(-100%) rotate(-5deg) translateY(-5px) scale(0.9);
-  }
-  40% {
-    transform: translateX(0%) rotate(0deg) translateY(2px) scale(1.1);
-  }
-  50% {
-    transform: translateX(10%) rotate(3deg) translateY(-10px) scale(0.95);
-  }
-  60% {
-    transform: translateX(20%) rotate(-3deg) translateY(5px) scale(1.05);
-  }
-  100% {
-    transform: translateX(100%) rotate(5deg) translateY(-5px) scale(0.9);
-  }
+.loading-spinner-track,
+.loading-spinner-head {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.loading-spinner-track {
+  opacity: 0.35;
+}
+
+.loading-spinner-head {
+  stroke-linecap: round;
 }
 
 .loading-text {
-  color: @morandi-yellow;
-  font-size: 18px;
-  line-height: 1.6;
-  font-family: 'PixelMplus12', 'YouYuan', cursive, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.4);
-  letter-spacing: 0.5px;
-  font-weight: 500;
-  transform: skew(-3deg);
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height);
 
   p {
-    margin: 12px 0;
-    animation: pulse 2s ease-in-out infinite;
+    margin: 6px 0;
+    overflow-wrap: anywhere;
   }
 
   .proxy-health-error {
-    animation: none;
-    color: #f2c8c8;
-    font-size: 15px;
-    transform: none;
+    color: var(--error);
   }
 }
 
 .proxy-health-retry {
-  margin-top: 12px;
-  padding: 8px 18px;
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  border-radius: 6px;
-  color: inherit;
-  background: rgba(255, 255, 255, 0.08);
+  min-height: var(--row-height);
+  margin-top: 10px;
+  padding: 0 var(--pad-x);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--font-size);
+  font-weight: 400;
   cursor: pointer;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.16);
+    background: var(--bg-hover);
+    border-color: var(--border-strong);
   }
-}
 
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-    transform: translateY(0);
+  &:focus-visible {
+    outline: 1px solid var(--border-strong);
+    outline-offset: 0;
   }
-  50% {
-    opacity: 0.7;
-    transform: translateY(-2px);
-  }
-}
-
-.fade-loading-enter-active,
-.fade-loading-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.fade-loading-enter-from,
-.fade-loading-leave-to {
-  opacity: 0;
-}
-
-:global(html[data-bs-theme='light'] .loading-overlay) {
-  background: linear-gradient(135deg, @gura-bg-light 0%, @gura-bg-mid 100%);
-}
-
-:global(html[data-bs-theme='light'] .loading-image) {
-  filter: drop-shadow(0 4px 12px rgba(74, 158, 255, 0.3));
-}
-
-:global(html[data-bs-theme='light'] .loading-text) {
-  color: @gura-blue;
-  text-shadow: 1px 1px 3px rgba(74, 158, 255, 0.2);
-}
-
-:global(html[data-bs-theme='light'] .proxy-health-error) {
-  color: #8f3434;
 }
 </style>
 

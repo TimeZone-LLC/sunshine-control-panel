@@ -1,7 +1,5 @@
 const NATIVE_MESSAGE_TYPES = new Set([
   'native-navigation-context-request',
-  'native-updater-context-request',
-  'native-update-request',
   'native-rtx-hdr-context-request',
   'native-rtx-hdr-open-request',
 ])

@@ -426,6 +426,11 @@ pub fn handle_toolbar_menu_event<R: Runtime>(app: &AppHandle<R>, event_id: &str)
                 error!("Failed to create the tool window: {}", e);
             }
         }
+        action if is_toolbar_settings_action(action) => {
+            if let Err(e) = create_tool_window_internal(app, "toolbar_settings") {
+                error!("Failed to create the toolbar settings window: {}", e);
+            }
+        }
         "close" | "toolbar_close" => {
             if let Some(window) = app.get_webview_window("toolbar") {
                 let _ = window.close();
@@ -433,6 +438,10 @@ pub fn handle_toolbar_menu_event<R: Runtime>(app: &AppHandle<R>, event_id: &str)
         }
         _ => {}
     }
+}
+
+fn is_toolbar_settings_action(action: &str) -> bool {
+    matches!(action, "toolbar_settings" | "toolbar_toolbar_settings")
 }
 
 // 内部泛型函数，用于创建工具栏窗口
@@ -554,8 +563,16 @@ pub async fn handle_toolbar_menu_action(app: AppHandle, action: String) -> Resul
 
 #[cfg(test)]
 mod tests {
-    use super::{MonitorBounds, monitor_index_for_position};
+    use super::{MonitorBounds, is_toolbar_settings_action, monitor_index_for_position};
     use tauri::{PhysicalPosition, PhysicalSize};
+
+    #[test]
+    fn routes_only_neutral_toolbar_settings_actions() {
+        assert!(is_toolbar_settings_action("toolbar_settings"));
+        assert!(is_toolbar_settings_action("toolbar_toolbar_settings"));
+        assert!(!is_toolbar_settings_action("settings"));
+        assert!(!is_toolbar_settings_action("toolbar"));
+    }
 
     #[test]
     fn selects_the_monitor_containing_a_saved_negative_position() {

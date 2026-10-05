@@ -141,53 +141,6 @@ pub async fn read_directory(path: String) -> Result<Vec<String>, String> {
     }
 }
 
-/// 读取图片文件并返回 Base64 编码的 Data URL
-#[tauri::command]
-pub async fn read_image_as_data_url(path: String) -> Result<String, String> {
-    use std::fs;
-    use std::path::Path;
-
-    // 读取文件
-    let file_bytes = fs::read(&path).map_err(|e| format!("读取文件失败: {}", e))?;
-
-    debug!(
-        "📖 读取文件成功: {}, 大小: {} bytes",
-        path,
-        file_bytes.len()
-    );
-
-    // 根据扩展名确定 MIME 类型
-    let path_obj = Path::new(&path);
-    let extension = path_obj
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_lowercase();
-
-    let mime_type = match extension.as_str() {
-        "png" => "image/png",
-        "jpg" | "jpeg" => "image/jpeg",
-        "gif" => "image/gif",
-        "webp" => "image/webp",
-        _ => "image/png", // 默认
-    };
-
-    // 转换为 Base64
-    use base64::{Engine as _, engine::general_purpose};
-    let base64 = general_purpose::STANDARD.encode(&file_bytes);
-
-    // 构造 Data URL
-    let data_url = format!("data:{};base64,{}", mime_type, base64);
-
-    debug!(
-        "✅ Data URL 生成成功, MIME: {}, Base64 长度: {}",
-        mime_type,
-        base64.len()
-    );
-
-    Ok(data_url)
-}
-
 /// 复制图片文件到 Sunshine assets 目录
 /// 返回相对于 Sunshine Web 服务器的 URL 路径（/boxart/xxx.jpg）
 #[tauri::command]
