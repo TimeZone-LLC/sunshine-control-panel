@@ -371,22 +371,6 @@ pub(super) fn build_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<M
 
     let check_update = MenuItem::with_id(app, "check_update", s.check_update, true, None::<&str>)?;
     let about = MenuItem::with_id(app, "about", s.about, true, None::<&str>)?;
-    let help_separator = PredefinedMenuItem::separator(app)?;
-    let star_project = MenuItem::with_id(app, "star_project", s.star_project, true, None::<&str>)?;
-    let visit_project_sunshine = MenuItem::with_id(
-        app,
-        "visit_project_sunshine",
-        s.visit_project_sunshine,
-        true,
-        None::<&str>,
-    )?;
-    let visit_project_moonlight = MenuItem::with_id(
-        app,
-        "visit_project_moonlight",
-        s.visit_project_moonlight,
-        true,
-        None::<&str>,
-    )?;
     let help_submenu = Submenu::with_id_and_items(
         app,
         "help",
@@ -395,10 +379,6 @@ pub(super) fn build_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<M
         &[
             &check_update,
             &about,
-            &help_separator,
-            &star_project,
-            &visit_project_sunshine,
-            &visit_project_moonlight,
         ],
     )?;
 

@@ -195,6 +195,5 @@ function playtimeLabel(appName) {
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   color: var(--text-faint);
-  text-transform: uppercase;
 }
 </style>

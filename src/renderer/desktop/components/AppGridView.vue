@@ -139,7 +139,6 @@ function playtimeLabel(appName) {
       font-size: 28px;
       font-weight: 600;
       color: var(--text-faint);
-      text-transform: uppercase;
     }
   }
 }

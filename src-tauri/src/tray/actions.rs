@@ -79,13 +79,6 @@ pub fn handle_tray_menu_event<R: Runtime + 'static>(app: &AppHandle<R>, menu_id:
         "lang_zh" => switch_tray_locale(app, "zh"),
         "lang_en" => switch_tray_locale(app, "en"),
         "lang_ja" => switch_tray_locale(app, "ja"),
-        "star_project" => utils::open_url_in_browser("https://www.alkaidlab.com/"),
-        "visit_project_sunshine" => {
-            utils::open_url_in_browser("https://github.com/AlkaidLab/foundation-sunshine")
-        }
-        "visit_project_moonlight" => {
-            utils::open_url_in_browser("https://github.com/qiin2333/moonlight-vplus")
-        }
         "restart" => restart_sunshine(app),
         _ => warn!("⚠️ 未知的托盘菜单事件: {}", menu_id),
     }

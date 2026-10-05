@@ -1,5 +1,5 @@
-﻿<!DOCTYPE html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -19,6 +19,14 @@
       })()
     </script>
     <style>
+      @font-face {
+        font-family: 'Geist';
+        src: url('../assets/fonts/Geist-Regular.woff2') format('woff2');
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+      }
+
       * {
         margin: 0;
         padding: 0;
@@ -26,15 +34,17 @@
       }
 
       :root {
-        --boot-background: linear-gradient(135deg, #2d2628 0%, #3d3235 100%);
-        --boot-foreground: #e6d5b8;
-        --boot-shadow: rgba(212, 165, 165, 0.3);
+        --boot-background: #0a0a0b;
+        --boot-foreground: #9a9aa4;
+        --boot-border: #303036;
+        --boot-accent: #ededf0;
       }
 
       :root[data-bs-theme='light'] {
-        --boot-background: linear-gradient(135deg, #f0f8ff 0%, #e6f2ff 100%);
-        --boot-foreground: #4a9eff;
-        --boot-shadow: rgba(74, 158, 255, 0.3);
+        --boot-background: #f7f7f8;
+        --boot-foreground: #5c5c66;
+        --boot-border: #cfcfd3;
+        --boot-accent: #15151a;
       }
 
       body {
@@ -55,48 +65,35 @@
         align-items: center;
         justify-content: center;
         color: var(--boot-foreground);
-        font-family: 'PixelMplus12', 'Segoe UI', sans-serif;
+        font-family: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
       }
 
-      .boot-loading img {
-        width: min(180px, 36vw);
-        opacity: 0.85;
-        filter: drop-shadow(0 4px 12px var(--boot-shadow));
-        animation: boot-gura 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+      .boot-spinner {
+        width: 28px;
+        height: 28px;
+        border: 2px solid var(--boot-border);
+        border-top-color: var(--boot-accent);
+        border-radius: 50%;
+        animation: boot-spin 0.8s linear infinite;
       }
 
       .boot-loading p {
         margin-top: 20px;
-        font-size: 18px;
+        font-size: 13px;
       }
 
-      @keyframes boot-gura {
-        0% {
-          transform: translateX(-80%) rotate(-5deg) translateY(-5px) scale(0.9);
+      @keyframes boot-spin {
+        to {
+          transform: rotate(360deg);
         }
-        45% {
-          transform: translateX(0) rotate(0deg) translateY(2px) scale(1.08);
-        }
-        55% {
-          transform: translateX(10%) rotate(3deg) translateY(-8px) scale(0.96);
-        }
-        100% {
-          transform: translateX(80%) rotate(5deg) translateY(-5px) scale(0.9);
-        }
-      }
-      
-      @font-face {
-        font-family: 'PixelMplus12';
-        src: url('./public/fonts/PixelMplus12-Bold.woff2') format('woff2');
-        font-weight: 700;
       }
     </style>
   </head>
   <body>
     <div id="app">
       <div class="boot-loading" role="status" aria-live="polite">
-        <img src="./public/gura-pix.png" alt="" />
-        <p>正在准备 Sunshine...</p>
+        <div class="boot-spinner" aria-hidden="true"></div>
+        <p>Preparing Sunshine...</p>
       </div>
     </div>
     <script type="module" src="./sunshine-frame.js"></script>

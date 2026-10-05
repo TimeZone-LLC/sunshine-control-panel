@@ -429,7 +429,7 @@ const EN_STRINGS: TrayStrings = TrayStrings {
     reset_display: "Reset Display",
     reset_display_confirm: "This resets persisted display-device state. Continue?",
     restart_user_mode: "Run Sunshine in User Mode",
-    show_toolbar: "Show Desktop Pet",
+    show_toolbar: "Show toolbar",
     prevent_sleep: "Prevent System Sleep",
     rtss_control: "RTSS Control",
     host_performance: "Host Performance",

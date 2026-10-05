@@ -128,6 +128,5 @@ defineEmits(['launch', 'contextmenu'])
   font-family: var(--font-mono);
   font-size: var(--font-size);
   color: var(--text-faint);
-  text-transform: uppercase;
 }
 </style>
