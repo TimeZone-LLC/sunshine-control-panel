@@ -32,13 +32,13 @@ if (-not $sunshineDir) {
 }
 
 if (-not $sunshineDir) {
-    Write-Host "❌ 找不到 Sunshine 安装目录" -ForegroundColor Red
+    Write-Host "Sunshine installation directory was not found." -ForegroundColor Red
     exit 1
 }
 
 $guiDir = Join-Path $sunshineDir "assets\gui"
-Write-Host "📁 Sunshine 目录: $sunshineDir" -ForegroundColor Cyan
-Write-Host "📁 GUI 目标目录: $guiDir" -ForegroundColor Cyan
+Write-Host "Sunshine directory: $sunshineDir" -ForegroundColor DarkGray
+Write-Host "GUI destination: $guiDir" -ForegroundColor DarkGray
 
 # 编译
 $projectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -52,10 +52,10 @@ if (-not (Test-Path "$projectRoot\src-tauri\Cargo.toml")) {
 }
 
 if (-not $NoBuild) {
-    Write-Host "`n🔨 编译 Sunshine GUI..." -ForegroundColor Yellow
+    Write-Host "`nBuilding the Sunshine GUI..." -ForegroundColor Gray
     & (Join-Path $projectRoot 'scripts\build-native-plugins.ps1') -Configuration $(if ($Release) { 'Release' } else { 'Debug' })
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "❌ 原生工具插件编译失败" -ForegroundColor Red
+        Write-Host "Native tool plugin build failed." -ForegroundColor Red
         exit 1
     }
     Push-Location "$projectRoot\src-tauri"
@@ -68,7 +68,7 @@ if (-not $NoBuild) {
 
     if ($LASTEXITCODE -ne 0) {
         Pop-Location
-        Write-Host "❌ 编译失败" -ForegroundColor Red
+        Write-Host "GUI build failed." -ForegroundColor Red
         exit 1
     }
     Pop-Location
@@ -90,17 +90,17 @@ foreach ($p in $exePaths) {
 }
 
 if (-not $exeSrc) {
-    Write-Host "❌ 找不到编译产物 sunshine-gui.exe" -ForegroundColor Red
+    Write-Host "Build output sunshine-gui.exe was not found." -ForegroundColor Red
     exit 1
 }
 
-Write-Host "📦 编译产物: $exeSrc" -ForegroundColor Green
+Write-Host "Build output: $exeSrc" -ForegroundColor DarkGray
 $exeSize = [math]::Round((Get-Item $exeSrc).Length / 1MB, 1)
-Write-Host "   大小: ${exeSize} MB"
+Write-Host "   Size: ${exeSize} MB"
 
 $pluginSrc = Join-Path (Split-Path $exeSrc -Parent) 'alkaidlab-plugin-stylus.dll'
 if (-not (Test-Path -LiteralPath $pluginSrc -PathType Leaf)) {
-    Write-Host "❌ 找不到原生工具插件 alkaidlab-plugin-stylus.dll" -ForegroundColor Red
+    Write-Host "Native tool plugin alkaidlab-plugin-stylus.dll was not found." -ForegroundColor Red
     exit 1
 }
 
@@ -112,12 +112,12 @@ if (-not (Test-Path $guiDir)) {
 # 先停止正在运行的 GUI
 $running = Get-Process -Name "sunshine-gui" -ErrorAction SilentlyContinue
 if ($running) {
-    Write-Host "⏹ 停止运行中的 sunshine-gui..." -ForegroundColor Yellow
+    Write-Host "Stopping the running sunshine-gui process..." -ForegroundColor Gray
     $running | Stop-Process -Force
     Start-Sleep -Seconds 1
 }
 
-Write-Host "📋 复制到 $guiDir ..." -ForegroundColor Yellow
+Write-Host "Copying files to $guiDir ..." -ForegroundColor Gray
 Copy-Item $exeSrc "$guiDir\sunshine-gui.exe" -Force
 Copy-Item -LiteralPath $pluginSrc -Destination "$guiDir\alkaidlab-plugin-stylus.dll" -Force
 
@@ -128,5 +128,5 @@ if (Test-Path $loaderPath) {
     Write-Host "   + WebView2Loader.dll"
 }
 
-Write-Host "`n✅ GUI 已部署到 $guiDir" -ForegroundColor Green
-Write-Host "   sunshine-gui.exe ($exeSize MB)" -ForegroundColor Green
+Write-Host "`nGUI deployed to $guiDir"
+Write-Host "   sunshine-gui.exe ($exeSize MB)"

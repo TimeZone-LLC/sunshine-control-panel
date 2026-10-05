@@ -33,11 +33,11 @@ use windows::Win32::Graphics::Gdi::{
     CreateCompatibleDC, CreateFontW, CreatePen, CreateSolidBrush, DEFAULT_CHARSET,
     DEFAULT_GUI_FONT, DEFAULT_PITCH, DT_CENTER, DT_END_ELLIPSIS, DT_LEFT, DT_NOPREFIX, DT_RIGHT,
     DT_SINGLELINE, DT_VCENTER, DT_WORDBREAK, DeleteDC, DeleteObject, DrawTextW, EndPaint,
-    FF_DONTCARE, FW_NORMAL, FillRect, FrameRect, GRAY_BRUSH, GetDC, GetStockObject,
-    GetTextExtentPoint32W, HALFTONE, HBITMAP, HBRUSH, HDC, HFONT, HGDIOBJ, HPEN, IntersectClipRect,
-    InvalidateRect, LineTo, MoveToEx, OUT_DEFAULT_PRECIS, PAINTSTRUCT, PS_DOT, PS_SOLID, ReleaseDC,
-    RestoreDC, SRCCOPY, SaveDC, ScreenToClient, SelectObject, SetBkMode, SetStretchBltMode,
-    SetTextColor, StretchBlt, TRANSPARENT, WHITE_BRUSH,
+    FF_DONTCARE, FW_NORMAL, FillRect, FrameRect, GetDC, GetStockObject, GetTextExtentPoint32W,
+    HALFTONE, HBITMAP, HBRUSH, HDC, HFONT, HGDIOBJ, HPEN, IntersectClipRect, InvalidateRect,
+    LineTo, MoveToEx, OUT_DEFAULT_PRECIS, PAINTSTRUCT, PS_DOT, PS_SOLID, ReleaseDC, RestoreDC,
+    SRCCOPY, SaveDC, ScreenToClient, SelectObject, SetBkMode, SetStretchBltMode, SetTextColor,
+    StretchBlt, TRANSPARENT, WHITE_BRUSH,
 };
 use windows::Win32::System::DataExchange::{
     CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
@@ -112,6 +112,20 @@ const REPAINT_INTERVAL_MS: u32 = 16;
 const CLOSE_RETRY_TIMER_ID: usize = 3;
 const CLOSE_RETRY_INTERVAL_MS: u32 = 50;
 
+// GDI COLORREF stores channels as 0x00bbggrr. These values mirror the panel's
+// canonical near-black surfaces, neutral borders, and accessible text tokens.
+const UI_BG_PAGE: COLORREF = COLORREF(0x000b_0a0a); // #0a0a0b
+const UI_BG_PANEL: COLORREF = COLORREF(0x0013_1111); // #111113
+const UI_BG_SURFACE: COLORREF = COLORREF(0x0016_1414); // #141416
+const UI_BG_RAISED: COLORREF = COLORREF(0x0021_1d1d); // #1d1d21
+const UI_BORDER: COLORREF = COLORREF(0x0036_3030); // #303036
+const UI_BORDER_SOFT: COLORREF = COLORREF(0x0029_2424); // #242429
+const UI_BORDER_STRONG: COLORREF = COLORREF(0x0047_3f3f); // #3f3f47
+const UI_TEXT: COLORREF = COLORREF(0x00f0_eded); // #ededf0
+const UI_TEXT_MUTED: COLORREF = COLORREF(0x00a4_9a9a); // #9a9aa4
+const UI_TEXT_FAINT: COLORREF = COLORREF(0x0078_6e6e); // #6e6e78
+const UI_WARNING: COLORREF = COLORREF(0x0055_8ab0); // #b08a55
+
 type TranslationCatalog = BTreeMap<String, BTreeMap<String, String>>;
 
 struct Recording {
@@ -181,36 +195,20 @@ impl DrawingPens {
     fn new(dpi: u32) -> Option<Self> {
         let pens = Self {
             dpi,
-            mouse: unsafe {
-                CreatePen(
-                    PS_SOLID,
-                    scale_for_dpi(2, dpi).max(1),
-                    COLORREF(0x0041_37dc),
-                )
-            },
-            touch: unsafe {
-                CreatePen(
-                    PS_SOLID,
-                    scale_for_dpi(3, dpi).max(1),
-                    COLORREF(0x005a_8e28),
-                )
-            },
+            mouse: unsafe { CreatePen(PS_SOLID, scale_for_dpi(2, dpi).max(1), UI_TEXT_FAINT) },
+            touch: unsafe { CreatePen(PS_SOLID, scale_for_dpi(3, dpi).max(1), UI_BORDER_STRONG) },
             pressure: (0..8)
                 .map(|level| unsafe {
                     let minimum_width = scale_for_dpi(2, dpi).max(1);
                     let maximum_width = scale_for_dpi(12, dpi).max(minimum_width);
                     let line_width = minimum_width + (maximum_width - minimum_width) * level / 7;
-                    CreatePen(PS_SOLID, line_width, COLORREF(0x00d9_5f16))
+                    CreatePen(PS_SOLID, line_width, UI_BG_PAGE)
                 })
                 .collect(),
-            graph_axis: unsafe { CreatePen(PS_SOLID, 1, COLORREF(0x00d4_cac3)) },
-            graph_threshold: unsafe { CreatePen(PS_DOT, 1, COLORREF(0x0060_60d0)) },
+            graph_axis: unsafe { CreatePen(PS_SOLID, 1, UI_BORDER_STRONG) },
+            graph_threshold: unsafe { CreatePen(PS_DOT, 1, UI_WARNING) },
             graph_sample: unsafe {
-                CreatePen(
-                    PS_SOLID,
-                    scale_for_dpi(2, dpi).max(1),
-                    COLORREF(0x005a_8e28),
-                )
+                CreatePen(PS_SOLID, scale_for_dpi(2, dpi).max(1), UI_TEXT_MUTED)
             },
         };
         if pens.mouse.is_invalid()
@@ -912,11 +910,11 @@ fn diagnosis_view(state: &WindowState) -> DiagnosisView {
 
 fn diagnosis_color(level: DiagnosisLevel) -> COLORREF {
     match level {
-        DiagnosisLevel::Waiting | DiagnosisLevel::Insufficient => COLORREF(0x00a0_9288),
-        DiagnosisLevel::Running => COLORREF(0x00d9_7d2e),
-        DiagnosisLevel::Normal => COLORREF(0x0066_8e3c),
-        DiagnosisLevel::Warning => COLORREF(0x0046_aae6),
-        DiagnosisLevel::MouseOnly => COLORREF(0x0041_37dc),
+        DiagnosisLevel::Waiting | DiagnosisLevel::Insufficient | DiagnosisLevel::Running => {
+            UI_TEXT_MUTED
+        }
+        DiagnosisLevel::Normal => UI_TEXT,
+        DiagnosisLevel::Warning | DiagnosisLevel::MouseOnly => UI_WARNING,
     }
 }
 
@@ -1120,6 +1118,22 @@ fn update_ui_font(state: &mut WindowState) {
 
 fn scale_for_dpi(value: i32, dpi: u32) -> i32 {
     ((value as i64 * dpi.max(BASE_DPI) as i64 + (BASE_DPI / 2) as i64) / BASE_DPI as i64) as i32
+}
+
+unsafe fn fill_rect_color(dc: HDC, bounds: &RECT, color: COLORREF) {
+    let brush = unsafe { CreateSolidBrush(color) };
+    if !brush.is_invalid() {
+        let _ = unsafe { FillRect(dc, bounds, brush) };
+        let _ = unsafe { DeleteObject(HGDIOBJ(brush.0)) };
+    }
+}
+
+unsafe fn frame_rect_color(dc: HDC, bounds: &RECT, color: COLORREF) {
+    let brush = unsafe { CreateSolidBrush(color) };
+    if !brush.is_invalid() {
+        let _ = unsafe { FrameRect(dc, bounds, brush) };
+        let _ = unsafe { DeleteObject(HGDIOBJ(brush.0)) };
+    }
 }
 
 fn measured_control_width(
@@ -2187,12 +2201,9 @@ unsafe fn draw_sampling_graph(
     threshold_pen: HPEN,
     sample_pen: HPEN,
 ) {
-    let background = unsafe { CreateSolidBrush(COLORREF(0x00ff_fcfa)) };
-    if !background.is_invalid() {
-        let _ = unsafe { FillRect(dc, &bounds, background) };
-        let _ = unsafe { DeleteObject(HGDIOBJ(background.0)) };
-    }
-    let _ = unsafe { FrameRect(dc, &bounds, HBRUSH(GetStockObject(GRAY_BRUSH).0)) };
+    unsafe { fill_rect_color(dc, &bounds, UI_BG_SURFACE) };
+    unsafe { frame_rect_color(dc, &bounds, UI_BORDER_SOFT) };
+    let _ = unsafe { SetTextColor(dc, UI_TEXT_MUTED) };
     let inset = scale_for_dpi(6, dpi);
     let title = if analysis.recent_intervals_ms.is_empty() {
         tr("graph.waiting").to_string()
@@ -2593,7 +2604,7 @@ unsafe fn paint(hwnd: HWND) {
         }
         let frame_cache = state.frame_cache.take();
         let target_dc = frame_cache.as_ref().map_or(dc, |cache| cache.dc);
-        let background = unsafe { CreateSolidBrush(COLORREF(0x00fa_f7f5)) };
+        let background = unsafe { CreateSolidBrush(UI_BG_PAGE) };
         let white = unsafe { GetStockObject(WHITE_BRUSH) };
         if !background.is_invalid() {
             let _ = unsafe { FillRect(target_dc, &client, background) };
@@ -2646,14 +2657,14 @@ unsafe fn paint(hwnd: HWND) {
                 let _ = unsafe { RestoreDC(target_dc, saved) };
             }
         }
-        let _ = unsafe { FrameRect(target_dc, &canvas, HBRUSH(GetStockObject(GRAY_BRUSH).0)) };
+        unsafe { frame_rect_color(target_dc, &canvas, UI_BORDER_STRONG) };
         let _ = unsafe { SetBkMode(target_dc, TRANSPARENT) };
         let body_font = state.ui_font.as_ref().map_or_else(
             || unsafe { GetStockObject(DEFAULT_GUI_FONT) },
             |font| HGDIOBJ(font.0.0),
         );
         let old_font = unsafe { SelectObject(target_dc, body_font) };
-        let _ = unsafe { SetTextColor(target_dc, COLORREF(0x0066_5c55)) };
+        let _ = unsafe { SetTextColor(target_dc, UI_TEXT_MUTED) };
 
         let margin = scale_for_dpi(16, state.dpi);
         let instruction = if state.mode == DiagnosticMode::Running {
@@ -2687,19 +2698,9 @@ unsafe fn paint(hwnd: HWND) {
             right: client.right - margin,
             bottom: state.canvas_top - scale_for_dpi(4, state.dpi),
         };
-        let status_background = unsafe { CreateSolidBrush(COLORREF(0x00fc_f4ec)) };
-        if !status_background.is_invalid() {
-            let _ = unsafe { FillRect(target_dc, &status_background_rect, status_background) };
-            let _ = unsafe { DeleteObject(HGDIOBJ(status_background.0)) };
-        }
-        let _ = unsafe {
-            FrameRect(
-                target_dc,
-                &status_background_rect,
-                HBRUSH(GetStockObject(GRAY_BRUSH).0),
-            )
-        };
-        let _ = unsafe { SetTextColor(target_dc, COLORREF(0x002d_241e)) };
+        unsafe { fill_rect_color(target_dc, &status_background_rect, UI_BG_PANEL) };
+        unsafe { frame_rect_color(target_dc, &status_background_rect, UI_BORDER) };
+        let _ = unsafe { SetTextColor(target_dc, UI_TEXT) };
 
         let pressure_text = if state.last_pressure_available {
             format!(
@@ -2756,7 +2757,7 @@ unsafe fn paint(hwnd: HWND) {
                     + (canvas.bottom - canvas.top) / 2
                     + scale_for_dpi(34, state.dpi),
             };
-            let _ = unsafe { SetTextColor(target_dc, COLORREF(0x00b0_a49a)) };
+            let _ = unsafe { SetTextColor(target_dc, UI_TEXT_FAINT) };
             let _ = unsafe {
                 DrawTextW(
                     target_dc,
@@ -2774,13 +2775,8 @@ unsafe fn paint(hwnd: HWND) {
                 right: canvas.right - scale_for_dpi(12, state.dpi),
                 bottom: canvas.top + scale_for_dpi(158, state.dpi),
             };
-            let card_background = unsafe { CreateSolidBrush(COLORREF(0x00ff_fcfa)) };
-            if !card_background.is_invalid() {
-                let _ = unsafe { FillRect(target_dc, &card_rect, card_background) };
-                let _ = unsafe { DeleteObject(HGDIOBJ(card_background.0)) };
-            }
-            let _ =
-                unsafe { FrameRect(target_dc, &card_rect, HBRUSH(GetStockObject(GRAY_BRUSH).0)) };
+            unsafe { fill_rect_color(target_dc, &card_rect, UI_BG_RAISED) };
+            unsafe { frame_rect_color(target_dc, &card_rect, UI_BORDER_STRONG) };
             let sampling_rate = if state.sampling_analysis.interval_median_ms > 0.0 {
                 format!(
                     "{:.0} Hz",
@@ -2826,7 +2822,7 @@ unsafe fn paint(hwnd: HWND) {
                 right: card_rect.right - scale_for_dpi(8, state.dpi),
                 bottom: card_rect.bottom - scale_for_dpi(6, state.dpi),
             };
-            let _ = unsafe { SetTextColor(target_dc, COLORREF(0x002d_241e)) };
+            let _ = unsafe { SetTextColor(target_dc, UI_TEXT) };
             let _ = unsafe {
                 DrawTextW(
                     target_dc,
@@ -2904,7 +2900,7 @@ unsafe fn paint(hwnd: HWND) {
                 right: client.right - margin,
                 bottom: top + scale_for_dpi(24, state.dpi),
             };
-            let _ = unsafe { SetTextColor(target_dc, COLORREF(0x002d_241e)) };
+            let _ = unsafe { SetTextColor(target_dc, UI_TEXT) };
             let _ = unsafe {
                 DrawTextW(
                     target_dc,
@@ -2929,7 +2925,7 @@ unsafe fn paint(hwnd: HWND) {
                 right: client.right - margin,
                 bottom: client.bottom - scale_for_dpi(8, state.dpi),
             };
-            let _ = unsafe { SetTextColor(target_dc, COLORREF(0x0066_5c55)) };
+            let _ = unsafe { SetTextColor(target_dc, UI_TEXT_MUTED) };
             let _ = unsafe {
                 DrawTextW(
                     target_dc,
