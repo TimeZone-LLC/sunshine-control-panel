@@ -13,6 +13,14 @@
         </article>
       </div>
       <div v-else class="chub-cards">
+        <article class="chub-card">
+          <div class="chub-card-head"><strong>{{ t.sidebar.hdrEnhanced }}</strong></div>
+          <p class="chub-hint">{{ t.hdrEnhanced.hint }}</p>
+          <div class="chub-card-actions">
+            <el-button size="small" type="primary" @click="emit('open-hdr-enhanced')">{{ t.hdrEnhanced.open }}</el-button>
+          </div>
+        </article>
+
         <!-- ControllerMeta -->
         <article class="chub-card">
           <div class="chub-card-head">
@@ -61,7 +69,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { controllerMeta } from '../../tauri-adapter.js'
 import { useI18n } from '../../desktop/i18n/index.js'
 
-const emit = defineEmits(['open-controller-meta', 'open-stylus-input-probe'])
+const emit = defineEmits(['open-controller-meta', 'open-stylus-input-probe', 'open-hdr-enhanced'])
 const { t } = useI18n()
 const metaStatus = reactive({ installed: false, version: '' })
 const probeFailed = ref(false)

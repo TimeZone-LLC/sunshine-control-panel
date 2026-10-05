@@ -13,6 +13,7 @@ export const ROUTES = {
   // Compatibility alias for callers that still navigate to the original page id.
   DUALSENSE: 'dualsense',
   CONTROLLERS_HUB: 'controllers-hub',
+  HDR_ENHANCED: 'hdr-enhanced',
 }
 
 /**
@@ -58,6 +59,11 @@ const routeConfig = {
     name: ROUTES.CONTROLLERS_HUB,
     component: 'ControllersHub',
     title: 'Device hub',
+  },
+  [ROUTES.HDR_ENHANCED]: {
+    name: ROUTES.HDR_ENHANCED,
+    component: 'HdrEnhancedManager',
+    title: 'Image enhancement',
   },
 }
 

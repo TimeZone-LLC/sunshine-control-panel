@@ -151,11 +151,13 @@
         <Welcome v-if="router.isRoute(ROUTES.WELCOME)" @close="goHome" />
         <WebStreamSettings v-if="router.isRoute(ROUTES.WEB_STREAM)" @close="goHome" />
         <AiAssistant v-if="router.isRoute(ROUTES.AI_ASSISTANT)" @close="goHome" />
+        <HdrEnhancedManager v-if="router.isRoute(ROUTES.HDR_ENHANCED)" />
         <ControllersHub
           v-if="router.isRoute(ROUTES.CONTROLLERS) || router.isRoute(ROUTES.DUALSENSE) || router.isRoute(ROUTES.CONTROLLERS_HUB)"
           @close="goHome"
           @open-controller-meta="openGamepadTest"
           @open-stylus-input-probe="openStylusInputProbe"
+          @open-hdr-enhanced="openRtxHdr"
         />
 
         <!-- 默认内容 (slot) -->
@@ -182,6 +184,7 @@ import Welcome from './welcome.vue'
 import WebStreamSettings from './WebStreamSettings.vue'
 import AiAssistant from './AiAssistant.vue'
 import ControllersHub from './controllersHub/ControllersHub.vue'
+import HdrEnhancedManager from './HdrEnhancedManager.vue'
 const UpdateDialog = defineAsyncComponent(() => import('./UpdateDialog.vue'))
 import { useSidebarState } from '../composables/useSidebarState.js'
 import { useWindowControls } from '../composables/useWindowControls.js'
@@ -217,6 +220,7 @@ const {
   openAiAssistant,
   openControllers,
   openDualSense,
+  openRtxHdr,
   goHome,
   skipVersion,
   includePrerelease,
@@ -277,6 +281,7 @@ const toolsCtx = {
   openWebStream,
   openAiAssistant,
   openControllers,
+  openRtxHdr,
   handleCheckForUpdates,
   openTimer,
   openUrl,
@@ -306,6 +311,7 @@ defineExpose({
   openAiAssistant,
   openControllers,
   openDualSense,
+  openRtxHdr,
   goHome,
   checkForUpdates: handleCheckForUpdates,
   router,

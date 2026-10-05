@@ -147,6 +147,27 @@ export const usbip = {
   attach: (remote, busId, tcpPort = 3240) => wrapResult('usbip_attach', { remote, busId, tcpPort }),
   detach: (port) => wrapResult('usbip_detach', { port }),
 }
+export const rtxHdr = {
+  recover: () => wrapResult('native_component_recover', { componentId: 'alkaidlab.nvidia_rtx_video' }),
+  setEnabled: (enabled) => wrapResult('hdr_enhanced_select_backend', { componentId: 'alkaidlab.nvidia_rtx_video', enabled }),
+  getStatus: () => wrapResult('native_component_get_status', { componentId: 'alkaidlab.nvidia_rtx_video' }),
+  install: (runtimePath) => wrapResult('native_component_import', {
+    componentId: 'alkaidlab.nvidia_rtx_video',
+    sources: { 'nvngx_truehdr.dll': runtimePath },
+  }),
+  uninstall: () => wrapResult('native_component_remove', { componentId: 'alkaidlab.nvidia_rtx_video' }),
+}
+
+export const dlssNr = {
+  recover: () => wrapResult('native_component_recover', { componentId: 'alkaidlab.nvidia_dlssnr' }),
+  setEnabled: (enabled) => wrapResult('hdr_enhanced_select_backend', { componentId: 'alkaidlab.nvidia_dlssnr', enabled }),
+  getStatus: () => wrapResult('native_component_get_status', { componentId: 'alkaidlab.nvidia_dlssnr' }),
+  install: (runtimePath) => wrapResult('native_component_import', {
+    componentId: 'alkaidlab.nvidia_dlssnr',
+    sources: { 'nvngx_dlssnr.dll': runtimePath },
+  }),
+  uninstall: () => wrapResult('native_component_remove', { componentId: 'alkaidlab.nvidia_dlssnr' }),
+}
 
 export const sunshine = {
   getVersion: () => wrapDefault('get_sunshine_version', 'Unknown'),
@@ -228,6 +249,8 @@ export default {
   virtualMicrophone,
   dualsense,
   usbip,
+  rtxHdr,
+  dlssNr,
   sunshine,
   tools,
   fileMapping,

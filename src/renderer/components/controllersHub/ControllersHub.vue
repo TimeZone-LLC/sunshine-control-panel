@@ -35,6 +35,7 @@
         <DeviceDiagnosticsPanel
           @open-controller-meta="emit('open-controller-meta')"
           @open-stylus-input-probe="emit('open-stylus-input-probe')"
+          @open-hdr-enhanced="emit('open-hdr-enhanced')"
         />
       </template>
     </div>
@@ -55,7 +56,7 @@ import RuntimeComponentsPanel from './RuntimeComponentsPanel.vue'
 import UsbPassthroughPanel from './UsbPassthroughPanel.vue'
 import { useI18n } from '../../desktop/i18n/index.js'
 
-const emit = defineEmits(['open-controller-meta', 'open-stylus-input-probe'])
+const emit = defineEmits(['open-controller-meta', 'open-stylus-input-probe', 'open-hdr-enhanced'])
 const { t } = useI18n()
 const activeTab = ref('overview')
 const ds5Selected = ref(false)

@@ -7,6 +7,7 @@ mod client_fingerprint_rules;
 mod clipboard;
 mod commands;
 mod controller_hub;
+mod controller_input;
 mod device_config;
 mod controllermeta;
 mod desktop_settings;
@@ -25,6 +26,10 @@ mod native_tools;
 mod power;
 mod proxy_server;
 mod rtss;
+use native_components::providers::nvidia_rtx_hdr as rtx_hdr;
+mod hdr_enhanced;
+mod nr_overlay;
+mod native_components;
 #[cfg(target_os = "windows")]
 mod shell_context_menu;
 mod sunshine;
@@ -109,6 +114,14 @@ fn configure_loopback_proxy_bypass() {
 fn main() {
     #[cfg(target_os = "windows")]
     configure_loopback_proxy_bypass();
+
+    #[cfg(target_os = "windows")]
+    if let Some(exit_code) = native_components::providers::nvidia_dlssnr::try_handle_elevated_command() {
+        std::process::exit(exit_code);
+    }
+    if let Some(exit_code) = rtx_hdr::try_handle_elevated_command() {
+        std::process::exit(exit_code);
+    }
 
     #[cfg(target_os = "windows")]
     utils::wait_for_elevated_restart_handoff();
@@ -227,6 +240,12 @@ fn main() {
             proxy_server::get_proxy_health_check,
             proxy_server::refresh_sunshine_target,
             proxy_server::wait_for_proxy_ready,
+            native_components::native_component_get_status,
+            native_components::hdr_enhanced_select_backend,
+            native_components::list_native_components,
+            native_components::native_component_import,
+            native_components::native_component_remove,
+            native_components::native_component_recover,
             utils::open_external_url,
             utils::open_local_path,
             utils::restart_graphics_driver,
@@ -299,6 +318,15 @@ fn main() {
             windows::webview_heartbeat,
             windows::resize_about_window,
             windows::resize_tool_window,
+            hdr_enhanced::nr_live_status,
+            hdr_enhanced::nr_live_set_enabled,
+            hdr_enhanced::nr_live_remember,
+            nr_overlay::nr_overlay_capture_shortcut,
+            nr_overlay::nr_overlay_settings,
+            nr_overlay::nr_overlay_save_settings,
+            nr_overlay::nr_overlay_select_session,
+            nr_overlay::nr_overlay_set_visible,
+            nr_overlay::nr_overlay_is_visible,
             rtss::get_rtss_status,
             rtss::rtss_set_osd,
             rtss::rtss_clear_osd,

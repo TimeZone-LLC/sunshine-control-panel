@@ -13,6 +13,7 @@
 
 <script setup>
 import { computed, shallowRef, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useI18n } from '../desktop/i18n/index.js'
 
@@ -20,14 +21,15 @@ const { t } = useI18n()
 
 const currentTool = shallowRef(null)
 const toolType = shallowRef('dpi')
-const isMonitorTool = computed(() => toolType.value === 'performance')
+const isMonitorTool = computed(() => ['performance', 'nr'].includes(toolType.value))
 
 const closeWindow = async () => {
   try {
     const window = getCurrentWindow()
-    await window.close()
+    if (toolType.value === 'nr') await invoke('nr_overlay_set_visible', { visible: false })
+    else await window.close()
   } catch (error) {
-    console.error('关闭窗口失败:', error)
+    console.error('Failed to close the window:', error)
   }
 }
 
@@ -68,6 +70,9 @@ onMounted(async () => {
         break
       case 'rtss':
         currentTool.value = defineAsyncComponent(() => import('./tools/RtssOsdTool.vue'))
+        break
+      case 'nr':
+        currentTool.value = defineAsyncComponent(() => import('./tools/NrOverlayTool.vue'))
         break
       case 'performance':
         currentTool.value = defineAsyncComponent(() => import('./tools/HostPerformanceTool.vue'))

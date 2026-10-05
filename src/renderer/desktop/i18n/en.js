@@ -277,6 +277,7 @@ export const en = {
     stylusInputProbeStarted: 'Stylus input diagnostics started.',
     stylusInputProbeErrorTitle: 'Unable to start tool',
     stylusInputProbeMissing: 'The stylus input diagnostics plugin is missing. Repair or reinstall Sunshine, then try again.',
+    stylusInputProbeCleanupPending: 'The stylus input diagnostics plugin is finishing cleanup. Try again shortly. If it remains unavailable, restart the control panel.',
     stylusInputProbeUntrusted: 'The stylus input diagnostics plugin is damaged or incompatible. Repair or reinstall Sunshine.',
     stylusInputProbeLaunchFailed: 'The stylus input diagnostics plugin could not start. Try again later.',
     diagnostics: 'System Diagnostics',
@@ -832,6 +833,7 @@ export const en = {
     virtualDisplay: 'Virtual display',
     webStream: 'Web stream',
     deviceHub: 'Device hub',
+    hdrEnhanced: 'Image enhancement',
     controllers: 'Controllers',
     dualSense: 'DualSense emulation',
     uninstallVdd: 'Uninstall VDD',
@@ -850,6 +852,11 @@ export const en = {
     eyebrow: 'MANAGE / CONTROLLERS',
     title: 'Controllers',
     intro: 'Manage Sunshine virtual controllers.',
+  },
+
+  hdrEnhanced: {
+    open: 'Manage image enhancement',
+    hint: 'Install and configure optional NVIDIA RTX HDR and DLSS NR components.',
   },
 
   dualSense: {
