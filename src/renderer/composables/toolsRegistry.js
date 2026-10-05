@@ -31,10 +31,32 @@ import {
   Download,
   Connection,
   MagicStick,
+  House,
+  Grid,
+  Operation,
 } from '@element-plus/icons-vue'
 import IconLang from '../desktop/icons/IconLang.vue'
 import IconGamepad from '../desktop/icons/IconGamepad.vue'
 import { ROUTES } from './useRouter.js'
+import { WEBUI_PAGES, getWebuiPage } from './webuiNavigation.js'
+
+const WEBUI_ICONS = {
+  overview: House,
+  apps: Grid,
+  pairing: Connection,
+  'stream-settings': Operation,
+}
+
+export function createStreamingTools(ctx) {
+  return WEBUI_PAGES.map((page) => ({
+    id: page.id,
+    icon: WEBUI_ICONS[page.id],
+    label: ctx.t.value.sidebar[page.label],
+    action: () => ctx.openWebUi(page.path),
+    isActive: () =>
+      ctx.router.isRoute(ROUTES.HOME) && getWebuiPage(ctx.webuiPath.value)?.id === page.id,
+  }))
+}
 
 // ───────────────────────────────────────────────
 // 类型说明（JSDoc，非强制）

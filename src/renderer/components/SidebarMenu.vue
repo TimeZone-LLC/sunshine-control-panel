@@ -36,6 +36,22 @@
       <!-- 菜单列表 -->
       <el-scrollbar class="menu-scrollbar">
         <div class="menu-section">
+          <p v-if="!isCollapsed" class="section-title">{{ t.sidebar.sectionStream }}</p>
+          <div
+            v-for="item in streamingMenuItems"
+            :key="item.id"
+            class="menu-item"
+            :class="{ active: item.isActive?.() }"
+            @click.stop="item.action?.()"
+          >
+            <el-icon :size="20"><component :is="item.icon" /></el-icon>
+            <transition name="fade">
+              <span v-if="!isCollapsed">{{ item.label }}</span>
+            </transition>
+          </div>
+        </div>
+
+        <div class="menu-section">
           <p v-if="!isCollapsed" class="section-title">{{ t.sidebar.sectionManage }}</p>
           <div
             v-for="item in managementMenuItems"
@@ -192,13 +208,15 @@ import { useTools } from '../composables/useTools.js'
 import { useTouchWindowDrag } from '../composables/useTouchWindowDrag.js'
 import {
   createManagementTools,
+  createStreamingTools,
   createUtilityTools,
   createFooterTools,
 } from '../composables/toolsRegistry.js'
 import { ROUTES } from '../composables/useRouter.js'
 import { useI18n } from '../desktop/i18n/index.js'
 
-const emit = defineEmits(['route-change'])
+const props = defineProps({ webuiPath: { type: String, default: '/' } })
+const emit = defineEmits(['route-change', 'webui-navigate'])
 
 const { t, locale, toggleLocale } = useI18n()
 
@@ -290,8 +308,14 @@ const toolsCtx = {
   restartAsAdmin,
   showClipboardSyncStatus,
   clipboardSyncEnabled,
+  webuiPath: computed(() => props.webuiPath),
+  openWebUi: (path) => {
+    emit('webui-navigate', path)
+    router.goHome()
+  },
 }
 
+const streamingMenuItems = computed(() => createStreamingTools(toolsCtx))
 const managementMenuItems = computed(() => createManagementTools(toolsCtx))
 const toolsMenuItems = computed(() => createUtilityTools(toolsCtx))
 const footerMenuItems = computed(() => createFooterTools(toolsCtx))

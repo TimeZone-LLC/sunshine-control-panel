@@ -37,3 +37,12 @@ body {
 #bd-theme {
   display: none;
 }
+
+/* Only the native panel proxy injects this stylesheet. Page headers stay untouched. */
+html[data-sunshine-navigation='unified'] .navbar {
+  display: none !important;
+}
+html[data-sunshine-navigation='unified'] body {
+  /* The OS caption is outside WebView2, so the hidden navbar leaves no gutter. */
+  padding-top: 0 !important;
+}

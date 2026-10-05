@@ -828,6 +828,7 @@ export const en = {
 
   // === Sidebar ===
   sidebar: {
+    sectionStream: 'Streaming',
     sectionManage: 'Management',
     sectionTools: 'Tools',
     minimize: 'Minimize',
@@ -837,6 +838,10 @@ export const en = {
     advancedSettings: 'Advanced settings',
     virtualDisplay: 'Virtual display',
     webStream: 'Web stream',
+    overview: 'Overview',
+    applications: 'Applications',
+    clientPairing: 'Client pairing',
+    streamSettings: 'Streaming settings',
     deviceHub: 'Device hub',
     hdrEnhanced: 'Image enhancement',
     controllers: 'Controllers',
