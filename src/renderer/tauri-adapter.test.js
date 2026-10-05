@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { controllerHubCommandArgs, isAllowedExternalUrl } from './tauri-adapter.js'
+import { controllerHubCommandArgs, isAllowedExternalUrl, sunshine } from './tauri-adapter.js'
 
 test('external URL validation rejects local paths and unapproved protocols', () => {
   assert.equal(isAllowedExternalUrl('https://example.com'), true)
@@ -22,4 +22,8 @@ test('controller hub adapter preserves backend and false stable-identity values'
   assert.equal(args.gamepad, 'xseries')
   assert.equal(args.gamepadDriver, 'virtualhid')
   assert.equal(args.ds5InputtinoRandomizeMac, false)
+})
+
+test('controller hub per-game loading has a proxy-readiness bridge', () => {
+  assert.equal(typeof sunshine.waitForProxyReady, 'function')
 })
