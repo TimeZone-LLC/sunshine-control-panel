@@ -53,6 +53,15 @@ if (-not (Test-Path "$projectRoot\src-tauri\Cargo.toml")) {
 
 if (-not $NoBuild) {
     Write-Host "`nBuilding the Sunshine GUI..." -ForegroundColor Gray
+    Push-Location $projectRoot
+    npm run build:renderer
+    if ($LASTEXITCODE -ne 0) {
+        Pop-Location
+        Write-Host "Renderer build failed." -ForegroundColor Red
+        exit 1
+    }
+    Pop-Location
+
     & (Join-Path $projectRoot 'scripts\build-native-plugins.ps1') -Configuration $(if ($Release) { 'Release' } else { 'Debug' })
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Native tool plugin build failed." -ForegroundColor Red
@@ -117,9 +126,80 @@ if ($running) {
     Start-Sleep -Seconds 1
 }
 
+$exeDest = Join-Path $guiDir 'sunshine-gui.exe'
+$pluginDest = Join-Path $guiDir 'alkaidlab-plugin-stylus.dll'
+$transactionId = [Guid]::NewGuid().ToString('N')
+$exeStage = Join-Path $guiDir ".sunshine-gui.$transactionId.new"
+$pluginStage = Join-Path $guiDir ".alkaidlab-plugin-stylus.$transactionId.new"
+$exeBackup = Join-Path $guiDir ".sunshine-gui.$transactionId.bak"
+$pluginBackup = Join-Path $guiDir ".alkaidlab-plugin-stylus.$transactionId.bak"
+$destinationRoot = [IO.Path]::GetFullPath($guiDir).TrimEnd('\') + '\'
+$transactionPaths = @($exeDest, $pluginDest, $exeStage, $pluginStage, $exeBackup, $pluginBackup)
+foreach ($path in $transactionPaths) {
+    if (-not [IO.Path]::GetFullPath($path).StartsWith($destinationRoot, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Deployment path escaped the GUI directory: $path"
+    }
+}
+
+$hadExe = Test-Path -LiteralPath $exeDest -PathType Leaf
+$hadPlugin = Test-Path -LiteralPath $pluginDest -PathType Leaf
+$exeBackedUp = $false
+$pluginBackedUp = $false
+$exeActivated = $false
+$pluginActivated = $false
+$deploymentCommitted = $false
 Write-Host "Copying files to $guiDir ..." -ForegroundColor Gray
-Copy-Item $exeSrc "$guiDir\sunshine-gui.exe" -Force
-Copy-Item -LiteralPath $pluginSrc -Destination "$guiDir\alkaidlab-plugin-stylus.dll" -Force
+try {
+    Copy-Item -LiteralPath $exeSrc -Destination $exeStage
+    Copy-Item -LiteralPath $pluginSrc -Destination $pluginStage
+
+    if ($hadExe) {
+        Move-Item -LiteralPath $exeDest -Destination $exeBackup
+        $exeBackedUp = $true
+    }
+    if ($hadPlugin) {
+        Move-Item -LiteralPath $pluginDest -Destination $pluginBackup
+        $pluginBackedUp = $true
+    }
+
+    Move-Item -LiteralPath $exeStage -Destination $exeDest
+    $exeActivated = $true
+    Move-Item -LiteralPath $pluginStage -Destination $pluginDest
+    $pluginActivated = $true
+    $deploymentCommitted = $true
+} catch {
+    $deploymentError = $_
+    try {
+        if ($exeActivated -and (Test-Path -LiteralPath $exeDest -PathType Leaf)) {
+            Remove-Item -LiteralPath $exeDest -Force
+        }
+        if ($pluginActivated -and (Test-Path -LiteralPath $pluginDest -PathType Leaf)) {
+            Remove-Item -LiteralPath $pluginDest -Force
+        }
+        if ($exeBackedUp -and (Test-Path -LiteralPath $exeBackup -PathType Leaf)) {
+            Move-Item -LiteralPath $exeBackup -Destination $exeDest
+        }
+        if ($pluginBackedUp -and (Test-Path -LiteralPath $pluginBackup -PathType Leaf)) {
+            Move-Item -LiteralPath $pluginBackup -Destination $pluginDest
+        }
+    } catch {
+        Write-Host "Deployment rollback failed: $($_.Exception.Message)" -ForegroundColor Red
+    }
+    throw $deploymentError
+} finally {
+    foreach ($temporaryPath in @($exeStage, $pluginStage)) {
+        if (Test-Path -LiteralPath $temporaryPath -PathType Leaf) {
+            Remove-Item -LiteralPath $temporaryPath -Force
+        }
+    }
+    if ($deploymentCommitted) {
+        foreach ($backupPath in @($exeBackup, $pluginBackup)) {
+            if (Test-Path -LiteralPath $backupPath -PathType Leaf) {
+                Remove-Item -LiteralPath $backupPath -Force
+            }
+        }
+    }
+}
 
 # WebView2Loader.dll (如果存在)
 $loaderPath = Split-Path $exeSrc -Parent | Join-Path -ChildPath "WebView2Loader.dll"
