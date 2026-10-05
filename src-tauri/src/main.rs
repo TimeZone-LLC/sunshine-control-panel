@@ -6,6 +6,7 @@ mod bat_runner;
 mod client_fingerprint_rules;
 mod clipboard;
 mod commands;
+mod device_config;
 mod controllermeta;
 mod desktop_settings;
 mod dualsense;
@@ -30,6 +31,7 @@ mod text_context;
 mod toolbar;
 mod tray;
 mod tray_config;
+mod usbip;
 mod utils;
 mod vdd;
 mod vdd_calibration;
@@ -110,6 +112,11 @@ fn main() {
 
     #[cfg(target_os = "windows")]
     if let Some(exit_code) = dualsense::try_handle_elevated_command() {
+        std::process::exit(exit_code);
+    }
+
+    #[cfg(target_os = "windows")]
+    if let Some(exit_code) = usbip::try_handle_elevated_command() {
         std::process::exit(exit_code);
     }
 
@@ -236,6 +243,14 @@ fn main() {
             dualsense::dualsense_set_config,
             dualsense::dualsense_set_haptics_tuning,
             dualsense::dualsense_self_test,
+            usbip::usbip_get_status,
+            usbip::usbip_get_forwarding_config,
+            usbip::usbip_save_forwarding_config,
+            usbip::usbip_install_transport,
+            usbip::usbip_cleanup_transport,
+            usbip::usbip_list_remote,
+            usbip::usbip_attach,
+            usbip::usbip_detach,
             fs_utils::get_icc_file_list,
             fs_utils::read_directory,
             fs_utils::read_image_as_data_url,
