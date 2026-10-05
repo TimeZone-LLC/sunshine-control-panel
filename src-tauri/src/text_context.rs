@@ -2,8 +2,9 @@
 
 use std::cell::Cell;
 use std::sync::{
+    Arc, Mutex,
     atomic::{AtomicBool, Ordering},
-    mpsc as std_mpsc, Arc, Mutex,
+    mpsc as std_mpsc,
 };
 use std::thread::JoinHandle;
 use std::time::Duration;
@@ -13,11 +14,10 @@ use log::{debug, info, warn};
 use serde::Serialize;
 use tauri::async_runtime::JoinHandle as AsyncJoinHandle;
 use tokio::sync::Notify;
-use windows::core::{BOOL, GUID};
 use windows::Win32::Foundation::{HWND, POINT, RECT};
 use windows::Win32::Graphics::Gdi::ClientToScreen;
 use windows::Win32::System::Com::{
-    CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED,
+    CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx, CoUninitialize,
     SAFEARRAY,
 };
 use windows::Win32::System::Ole::{
@@ -25,20 +25,21 @@ use windows::Win32::System::Ole::{
     SafeArrayUnaccessData,
 };
 use windows::Win32::UI::Accessibility::{
-    CUIAutomation, IUIAutomation, IUIAutomationCacheRequest, IUIAutomationElement,
-    IUIAutomationTextPattern2, IUIAutomationValuePattern,
-    SetWinEventHook, UIA_BoundingRectanglePropertyId, UIA_ControlTypePropertyId,
-    UIA_EditControlTypeId, UIA_HasKeyboardFocusPropertyId, UIA_IsEnabledPropertyId,
-    UIA_IsOffscreenPropertyId, UIA_IsPasswordPropertyId, UIA_TextPattern2Id,
-    UIA_ValueIsReadOnlyPropertyId, UIA_ValuePatternId, UnhookWinEvent, HWINEVENTHOOK,
+    CUIAutomation, HWINEVENTHOOK, IUIAutomation, IUIAutomationCacheRequest, IUIAutomationElement,
+    IUIAutomationTextPattern2, IUIAutomationValuePattern, SetWinEventHook,
+    UIA_BoundingRectanglePropertyId, UIA_ControlTypePropertyId, UIA_EditControlTypeId,
+    UIA_HasKeyboardFocusPropertyId, UIA_IsEnabledPropertyId, UIA_IsOffscreenPropertyId,
+    UIA_IsPasswordPropertyId, UIA_TextPattern2Id, UIA_ValueIsReadOnlyPropertyId,
+    UIA_ValuePatternId, UnhookWinEvent,
 };
 use windows::Win32::UI::Shell::IFrameworkInputPane;
 use windows::Win32::UI::WindowsAndMessaging::{
-    DispatchMessageW, GetForegroundWindow, GetGUIThreadInfo, GetWindowThreadProcessId,
-    MsgWaitForMultipleObjectsEx, PeekMessageW, TranslateMessage, EVENT_OBJECT_FOCUS,
-    EVENT_SYSTEM_FOREGROUND, GUITHREADINFO, MSG, MWMO_INPUTAVAILABLE, PM_REMOVE, QS_ALLINPUT,
+    DispatchMessageW, EVENT_OBJECT_FOCUS, EVENT_SYSTEM_FOREGROUND, GUITHREADINFO,
+    GetForegroundWindow, GetGUIThreadInfo, GetWindowThreadProcessId, MSG, MWMO_INPUTAVAILABLE,
+    MsgWaitForMultipleObjectsEx, PM_REMOVE, PeekMessageW, QS_ALLINPUT, TranslateMessage,
     WINEVENT_OUTOFCONTEXT,
 };
+use windows::core::{BOOL, GUID};
 
 use crate::sunshine::{create_https_client, get_local_sunshine_url};
 
@@ -298,10 +299,7 @@ fn inspect_focused_element(
             .ok()
             .and_then(|pattern| unsafe { pattern.CachedIsReadOnly() }.ok())
             .map(|value| value.as_bool());
-    let editable = is_confirmed_editor(
-        control_type == UIA_EditControlTypeId.0,
-        value_read_only,
-    );
+    let editable = is_confirmed_editor(control_type == UIA_EditControlTypeId.0, value_read_only);
     let caret_rect = editable.then(|| inspect_caret(&element)).flatten();
     let signature = FocusSignature {
         control_type,

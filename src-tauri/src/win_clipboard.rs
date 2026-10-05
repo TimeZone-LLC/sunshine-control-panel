@@ -7,7 +7,7 @@
 //! empties it once, and sets all flavors with clipboard-win's no-clear raw
 //! setter.
 
-use clipboard_win::{formats, raw, Clipboard};
+use clipboard_win::{Clipboard, formats, raw};
 use std::sync::OnceLock;
 
 const CF_DIB: u32 = 8;

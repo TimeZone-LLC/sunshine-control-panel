@@ -31,11 +31,11 @@ mod utils;
 mod vdd;
 mod vdd_calibration;
 #[cfg(target_os = "windows")]
-mod win_clipboard;
-#[cfg(target_os = "windows")]
 mod vdd_ioctl;
 mod vigem;
 mod vmouse;
+#[cfg(target_os = "windows")]
+mod win_clipboard;
 mod windows;
 
 use log::info;
