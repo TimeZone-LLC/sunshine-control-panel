@@ -217,15 +217,25 @@ fn get_sunshine_target() -> String {
 
 async fn refresh_sunshine_target_internal() -> Result<String, String> {
     #[cfg(test)]
-    if let Some(base_url) = TEST_REFRESH_TARGET.lock().unwrap().clone() {
-        set_sunshine_target(base_url.clone());
-        return Ok(base_url);
+    {
+        if let Some(base_url) = TEST_REFRESH_TARGET.lock().unwrap().clone() {
+            set_sunshine_target(base_url.clone());
+            return Ok(base_url);
+        }
+
+        // Unit tests must never fall through to the developer's installed
+        // Sunshine instance. Keep an explicit test target stable when no
+        // refresh override is configured.
+        return Ok(get_sunshine_target());
     }
 
-    let url = crate::sunshine::get_sunshine_url().await?;
-    let base_url = url.trim_end_matches('/').to_string();
-    set_sunshine_target(base_url.clone());
-    Ok(base_url)
+    #[cfg(not(test))]
+    {
+        let url = crate::sunshine::get_sunshine_url().await?;
+        let base_url = url.trim_end_matches('/').to_string();
+        set_sunshine_target(base_url.clone());
+        Ok(base_url)
+    }
 }
 
 /// Refresh the proxy target from the current Sunshine config.
@@ -1437,7 +1447,7 @@ mod tests {
     }
 
     fn reset_proxy_test_state() {
-        set_sunshine_target("https://localhost:47990".to_string());
+        set_sunshine_target("http://127.0.0.1:9".to_string());
         *TEST_REFRESH_TARGET
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
@@ -1788,7 +1798,8 @@ mod tests {
         let marker = "ai-fast-fail-bypass-ok";
         let new_target = spawn_one_shot_http_server(marker).await;
 
-        set_sunshine_target(new_target);
+        set_sunshine_target(new_target.clone());
+        *TEST_REFRESH_TARGET.lock().unwrap() = Some(new_target);
         mark_unavailable();
 
         let request = axum::http::Request::builder()
