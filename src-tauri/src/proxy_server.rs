@@ -1421,6 +1421,30 @@ mod tests {
 
     static TEST_LOCK: Lazy<tokio::sync::Mutex<()>> = Lazy::new(|| tokio::sync::Mutex::new(()));
 
+    struct ProxyTestStateReset;
+
+    impl ProxyTestStateReset {
+        fn new() -> Self {
+            reset_proxy_test_state();
+            Self
+        }
+    }
+
+    impl Drop for ProxyTestStateReset {
+        fn drop(&mut self) {
+            reset_proxy_test_state();
+        }
+    }
+
+    fn reset_proxy_test_state() {
+        set_sunshine_target("https://localhost:47990".to_string());
+        *TEST_REFRESH_TARGET
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
+        SUNSHINE_AVAILABLE.store(true, Ordering::Relaxed);
+        LAST_CHECK_TIME.store(0, Ordering::Relaxed);
+    }
+
     async fn unused_local_port() -> u16 {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         listener.local_addr().unwrap().port()
@@ -1649,6 +1673,8 @@ mod tests {
 
     #[tokio::test]
     async fn proxy_rejects_oversized_buffered_response() {
+        let _guard = TEST_LOCK.lock().await;
+        let _state = ProxyTestStateReset::new();
         let url = spawn_one_shot_unknown_length_server("response-too-large").await;
         let response = reqwest::get(url).await.unwrap();
 
@@ -1658,6 +1684,8 @@ mod tests {
 
     #[tokio::test]
     async fn proxy_stops_oversized_streamed_response() {
+        let _guard = TEST_LOCK.lock().await;
+        let _state = ProxyTestStateReset::new();
         let url = spawn_one_shot_unknown_length_server("response-too-large").await;
         let response = reqwest::get(url).await.unwrap();
         let body = limited_response_body(response, 8).unwrap();
@@ -1667,6 +1695,8 @@ mod tests {
 
     #[tokio::test]
     async fn full_log_download_streams_without_a_total_size_limit() {
+        let _guard = TEST_LOCK.lock().await;
+        let _state = ProxyTestStateReset::new();
         let url = spawn_one_shot_unknown_length_server("response-larger-than-test-limit").await;
         let response = reqwest::get(url).await.unwrap();
         let body = streamed_response_body(response, None).unwrap();
@@ -1720,6 +1750,7 @@ mod tests {
     #[tokio::test]
     async fn proxy_retries_with_refreshed_target_when_port_changes() {
         let _guard = TEST_LOCK.lock().await;
+        let _state = ProxyTestStateReset::new();
         let marker = "proxy-refresh-target-ok";
         let old_port = unused_local_port().await;
         let new_target = spawn_one_shot_http_server(marker).await;
@@ -1740,9 +1771,10 @@ mod tests {
             .unwrap();
         let text = String::from_utf8_lossy(&body);
 
-        *TEST_REFRESH_TARGET.lock().unwrap() = None;
-
-        assert!(status.is_success(), "unexpected status: {status}");
+        assert!(
+            status.is_success(),
+            "unexpected status: {status}, body: {text}"
+        );
         assert!(
             text.contains(marker),
             "proxy did not retry against refreshed target: {text}"
@@ -1752,6 +1784,7 @@ mod tests {
     #[tokio::test]
     async fn ai_api_bypasses_fast_fail_cache() {
         let _guard = TEST_LOCK.lock().await;
+        let _state = ProxyTestStateReset::new();
         let marker = "ai-fast-fail-bypass-ok";
         let new_target = spawn_one_shot_http_server(marker).await;
 
@@ -1771,8 +1804,6 @@ mod tests {
             .unwrap();
         let text = String::from_utf8_lossy(&body);
 
-        reset_fast_fail();
-
         assert!(
             status.is_success(),
             "unexpected status: {status}, body: {text}"
@@ -1786,6 +1817,7 @@ mod tests {
     #[tokio::test]
     async fn ai_api_connection_failure_does_not_mark_sunshine_unavailable() {
         let _guard = TEST_LOCK.lock().await;
+        let _state = ProxyTestStateReset::new();
         let old_port = unused_local_port().await;
         let target = format!("http://127.0.0.1:{}", old_port);
 
@@ -1805,9 +1837,6 @@ mod tests {
             .await
             .unwrap();
         let text = String::from_utf8_lossy(&body);
-
-        *TEST_REFRESH_TARGET.lock().unwrap() = None;
-        reset_fast_fail();
 
         assert_eq!(
             status,
