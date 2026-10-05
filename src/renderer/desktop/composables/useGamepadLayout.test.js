@@ -18,25 +18,25 @@ const XBOX_IDS = [
   'Generic USB Joystick (STANDARD GAMEPAD Vendor: 0079 Product: 0006)', // 杂牌落到 Xbox 布局
 ]
 
-test('Sony 设备（含蓝牙改名）识别为 ps 布局', () => {
+test('Sony devices, including Bluetooth aliases, use the PlayStation layout', () => {
   for (const id of PS_IDS) {
-    assert.equal(detectLayout(id), 'ps', `应识别为 ps: ${id}`)
+    assert.equal(detectLayout(id), 'ps', `expected PlayStation layout: ${id}`)
   }
 })
 
-test('Xbox 与未知设备落到 xbox 布局（标准映射索引即 Xbox 约定）', () => {
+test('Xbox and unknown devices use the standard Xbox layout', () => {
   for (const id of XBOX_IDS) {
-    assert.equal(detectLayout(id), 'xbox', `应识别为 xbox: ${id}`)
+    assert.equal(detectLayout(id), 'xbox', `expected Xbox layout: ${id}`)
   }
 })
 
-test('空 id 与无手柄状态落到 xbox 布局', () => {
+test('empty identifiers and no connected gamepad use the Xbox layout', () => {
   assert.equal(detectLayout(''), 'xbox')
   assert.equal(detectLayout(null), 'xbox')
   assert.equal(detectLayout(undefined), 'xbox')
 })
 
-test('大小写与厂商号位置不敏感；"Xbox ... Wireless Controller" 不得误判', () => {
+test('matching ignores case and vendor position without misclassifying Xbox wireless controllers', () => {
   assert.equal(detectLayout('vendor: 054C product: 0ce6'), 'ps')
   assert.equal(detectLayout('dualsense adaptation layer'), 'ps')
   // 锚定的 ^wireless controller：蓝牙 Sony 开头命中，Xbox 品牌词组不命中
@@ -47,7 +47,7 @@ test('大小写与厂商号位置不敏感；"Xbox ... Wireless Controller" 不�
   assert.equal(detectLayout('Xbox One Controller (STANDARD GAMEPAD Vendor: 045e Product: 054c)'), 'xbox')
 })
 
-test('两套布局的按键符号语义对应：confirm/back 互为镜像', () => {
+test('PlayStation and Xbox layouts mirror confirm and back semantics', () => {
   const xbox = chipFor('confirm', 'xbox')
   const ps = chipFor('confirm', 'ps')
   assert.equal(xbox.glyph, 'A')
@@ -60,7 +60,7 @@ test('两套布局的按键符号语义对应：confirm/back 互为镜像', () =
   assert.equal(chipFor('scroll', 'ps').glyph, 'L2/R2')
 })
 
-test('未知动作 id 不抛异常并返回中性空芯片', () => {
+test('unknown action identifiers return a neutral empty chip', () => {
   const chip = chipFor('nonexistent', 'ps')
   assert.equal(chip.tone, 'neutral')
 })

@@ -73,7 +73,7 @@ async function loadConfig() {
     const result = await controllerHub.getConfig()
     if (result?.success) Object.assign(config.value, result.data)
   } catch (error) {
-    console.warn('控制器高级配置读取失败:', error)
+    console.warn('Unable to read advanced controller settings:', error)
   }
 }
 
@@ -100,4 +100,3 @@ async function saveKey(key, value) {
 
 onMounted(loadConfig)
 </script>
-

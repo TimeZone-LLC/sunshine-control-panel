@@ -59,7 +59,7 @@ test('a sidebar to the left wins over a far tile on the same row', () => {
   const from = { left: 300, right: 480, top: 100, bottom: 360 }
 
   const index = chooseByDirection('left', from, [sidebar, nearTile])
-  assert.equal(index, 1, '左移应该先到相邻卡片，而不是一路跳到侧边栏')
+  assert.equal(index, 1, 'moving left should choose the adjacent tile before the sidebar')
 
   // 已经在最左边的卡片上时，左移才落到侧边栏
   const fromNear = nearTile

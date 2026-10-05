@@ -34,10 +34,10 @@ use windows::Win32::Graphics::Gdi::{
     DEFAULT_GUI_FONT, DEFAULT_PITCH, DT_CENTER, DT_END_ELLIPSIS, DT_LEFT, DT_NOPREFIX, DT_RIGHT,
     DT_SINGLELINE, DT_VCENTER, DT_WORDBREAK, DeleteDC, DeleteObject, DrawTextW, EndPaint,
     FF_DONTCARE, FW_NORMAL, FillRect, FrameRect, GetDC, GetStockObject, GetTextExtentPoint32W,
-    HALFTONE, HBITMAP, HBRUSH, HDC, HFONT, HGDIOBJ, HPEN, IntersectClipRect, InvalidateRect,
+    HALFTONE, HBITMAP, HDC, HFONT, HGDIOBJ, HPEN, IntersectClipRect, InvalidateRect,
     LineTo, MoveToEx, OUT_DEFAULT_PRECIS, PAINTSTRUCT, PS_DOT, PS_SOLID, ReleaseDC, RestoreDC,
     SRCCOPY, SaveDC, ScreenToClient, SelectObject, SetBkMode, SetStretchBltMode, SetTextColor,
-    StretchBlt, TRANSPARENT, WHITE_BRUSH,
+    StretchBlt, TRANSPARENT,
 };
 use windows::Win32::System::DataExchange::{
     CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
@@ -125,6 +125,9 @@ const UI_TEXT: COLORREF = COLORREF(0x00f0_eded); // #ededf0
 const UI_TEXT_MUTED: COLORREF = COLORREF(0x00a4_9a9a); // #9a9aa4
 const UI_TEXT_FAINT: COLORREF = COLORREF(0x0078_6e6e); // #6e6e78
 const UI_WARNING: COLORREF = COLORREF(0x0055_8ab0); // #b08a55
+// White is reserved for the functional writing canvas. Every trace color used
+// on it has at least 3:1 contrast; the pressure trace is near-black.
+const CANVAS_BACKGROUND: COLORREF = COLORREF(0x00ff_ffff); // #ffffff
 
 type TranslationCatalog = BTreeMap<String, BTreeMap<String, String>>;
 
@@ -205,7 +208,7 @@ impl DrawingPens {
                     CreatePen(PS_SOLID, line_width, UI_BG_PAGE)
                 })
                 .collect(),
-            graph_axis: unsafe { CreatePen(PS_SOLID, 1, UI_BORDER_STRONG) },
+            graph_axis: unsafe { CreatePen(PS_SOLID, 1, UI_TEXT_FAINT) },
             graph_threshold: unsafe { CreatePen(PS_DOT, 1, UI_WARNING) },
             graph_sample: unsafe {
                 CreatePen(PS_SOLID, scale_for_dpi(2, dpi).max(1), UI_TEXT_MUTED)
@@ -2377,8 +2380,7 @@ unsafe fn create_canvas_cache(compatible_dc: HDC, width: i32, height: i32) -> Op
         right: width,
         bottom: height,
     };
-    let white = unsafe { GetStockObject(WHITE_BRUSH) };
-    let _ = unsafe { FillRect(dc, &bounds, HBRUSH(white.0)) };
+    unsafe { fill_rect_color(dc, &bounds, CANVAS_BACKGROUND) };
     Some(CanvasCache {
         dc,
         bitmap,
@@ -2604,14 +2606,7 @@ unsafe fn paint(hwnd: HWND) {
         }
         let frame_cache = state.frame_cache.take();
         let target_dc = frame_cache.as_ref().map_or(dc, |cache| cache.dc);
-        let background = unsafe { CreateSolidBrush(UI_BG_PAGE) };
-        let white = unsafe { GetStockObject(WHITE_BRUSH) };
-        if !background.is_invalid() {
-            let _ = unsafe { FillRect(target_dc, &client, background) };
-            let _ = unsafe { DeleteObject(HGDIOBJ(background.0)) };
-        } else {
-            let _ = unsafe { FillRect(target_dc, &client, HBRUSH(white.0)) };
-        }
+        unsafe { fill_rect_color(target_dc, &client, UI_BG_PAGE) };
         if let Some(cached_dc) = cached_dc {
             let _ = unsafe {
                 BitBlt(
@@ -2627,7 +2622,7 @@ unsafe fn paint(hwnd: HWND) {
                 )
             };
         } else {
-            let _ = unsafe { FillRect(target_dc, &canvas, HBRUSH(white.0)) };
+            unsafe { fill_rect_color(target_dc, &canvas, CANVAS_BACKGROUND) };
             let saved = unsafe { SaveDC(target_dc) };
             let _ = unsafe {
                 IntersectClipRect(

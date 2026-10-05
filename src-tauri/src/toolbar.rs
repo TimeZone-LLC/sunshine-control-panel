@@ -11,11 +11,12 @@ fn get_toolbar_config_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, St
     let app_data_dir = app
         .path()
         .app_data_dir()
-        .map_err(|e| format!("获取应用数据目录失败: {}", e))?;
+        .map_err(|e| format!("Failed to get the application data directory: {}", e))?;
 
     // 确保目录存在
     if !app_data_dir.exists() {
-        fs::create_dir_all(&app_data_dir).map_err(|e| format!("创建应用数据目录失败: {}", e))?;
+        fs::create_dir_all(&app_data_dir)
+            .map_err(|e| format!("Failed to create the application data directory: {}", e))?;
     }
 
     Ok(app_data_dir.join("toolbar_config.json"))
@@ -44,9 +45,9 @@ pub fn save_toolbar_position_internal<R: Runtime>(app: &AppHandle<R>, x: f64, y:
         });
 
         if let Err(e) = fs::write(&config_path, config.to_string()) {
-            error!("❌ 保存工具栏位置失败: {}", e);
+            error!("Failed to save the toolbar position: {}", e);
         } else {
-            debug!("💾 工具栏位置已保存: ({}, {})", x, y);
+            debug!("Toolbar position saved: ({}, {})", x, y);
         }
     }
 }
@@ -101,7 +102,7 @@ fn load_toolbar_position<R: Runtime>(app: &AppHandle<R>) -> Option<(f64, f64)> {
     let config_path = match get_toolbar_config_path(app) {
         Ok(path) => path,
         Err(e) => {
-            error!("❌ 获取配置路径失败: {}", e);
+            error!("Failed to get the toolbar configuration path: {}", e);
             return None;
         }
     };
@@ -115,16 +116,16 @@ fn load_toolbar_position<R: Runtime>(app: &AppHandle<R>) -> Option<(f64, f64)> {
             Ok(config) => {
                 let x = config["x"].as_f64()?;
                 let y = config["y"].as_f64()?;
-                debug!("📂 加载工具栏位置: ({}, {})", x, y);
+                debug!("Loaded toolbar position: ({}, {})", x, y);
                 Some((x, y))
             }
             Err(e) => {
-                error!("❌ 解析工具栏配置失败: {}", e);
+                error!("Failed to parse the toolbar configuration: {}", e);
                 None
             }
         },
         Err(e) => {
-            error!("❌ 读取工具栏配置失败: {}", e);
+            error!("Failed to read the toolbar configuration: {}", e);
             None
         }
     }
@@ -266,9 +267,14 @@ fn default_toolbar_position(
 }
 
 // 辅助函数：创建工具窗口
-pub fn create_tool_window_internal<R: Runtime>(app: &AppHandle<R>, tool_type: &str) -> Result<(), String> {
+pub fn create_tool_window_internal<R: Runtime>(
+    app: &AppHandle<R>,
+    tool_type: &str,
+) -> Result<(), String> {
     let is_nr = tool_type == "nr";
-    if is_nr { crate::nr_overlay::request_visibility(app, true); }
+    if is_nr {
+        crate::nr_overlay::request_visibility(app, true);
+    }
     let tool_window_id = if is_nr { "nr_overlay" } else { "tool_window" };
     let window_width = if is_nr { 190.0 } else { 340.0 };
     let window_height = if is_nr { 48.0 } else { 260.0 };
@@ -285,7 +291,7 @@ pub fn create_tool_window_internal<R: Runtime>(app: &AppHandle<R>, tool_type: &s
     // 创建工具窗口，通过 URL 参数传递工具类型
     let url = format!("tool-window/index.html?tool={}", tool_type);
     let title = format!("ZakoToolsWindow - {}", tool_type);
-    debug!("🔧 创建工具窗口 URL: {}", url);
+    debug!("Creating tool window URL: {}", url);
 
     let mut builder =
         tauri::WebviewWindowBuilder::new(app, tool_window_id, tauri::WebviewUrl::App(url.into()))
@@ -325,7 +331,7 @@ pub fn create_tool_window_internal<R: Runtime>(app: &AppHandle<R>, tool_type: &s
                 if !is_performance_monitor {
                     window.open_devtools();
                     let _ = window.set_always_on_top(false);
-                    debug!("🔧 [开发模式] 工具窗口已自动打开 DevTools");
+                    debug!("Opened DevTools for the tool window in development mode");
                 }
             }
 
@@ -358,11 +364,13 @@ pub fn create_tool_window_internal<R: Runtime>(app: &AppHandle<R>, tool_type: &s
                         let _ = window.set_position(position);
                     }
                 }
-                if !is_nr || crate::nr_overlay::visibility_requested() { let _ = window.show(); }
+                if !is_nr || crate::nr_overlay::visibility_requested() {
+                    let _ = window.show();
+                }
             });
         }
         Err(e) => {
-            return Err(format!("创建工具窗口失败: {}", e));
+            return Err(format!("Failed to create the tool window: {}", e));
         }
     }
     Ok(())
@@ -382,7 +390,7 @@ pub fn handle_toolbar_menu_event<R: Runtime>(app: &AppHandle<R>, event_id: &str)
             Some(window)
         } else {
             if let Err(e) = windows::create_main_window(app) {
-                error!("❌ 创建主窗口失败: {}", e);
+                error!("Failed to create the main window: {}", e);
                 return None;
             }
             app.get_webview_window("main")
@@ -400,27 +408,22 @@ pub fn handle_toolbar_menu_event<R: Runtime>(app: &AppHandle<R>, event_id: &str)
         }
         "dpi" | "toolbar_dpi" => {
             if let Err(e) = create_tool_window_internal(app, "dpi") {
-                error!("创建工具窗口失败: {}", e);
+                error!("Failed to create the tool window: {}", e);
             }
         }
         "bitrate" | "toolbar_bitrate" => {
             if let Err(e) = create_tool_window_internal(app, "bitrate") {
-                error!("创建工具窗口失败: {}", e);
+                error!("Failed to create the tool window: {}", e);
             }
         }
         "performance" | "toolbar_performance" => {
             if let Err(e) = create_tool_window_internal(app, "performance") {
-                error!("创建工具窗口失败: {}", e);
+                error!("Failed to create the tool window: {}", e);
             }
         }
         "shortcuts" | "toolbar_shortcuts" => {
             if let Err(e) = create_tool_window_internal(app, "shortcuts") {
-                error!("创建工具窗口失败: {}", e);
-            }
-        }
-        "pet" | "toolbar_pet" => {
-            if let Err(e) = create_tool_window_internal(app, "pet") {
-                error!("创建工具窗口失败: {}", e);
+                error!("Failed to create the tool window: {}", e);
             }
         }
         "close" | "toolbar_close" => {
@@ -438,11 +441,11 @@ pub fn create_toolbar_window_internal<R: Runtime>(app: &AppHandle<R>) -> Result<
 
     // 检查工具栏窗口是否已存在
     if app.get_webview_window(TOOLBAR_WINDOW_ID).is_some() {
-        debug!("🔧 工具栏窗口已存在");
+        debug!("Toolbar window already exists");
         return Ok(());
     }
 
-    debug!("🔧 创建工具栏窗口");
+    debug!("Creating toolbar window");
 
     // 窗口大小和边距配置
     let toolbar_size = 240.0; // 窗口大小（紧凑布局：80px 图标 + 80px 气泡半径 × 2）
@@ -452,7 +455,7 @@ pub fn create_toolbar_window_internal<R: Runtime>(app: &AppHandle<R>) -> Result<
         TOOLBAR_WINDOW_ID,
         tauri::WebviewUrl::App("toolbar/index.html".into()),
     )
-    .title("工具栏")
+    .title("Toolbar")
     .inner_size(toolbar_size, toolbar_size)
     .max_inner_size(toolbar_size, toolbar_size)
     .resizable(false)
@@ -481,7 +484,7 @@ pub fn create_toolbar_window_internal<R: Runtime>(app: &AppHandle<R>) -> Result<
                     let expected_phys = (target * sf) as u32;
                     if size.width != expected_phys || size.height != expected_phys {
                         warn!(
-                            "⚠️ 窗口尺寸异常！期望 {}x{} 实际 {}x{}",
+                            "Unexpected toolbar window size: expected {}x{}, got {}x{}",
                             expected_phys, expected_phys, size.width, size.height
                         );
                         let _ = win_check.set_size(tauri::Size::Physical(
@@ -494,21 +497,21 @@ pub fn create_toolbar_window_internal<R: Runtime>(app: &AppHandle<R>) -> Result<
             win
         }
         Err(e) => {
-            error!("❌ 创建工具栏窗口失败: {}", e);
-            return Err(format!("创建工具栏窗口失败: {}", e));
+            error!("Failed to create the toolbar window: {}", e);
+            return Err(format!("Failed to create the toolbar window: {}", e));
         }
     };
 
     // 保存值是物理坐标。根据该坐标选择对应显示器后再按该屏幕的
     // 原点和缩放约束位置，支持负坐标与混合 DPI。
     if let Some((saved_x, saved_y)) = load_toolbar_position(app) {
-        debug!("📂 读取保存的工具栏位置: ({}, {})", saved_x, saved_y);
+        debug!("Loaded saved toolbar position: ({}, {})", saved_x, saved_y);
         let saved_position =
             tauri::PhysicalPosition::new(saved_x.round() as i32, saved_y.round() as i32);
         let position =
             clamp_tool_window_position(&window, saved_position, toolbar_size, toolbar_size);
         if let Err(e) = window.set_position(position) {
-            error!("❌ 设置工具栏位置失败: {}", e);
+            error!("Failed to set the toolbar position: {}", e);
         }
     } else {
         // 首次显示放在主显示器右下角，并包含显示器物理原点。
@@ -521,17 +524,17 @@ pub fn create_toolbar_window_internal<R: Runtime>(app: &AppHandle<R>) -> Result<
             let desired = default_toolbar_position(&monitor, toolbar_size);
             let position = clamp_tool_window_position(&window, desired, toolbar_size, toolbar_size);
             if let Err(e) = window.set_position(position) {
-                error!("❌ 设置工具栏位置失败: {}", e);
+                error!("Failed to set the toolbar position: {}", e);
             }
         }
     }
 
     // 显示窗口
     if let Err(e) = window.show() {
-        error!("❌ 显示工具栏窗口失败: {}", e);
+        error!("Failed to show the toolbar window: {}", e);
     }
 
-    debug!("✅ 工具栏窗口创建成功");
+    debug!("Toolbar window created");
     Ok(())
 }
 
@@ -544,7 +547,7 @@ pub async fn create_toolbar_window(app: AppHandle) -> Result<(), String> {
 // Tauri 命令：处理工具栏菜单操作
 #[tauri::command]
 pub async fn handle_toolbar_menu_action(app: AppHandle, action: String) -> Result<(), String> {
-    debug!("🔧 处理菜单操作: {}", action);
+    debug!("Handling toolbar menu action: {}", action);
     handle_toolbar_menu_event(&app, &action);
     Ok(())
 }

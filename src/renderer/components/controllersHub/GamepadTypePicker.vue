@@ -196,7 +196,7 @@ async function loadApps() {
     apps.value = Array.isArray(data) ? data : data?.apps || []
   } catch (error) {
     if (requestId !== appsRequestId) return
-    console.error('加载应用列表失败:', error)
+    console.error('Unable to load the application list:', error)
     appsError.value = true
   } finally {
     if (timeoutTimer !== null) clearTimeout(timeoutTimer)
@@ -244,4 +244,3 @@ onMounted(() => {
   loadApps()
 })
 </script>
-
