@@ -1109,6 +1109,42 @@ pub async fn get_active_sessions() -> Result<Vec<SessionInfo>, String> {
 }
 
 #[tauri::command]
+pub async fn stop_all_sessions() -> Result<String, String> {
+    let sunshine_url = get_sunshine_url().await?;
+    let stop_url = format!(
+        "{}/api/runtime/sessions/stop",
+        sunshine_url.trim_end_matches('/')
+    );
+
+    info!("Requesting disconnection of all streaming sessions: {}", stop_url);
+
+    let client = create_https_client()?;
+    let response = client
+        .post(&stop_url)
+        .json(&serde_json::json!({}))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to request session disconnection: {}", e))?;
+
+    let status = response.status();
+    let response_text = response
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read the session-disconnection response: {}", e))?;
+
+    if !status.is_success() {
+        error!("Session disconnection failed (status {}): {}", status, response_text);
+        return Err(format!(
+            "Session disconnection failed (status {}): {}",
+            status, response_text
+        ));
+    }
+
+    info!("Requested disconnection of all streaming sessions");
+    Ok(response_text)
+}
+
+#[tauri::command]
 pub async fn change_bitrate(client_name: String, bitrate: u32) -> Result<String, String> {
     // 验证码率范围
     if !(1..=800000).contains(&bitrate) {

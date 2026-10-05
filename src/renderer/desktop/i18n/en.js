@@ -464,6 +464,11 @@ export const en = {
     broadcastQueue: 'Bcast q',
     totalPipeline: 'Total',
     samples: '{count} samples',
+    stopAllSessions: 'Disconnect all sessions',
+    confirmStopAll: 'Disconnect all sessions?',
+    stopAllHint: 'Ends every streaming session on every client',
+    stopAllOk: 'Disconnect requested for all sessions',
+    stopAllFailed: 'Disconnect failed: {error}',
     status: {
       idle: 'Idle',
       waiting: 'Waiting for samples',

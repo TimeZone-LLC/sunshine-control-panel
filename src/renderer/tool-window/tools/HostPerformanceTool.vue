@@ -104,6 +104,17 @@
             <strong>{{ formatUptime(currentSession.uptime_ms) }}</strong>
           </div>
         </div>
+        <div class="stop-row">
+          <button
+            class="stop-btn"
+            :class="{ armed: stopArmed }"
+            :disabled="stopBusy"
+            @click="requestStopAll"
+          >
+            {{ stopArmed ? t.performanceTool.confirmStopAll : t.performanceTool.stopAllSessions }}
+          </button>
+          <span v-if="stopMessage" class="stop-message">{{ stopMessage }}</span>
+        </div>
       </div>
     </template>
   </div>
@@ -159,6 +170,39 @@ const currentSession = computed(() => {
 
 const hostLatency = computed(() => currentSession.value?.host_latency ?? {})
 const pipeline = computed(() => currentSession.value?.pipeline ?? {})
+
+// Require a second click within three seconds before disconnecting every session.
+const stopArmed = ref(false)
+const stopBusy = ref(false)
+const stopMessage = ref('')
+let stopArmTimer = null
+let stopMessageTimer = null
+
+async function requestStopAll() {
+  if (!stopArmed.value) {
+    stopArmed.value = true
+    clearTimeout(stopArmTimer)
+    stopArmTimer = setTimeout(() => {
+      stopArmed.value = false
+    }, 3000)
+    return
+  }
+  stopArmed.value = false
+  clearTimeout(stopArmTimer)
+  stopBusy.value = true
+  try {
+    await sunshine.stopAllSessions()
+    stopMessage.value = t.value.performanceTool.stopAllOk
+  } catch (e) {
+    stopMessage.value = t.value.performanceTool.stopAllFailed.replace('{error}', String(e))
+  } finally {
+    stopBusy.value = false
+    clearTimeout(stopMessageTimer)
+    stopMessageTimer = setTimeout(() => {
+      stopMessage.value = ''
+    }, 3000)
+  }
+}
 
 const frameBudgetMs = computed(() => {
   const fps = currentSession.value?.fps || 60
@@ -376,6 +420,8 @@ onUnmounted(() => {
     window.clearInterval(pollTimer)
     pollTimer = null
   }
+  clearTimeout(stopArmTimer)
+  clearTimeout(stopMessageTimer)
 })
 </script>
 
@@ -722,6 +768,45 @@ onUnmounted(() => {
 
 .session-grid {
   grid-template-columns: 1.4fr 0.8fr 0.8fr;
+}
+
+.stop-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.stop-btn {
+  padding: 6px 14px;
+  border-radius: 0;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--perf-text);
+  background: var(--perf-surface);
+  border: 1px solid var(--perf-border-muted);
+
+  &:hover {
+    border-color: currentColor;
+  }
+
+  &.armed {
+    color: var(--perf-danger);
+    font-weight: 600;
+    border-color: var(--perf-danger);
+    background: var(--perf-danger-soft);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+}
+
+.stop-message {
+  font-size: 11px;
+  color: var(--perf-text-muted);
+  opacity: 0.85;
 }
 
 .pipeline-list {
