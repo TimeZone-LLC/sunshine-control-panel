@@ -1,0 +1,18 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-nr-controls",
+  "description": "Allows only the bundled main control panel to configure and operate live DLSS NR sessions.",
+  "windows": ["main"],
+  "local": true,
+  "permissions": [
+    "allow-nr-live-status",
+    "allow-nr-live-set-enabled",
+    "allow-nr-live-remember",
+    "allow-nr-overlay-capture-shortcut",
+    "allow-nr-overlay-settings",
+    "allow-nr-overlay-save-settings",
+    "allow-nr-overlay-select-session",
+    "allow-nr-overlay-set-visible",
+    "allow-nr-overlay-is-visible"
+  ]
+}

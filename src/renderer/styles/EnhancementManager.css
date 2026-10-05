@@ -246,7 +246,7 @@
 
 .mini-overlay {
   padding: 8px;
-  background: var(--bg-raised);
+  background: rgb(from var(--bg-panel) r g b / var(--panel-alpha, 1));
 }
 
 .mini-toggle {

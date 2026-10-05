@@ -255,7 +255,7 @@ onUnmounted(() => { disposed = true; clearTimeout(resizeRetry); clearTimeout(tim
   width: 182px;
   margin: 4px;
   color: var(--text);
-  background: var(--bg-panel);
+  background: rgb(from var(--bg-panel) r g b / var(--panel-alpha, 1));
   border: 1px solid var(--border);
   border-radius: 0;
   font: 13px/1.5 var(--font-sans);

@@ -111,8 +111,8 @@
 
       try {
         const selected = await openDialog({
-          title: '选择文件',
-          filters: [{ name: '所有文件', extensions: ['*'] }],
+          title: 'Choose a file',
+          filters: [{ name: 'All files', extensions: ['*'] }],
           multiple: false,
           directory: false,
         })
@@ -161,7 +161,7 @@
       try {
         return await invoke('get_vmouse_status')
       } catch (e) {
-        return { installed: false, running: false, status_text: '检测失败', driver_path: '', config_enabled: false }
+        return { installed: false, running: false, status_text: 'Detection failed', driver_path: '', config_enabled: false }
       }
     },
     async install() {
@@ -183,7 +183,7 @@
           running: false,
           version: '',
           version_ok: false,
-          status_text: '检测失败',
+          status_text: 'Detection failed',
           driver_path: '',
         }
       }

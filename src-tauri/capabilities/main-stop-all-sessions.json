@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-stop-all-sessions",
+  "description": "Allows only the main window's authenticated localhost Web UI to stop every active streaming session.",
+  "windows": ["main"],
+  "local": true,
+  "remote": {
+    "urls": [
+      "http://localhost:*",
+      "https://localhost:*",
+      "http://127.0.0.1:*",
+      "https://127.0.0.1:*"
+    ]
+  },
+  "permissions": ["allow-stop-all-sessions"]
+}

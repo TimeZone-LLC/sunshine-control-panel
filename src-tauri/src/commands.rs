@@ -2,10 +2,7 @@ use crate::{toolbar, windows};
 use base64::Engine as _;
 use log::{info, warn};
 use serde::Serialize;
-use std::sync::{
-    OnceLock,
-    atomic::{AtomicBool, Ordering},
-};
+use std::sync::OnceLock;
 use tauri::{AppHandle, Emitter, Manager};
 use url::Url;
 
@@ -169,117 +166,9 @@ pub async fn fetch_remote_bytes(
 
 // ===== Desktop screenshot =====
 
-static SCREENSHOT_CAPTURE_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
-
-struct ScreenshotCaptureGuard;
-
-impl ScreenshotCaptureGuard {
-    fn try_acquire() -> Result<Self, String> {
-        SCREENSHOT_CAPTURE_IN_PROGRESS
-            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-            .map(|_| Self)
-            .map_err(|_| "A screenshot capture is already in progress".to_string())
-    }
-}
-
-impl Drop for ScreenshotCaptureGuard {
-    fn drop(&mut self) {
-        SCREENSHOT_CAPTURE_IN_PROGRESS.store(false, Ordering::Release);
-    }
-}
-
-fn scaled_image_dimensions(width: u32, height: u32, max_dimension: u32) -> (u32, u32) {
-    let max_dimension = max_dimension.max(1);
-    let longest = width.max(height);
-    if longest <= max_dimension || longest == 0 {
-        return (width, height);
-    }
-
-    let scale = max_dimension as f64 / longest as f64;
-    (
-        ((width as f64 * scale).round() as u32).max(1),
-        ((height as f64 * scale).round() as u32).max(1),
-    )
-}
-
-/// Capture the primary display as a base64 JPEG.
-#[tauri::command]
-pub async fn capture_screenshot(window: tauri::WebviewWindow) -> Result<Option<String>, String> {
-    use std::io::Cursor;
-    use xcap::Monitor;
-
-    if window.label() != "toolbar" {
-        return Err("Screenshot capture is only available to the desktop pet toolbar".to_string());
-    }
-
-    // xcap uses a synchronous API, so capture on a blocking thread.
-    tokio::task::spawn_blocking(|| {
-        let _capture_guard = ScreenshotCaptureGuard::try_acquire()?;
-
-        let mut monitors =
-            Monitor::all().map_err(|e| format!("Failed to enumerate monitors: {}", e))?;
-        if monitors.is_empty() {
-            return Ok(None);
-        }
-        let mut primary_index = None;
-        for (index, monitor) in monitors.iter().enumerate() {
-            if monitor
-                .is_primary()
-                .map_err(|e| format!("Failed to identify primary monitor: {}", e))?
-            {
-                primary_index = Some(index);
-                break;
-            }
-        }
-        let primary_index = primary_index.ok_or_else(|| "No primary monitor found".to_string())?;
-        let monitor = monitors.swap_remove(primary_index);
-
-        let image = monitor
-            .capture_image()
-            .map_err(|e| format!("Screenshot failed: {}", e))?;
-
-        // Limit the longest edge to reduce token usage for both landscape and
-        // portrait displays.
-        let (w, h) = (image.width(), image.height());
-        let (target_w, target_h) = scaled_image_dimensions(w, h, 1024);
-        let resized = if (target_w, target_h) != (w, h) {
-            image::imageops::resize(
-                &image,
-                target_w,
-                target_h,
-                image::imageops::FilterType::Triangle,
-            )
-        } else {
-            image
-        };
-
-        // JPEG does not support alpha.
-        let rgb_image = image::DynamicImage::ImageRgba8(resized).to_rgb8();
-
-        // Encode as JPEG at quality 60.
-        let mut buf = Cursor::new(Vec::new());
-        let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buf, 60);
-        rgb_image
-            .write_with_encoder(encoder)
-            .map_err(|e| format!("JPEG encoding failed: {}", e))?;
-
-        let b64 = base64::engine::general_purpose::STANDARD.encode(buf.into_inner());
-        Ok(Some(format!("data:image/jpeg;base64,{}", b64)))
-    })
-    .await
-    .map_err(|e| format!("Screenshot task failed: {}", e))?
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{is_allowed_asset_url, scaled_image_dimensions};
-
-    #[test]
-    fn screenshot_scaling_limits_the_longest_edge() {
-        assert_eq!(scaled_image_dimensions(1920, 1080, 1024), (1024, 576));
-        assert_eq!(scaled_image_dimensions(1080, 1920, 1024), (576, 1024));
-        assert_eq!(scaled_image_dimensions(800, 600, 1024), (800, 600));
-    }
+    use super::is_allowed_asset_url;
 
     #[test]
     fn remote_asset_url_requires_the_exact_https_cdn_host() {

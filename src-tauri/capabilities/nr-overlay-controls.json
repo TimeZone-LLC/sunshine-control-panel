@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "nr-overlay-controls",
+  "description": "Allows only the bundled DLSS NR overlay to operate its selected live session.",
+  "windows": ["nr_overlay"],
+  "local": true,
+  "permissions": [
+    "allow-nr-live-status",
+    "allow-nr-live-set-enabled",
+    "allow-nr-live-remember",
+    "allow-nr-overlay-settings",
+    "allow-nr-overlay-save-settings",
+    "allow-nr-overlay-select-session",
+    "allow-nr-overlay-set-visible"
+  ]
+}

@@ -8,10 +8,9 @@ use tauri_build::{AppManifest, Attributes};
 /// tauri-build 默认扫描 `./capabilities/**/*` 加载所有 capability。
 const GENERATED_CAPABILITY_PATH: &str = "capabilities/app-commands.generated.json";
 
-/// Commands that must never be exposed to the Sunshine backend remote origin.
-/// Their local window-scoped grants live in hand-written capability files.
-const LOCAL_ONLY_COMMANDS: &[&str] = &[
-    "capture_screenshot",
+/// Commands excluded from the broad Sunshine backend remote-origin grant.
+/// Their least-privilege window/origin grants live in hand-written capability files.
+const SCOPED_COMMANDS: &[&str] = &[
     "hdr_enhanced_select_backend",
     "list_native_components",
     "native_component_get_status",
@@ -20,6 +19,16 @@ const LOCAL_ONLY_COMMANDS: &[&str] = &[
     "native_component_remove",
     "open_local_path",
     "open_native_tool",
+    "nr_live_remember",
+    "nr_live_set_enabled",
+    "nr_live_status",
+    "nr_overlay_capture_shortcut",
+    "nr_overlay_is_visible",
+    "nr_overlay_save_settings",
+    "nr_overlay_select_session",
+    "nr_overlay_set_visible",
+    "nr_overlay_settings",
+    "stop_all_sessions",
     "usbip_get_forwarding_config",
     "usbip_save_forwarding_config",
 ];
@@ -92,16 +101,16 @@ fn allow_id(command: &str) -> String {
 /// 该 capability 仅包含 app commands 的 allow- 权限并绑定 sunshine backend
 /// remote URLs；窗口/插件/外部 URL 等由 `capabilities/default.json` 维护。
 fn write_capability(commands: &[String]) {
-    for local_only in LOCAL_ONLY_COMMANDS {
+    for scoped in SCOPED_COMMANDS {
         assert!(
-            commands.iter().any(|command| command == local_only),
-            "LOCAL_ONLY_COMMANDS entry `{local_only}` was not found in generate_handler!"
+            commands.iter().any(|command| command == scoped),
+            "SCOPED_COMMANDS entry `{scoped}` was not found in generate_handler!"
         );
     }
 
     let permissions: Vec<String> = commands
         .iter()
-        .filter(|command| !LOCAL_ONLY_COMMANDS.contains(&command.as_str()))
+        .filter(|command| !SCOPED_COMMANDS.contains(&command.as_str()))
         .map(|command| allow_id(command))
         .collect();
     let permissions_lines = permissions

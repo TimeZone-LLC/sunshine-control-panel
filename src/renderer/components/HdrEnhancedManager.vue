@@ -254,7 +254,7 @@
                 <div
                   class="mini-overlay"
                   :style="{
-                    background: `rgb(14 16 13 / ${draftOpacity / 100})`
+                    '--panel-alpha': draftOpacity / 100
                   }"
                 >
                   <header><Rank aria-hidden="true" /><i aria-hidden="true" /> DLSS NR <ArrowUp aria-hidden="true" /></header>
