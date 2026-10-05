@@ -101,13 +101,29 @@ export const vigem = {
   uninstall: () => wrapResult('uninstall_vigem_driver'),
 }
 
+export const controllerHub = {
+  getConfig: () => wrapResult('get_controller_hub_config'),
+  saveConfig: (patch = {}) => wrapResult('save_controller_hub_config', {
+    gamepad: patch.gamepad,
+    motionAsDs4: patch.motion_as_ds4,
+    touchpadAsDs4: patch.touchpad_as_ds4,
+    ds4BackAsTouchpadClick: patch.ds4_back_as_touchpad_click,
+    enableDsuServer: patch.enable_dsu_server,
+    dsuServerPort: patch.dsu_server_port,
+  }),
+}
+
+export const virtualMicrophone = {
+  getStatus: () => wrapResult('get_virtual_microphone_status'),
+  test: () => wrapResult('test_virtual_microphone'),
+}
+
 export const dualsense = {
   getStatus: () => wrapResult('dualsense_get_status'),
   logPanelOpened: () => wrapResult('dualsense_log_panel_opened'),
   install: (packagePaths = []) => wrapResult('dualsense_install', { packagePaths }),
   uninstall: () => wrapResult('dualsense_uninstall'),
-  setConfig: (enabled, audioHaptics, genshinCompatibility) => wrapResult('dualsense_set_config', {
-    enabled: !!enabled,
+  setConfig: (audioHaptics, genshinCompatibility) => wrapResult('dualsense_set_config', {
     audioHaptics: !!audioHaptics,
     genshinCompatibility: !!genshinCompatibility,
   }),
@@ -120,6 +136,17 @@ export const dualsense = {
 }
 
 // ─── Sunshine 配置 ───────────────────────────────────────
+
+export const usbip = {
+  getForwardingConfig: () => wrapResult('usbip_get_forwarding_config'),
+  saveForwardingConfig: (enabled, port) => wrapResult('usbip_save_forwarding_config', { enabled, port }),
+  getStatus: () => wrapResult('usbip_get_status'),
+  installTransport: () => wrapResult('usbip_install_transport'),
+  cleanupTransport: () => wrapResult('usbip_cleanup_transport'),
+  listRemote: (remote, tcpPort = 3240) => wrapResult('usbip_list_remote', { remote, tcpPort }),
+  attach: (remote, busId, tcpPort = 3240) => wrapResult('usbip_attach', { remote, busId, tcpPort }),
+  detach: (port) => wrapResult('usbip_detach', { port }),
+}
 
 export const sunshine = {
   getVersion: () => wrapDefault('get_sunshine_version', 'Unknown'),
@@ -196,7 +223,10 @@ export default {
   vdd,
   vmouse,
   vigem,
+  controllerHub,
+  virtualMicrophone,
   dualsense,
+  usbip,
   sunshine,
   tools,
   fileMapping,

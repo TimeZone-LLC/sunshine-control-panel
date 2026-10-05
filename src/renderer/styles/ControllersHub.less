@@ -1,0 +1,423 @@
+// Device hub layout. Visual tokens come from brutalist.less.
+
+.chub-page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: var(--space-4);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--font-size);
+  line-height: var(--line-height);
+}
+
+.chub-header {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-panel);
+}
+
+.chub-header-icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid var(--border);
+  color: var(--text);
+
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.chub-header-copy h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.chub-intro,
+.chub-hint {
+  margin: var(--space-1) 0 0;
+  color: var(--text-dim);
+  font-size: var(--font-size-sm);
+}
+
+.chub-tabs {
+  margin-top: var(--space-3);
+}
+
+.chub-tabbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  border: 1px solid var(--border);
+  background: var(--border);
+}
+
+.chub-tab {
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: 0;
+  background: var(--bg-input);
+  color: var(--text-dim);
+  font: inherit;
+  cursor: pointer;
+  transition: background-color var(--transition), color var(--transition);
+
+  &:hover,
+  &:focus-visible {
+    background: var(--bg-hover);
+    color: var(--text);
+  }
+
+  &.is-active {
+    background: var(--bg-active);
+    color: var(--text);
+    font-weight: 600;
+  }
+}
+
+.chub-pane,
+.chub-panel {
+  margin-top: var(--space-3);
+}
+
+.chub-section,
+.chub-subsection,
+.chub-window,
+.chub-card,
+.chub-context-note {
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+}
+
+.chub-section,
+.chub-subsection,
+.chub-window {
+  padding: var(--space-3);
+}
+
+.chub-section + .chub-section,
+.chub-subsection + .chub-subsection,
+.chub-window + .chub-window {
+  margin-top: var(--space-3);
+}
+
+.chub-section-head,
+.chub-card-head,
+.chub-hud-row,
+.chub-panel-footer,
+.chub-card-actions,
+.chub-hud-actions,
+.chub-dsu-row,
+.forwarding-row,
+.forwarding-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.chub-section-head,
+.chub-card-head,
+.chub-hud-row {
+  justify-content: space-between;
+}
+
+.chub-section-label,
+.chub-window-tab,
+.chub-question {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.chub-section-rule {
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.chub-cards,
+.chub-runtime-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.chub-card {
+  display: flex;
+  min-height: 112px;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+
+.chub-card .chub-hint {
+  flex: 1;
+  margin: 0;
+}
+
+.chub-card-actions,
+.chub-panel-footer,
+.forwarding-actions {
+  justify-content: flex-end;
+}
+
+.chub-panel-footer {
+  margin-top: var(--space-3);
+}
+
+.chub-card-placeholder {
+  background: var(--bg-panel-soft);
+  pointer-events: none;
+}
+
+.chub-status-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--off);
+}
+
+.state-ready .chub-status-dot,
+.state-in_use .chub-status-dot {
+  background: var(--on);
+}
+
+.state-error .chub-status-dot,
+.chub-status-error,
+.chub-value-danger {
+  color: var(--error);
+}
+
+.state-error .chub-status-dot {
+  background: var(--error);
+}
+
+.chub-hud-state,
+.chub-hud-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.chub-hud-version,
+.chub-usb-port {
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+}
+
+.chub-notice,
+.chub-context-note,
+.chub-usb-setup {
+  margin-top: var(--space-3);
+}
+
+.chub-context-note,
+.chub-usb-setup {
+  padding: var(--space-2);
+  background: var(--bg-panel-soft);
+}
+
+.chub-type-picker,
+.chub-advanced-block,
+.chub-usb-attached-section {
+  margin-top: var(--space-4);
+}
+
+.chub-picker-row {
+  min-height: 72px;
+}
+
+.chub-mode-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.chub-mode-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 64px;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--transition), color var(--transition), border-color var(--transition);
+
+  &:hover:not(:disabled),
+  &:focus-visible {
+    background: var(--bg-hover);
+    border-color: var(--border-strong);
+  }
+
+  &.is-selected {
+    background: var(--bg-active);
+    border-color: var(--border-strong);
+  }
+
+  &.is-disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+}
+
+.chub-mode-body {
+  flex: 1;
+
+  strong,
+  small {
+    display: block;
+  }
+
+  small {
+    color: var(--text-dim);
+  }
+}
+
+.chub-mode-cursor {
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--border-strong);
+  color: transparent;
+}
+
+.is-selected .chub-mode-cursor {
+  background: var(--text);
+}
+
+.chub-check-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.chub-dsu-row {
+  flex-wrap: wrap;
+}
+
+.chub-dsu-port {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.chub-app-list,
+.chub-usb-list {
+  display: grid;
+  gap: 1px;
+  margin-top: var(--space-2);
+  border: 1px solid var(--border);
+  background: var(--border);
+}
+
+.chub-app-row,
+.chub-usb-device {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--row-height);
+  padding: var(--space-2);
+  background: var(--bg-panel);
+}
+
+.chub-app-name,
+.chub-usb-device-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.chub-app-select {
+  min-width: 180px;
+}
+
+.chub-usb-discovery {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) 120px auto;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.chub-disclosure {
+  margin-top: var(--space-3);
+
+  > summary {
+    cursor: pointer;
+    color: var(--text);
+  }
+}
+
+.chub-disclosure-mark {
+  display: none;
+}
+
+.chub-diagnostics-details {
+  margin-top: var(--space-3);
+  border-top: 1px solid var(--border);
+  color: var(--text-dim);
+
+  summary {
+    padding-top: var(--space-2);
+    cursor: pointer;
+  }
+}
+
+.chub-advanced {
+  border: 0;
+
+  .el-collapse-item__header,
+  .el-collapse-item__wrap {
+    background: var(--bg-panel);
+    color: var(--text);
+    border-color: var(--border);
+  }
+
+  .el-collapse-item__content {
+    padding: var(--space-3) 0;
+    color: var(--text);
+  }
+}
+
+.chub-page :is(.el-tag, .el-input__wrapper, .el-input-number__decrease, .el-input-number__increase,
+  .el-checkbox__inner, .el-switch__core, .el-switch__action, .el-progress-bar__outer,
+  .el-progress-bar__inner) {
+  border-radius: 0;
+}
+
+.chub-page .el-input__inner,
+.chub-page .el-input-number {
+  font-family: var(--font-mono);
+}
+
+@media (max-width: 720px) {
+  .chub-page {
+    padding: var(--space-3);
+  }
+
+  .chub-mode-list,
+  .chub-cards,
+  .chub-runtime-grid,
+  .chub-usb-discovery {
+    grid-template-columns: 1fr;
+  }
+
+  .chub-app-row,
+  .chub-usb-device,
+  .chub-panel-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .chub-app-select {
+    width: 100%;
+    min-width: 0;
+  }
+}

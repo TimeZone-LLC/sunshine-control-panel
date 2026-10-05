@@ -6,6 +6,7 @@ mod bat_runner;
 mod client_fingerprint_rules;
 mod clipboard;
 mod commands;
+mod controller_hub;
 mod device_config;
 mod controllermeta;
 mod desktop_settings;
@@ -233,6 +234,10 @@ fn main() {
             vmouse::install_vmouse_driver,
             vmouse::uninstall_vmouse_driver,
             vmouse::set_vmouse_config,
+            controller_hub::get_controller_hub_config,
+            controller_hub::save_controller_hub_config,
+            controller_hub::get_virtual_microphone_status,
+            controller_hub::test_virtual_microphone,
             vigem::get_vigem_status,
             vigem::install_vigem_driver,
             vigem::uninstall_vigem_driver,

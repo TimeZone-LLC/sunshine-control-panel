@@ -12,6 +12,7 @@ export const ROUTES = {
   CONTROLLERS: 'controllers',
   // Compatibility alias for callers that still navigate to the original page id.
   DUALSENSE: 'dualsense',
+  CONTROLLERS_HUB: 'controllers-hub',
 }
 
 /**
@@ -45,13 +46,18 @@ const routeConfig = {
   },
   [ROUTES.CONTROLLERS]: {
     name: ROUTES.CONTROLLERS,
-    component: 'DualSenseSettings',
-    title: '控制器',
+    component: 'ControllersHub',
+    title: 'Device hub',
   },
   [ROUTES.DUALSENSE]: {
     name: ROUTES.DUALSENSE,
-    component: 'DualSenseSettings',
-    title: '控制器',
+    component: 'ControllersHub',
+    title: 'Device hub',
+  },
+  [ROUTES.CONTROLLERS_HUB]: {
+    name: ROUTES.CONTROLLERS_HUB,
+    component: 'ControllersHub',
+    title: 'Device hub',
   },
 }
 

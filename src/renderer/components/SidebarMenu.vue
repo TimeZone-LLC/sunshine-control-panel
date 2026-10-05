@@ -151,8 +151,8 @@
         <Welcome v-if="router.isRoute(ROUTES.WELCOME)" @close="goHome" />
         <WebStreamSettings v-if="router.isRoute(ROUTES.WEB_STREAM)" @close="goHome" />
         <AiAssistant v-if="router.isRoute(ROUTES.AI_ASSISTANT)" @close="goHome" />
-        <DualSenseSettings
-          v-if="router.isRoute(ROUTES.CONTROLLERS) || router.isRoute(ROUTES.DUALSENSE)"
+        <ControllersHub
+          v-if="router.isRoute(ROUTES.CONTROLLERS) || router.isRoute(ROUTES.DUALSENSE) || router.isRoute(ROUTES.CONTROLLERS_HUB)"
           @close="goHome"
           @open-controller-meta="openGamepadTest"
         />
@@ -180,7 +180,7 @@ import VddSettings from './VddSettings.vue'
 import Welcome from './welcome.vue'
 import WebStreamSettings from './WebStreamSettings.vue'
 import AiAssistant from './AiAssistant.vue'
-import DualSenseSettings from './DualSenseSettings.vue'
+import ControllersHub from './controllersHub/ControllersHub.vue'
 const UpdateDialog = defineAsyncComponent(() => import('./UpdateDialog.vue'))
 import { useSidebarState } from '../composables/useSidebarState.js'
 import { useWindowControls } from '../composables/useWindowControls.js'

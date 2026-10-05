@@ -1,0 +1,280 @@
+// DualSense component and tuning layout. Visual tokens come from brutalist.less.
+
+.ds5-page {
+  width: 100%;
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+.ds5-page-header {
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.ds5-eyebrow,
+.ds5-intro,
+.ds5-tuning-hint,
+.ds5-tuning-field-tip {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--font-size-sm);
+}
+
+.ds5-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+
+  h1 {
+    margin: var(--space-1) 0;
+    font-size: 18px;
+    font-weight: 600;
+  }
+}
+
+.ds5-window,
+.ds5-section,
+.ds5-operation-card {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+}
+
+.ds5-window {
+  margin-top: 0;
+  border-color: var(--border-strong);
+}
+
+.ds5-window-tab,
+.ds5-section-label,
+.ds5-mini-label {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.ds5-section-head,
+.ds5-hud-row,
+.ds5-hud-state,
+.ds5-hud-actions,
+.ds5-panel-footer,
+.ds5-test-actions,
+.ds5-save-row,
+.ds5-compat-row,
+.ds5-tuning-field-head,
+.ds5-exact-value {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ds5-section-head,
+.ds5-hud-row,
+.ds5-compat-row,
+.ds5-tuning-field-head {
+  justify-content: space-between;
+}
+
+.ds5-section-rule {
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.ds5-hud-actions,
+.ds5-panel-footer,
+.ds5-test-actions,
+.ds5-save-row {
+  justify-content: flex-end;
+}
+
+.ds5-status-dot,
+.ds5-health-state i,
+.ds5-mode-cursor {
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--off);
+}
+
+.state-ready .ds5-status-dot,
+.state-in_use .ds5-status-dot,
+.ds5-health-state i.good {
+  background: var(--on);
+}
+
+.state-repair_required .ds5-status-dot,
+.ds5-health-state i.bad {
+  background: var(--error);
+}
+
+.ds5-hud-version,
+.ds5-kbd,
+.ds5-exact-value,
+.ds5-health-detail {
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+}
+
+.ds5-mode-list,
+.ds5-preset-row,
+.ds5-tuning-fields {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.ds5-mode-list,
+.ds5-preset-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ds5-tuning-fields {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ds5-mode-option,
+.ds5-preset {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 56px;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--transition), color var(--transition), border-color var(--transition);
+
+  &:hover:not(:disabled),
+  &:focus-visible {
+    background: var(--bg-hover);
+    border-color: var(--border-strong);
+  }
+
+  &.is-selected {
+    background: var(--bg-active);
+    border-color: var(--border-strong);
+
+    .ds5-mode-cursor {
+      background: var(--text);
+    }
+  }
+
+  &.is-static {
+    cursor: default;
+  }
+
+  strong,
+  small {
+    display: block;
+  }
+
+  small {
+    color: var(--text-dim);
+  }
+}
+
+.ds5-kbd {
+  margin-left: auto;
+}
+
+.ds5-tuning-field {
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  background: var(--bg-panel-soft);
+}
+
+.ds5-feel-badge,
+.ds5-unsaved-tag {
+  color: var(--text-dim);
+  font-size: var(--font-size-xs);
+}
+
+.ds5-eq-fader {
+  display: flex;
+  min-height: 170px;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+  color: var(--text-faint);
+  font-size: var(--font-size-xs);
+}
+
+.ds5-exact-value {
+  justify-content: space-between;
+}
+
+.ds5-compat-notice,
+.ds5-notice {
+  margin-top: var(--space-2);
+}
+
+.ds5-compat-notice {
+  padding: var(--space-2);
+  border: 1px solid var(--warn);
+  color: var(--warn);
+}
+
+.ds5-health-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(100px, auto) minmax(180px, 2fr);
+  gap: var(--space-2);
+  min-height: var(--row-height);
+  align-items: center;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.ds5-health-state {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.ds5-details-collapse {
+  border: 0;
+
+  .el-collapse-item__header,
+  .el-collapse-item__wrap {
+    background: var(--bg-panel);
+    color: var(--text);
+    border-color: var(--border);
+  }
+
+  .el-collapse-item__content {
+    padding: var(--space-2) 0;
+    color: var(--text);
+  }
+}
+
+.ds5-page :is(.el-tag, .el-input__wrapper, .el-input-number__decrease, .el-input-number__increase,
+  .el-checkbox__inner, .el-slider__runway, .el-slider__bar, .el-slider__button) {
+  border-radius: 0;
+}
+
+.ds5-action {
+  color: var(--text);
+}
+
+@media (max-width: 800px) {
+  .ds5-tuning-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .ds5-mode-list,
+  .ds5-preset-row {
+    grid-template-columns: 1fr;
+  }
+
+  .ds5-health-row {
+    grid-template-columns: 1fr;
+    padding: var(--space-2) 0;
+  }
+}
