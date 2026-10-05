@@ -21,12 +21,27 @@
 //! transferred out-of-band over HTTPS (`/api/v1/clipboard/blob[/<id>]`) so we
 //! can move payloads larger than the single-packet 65 KB wire ceiling.
 //!
-//! Echo suppression: every locally-applied inbound payload's hash is recorded
-//! before we touch the clipboard; the watcher's resulting on_clipboard_change
-//! sees the matching hash and drops the candidate, breaking the otherwise
-//! infinite write→watch→post→write loop.
+//! Compound clipboard (no wire-format change): a clipboard change carrying
+//! BOTH text and an image is emitted as two consecutive frames sharing a
+//! non-zero token, text frame first, image frame second. Peers without
+//! aggregation apply the frames in order and end with the image — the exact
+//! v1 outcome — so no version negotiation is needed. This agent applies each
+//! frame as it arrives (zero added latency) and retains the text payload;
+//! when the image lands — inline or after its REF blob fetch — the clipboard
+//! is upgraded with one compound write carrying both flavors. Single-flavor
+//! changes keep the legacy token=0 single frame. Burst text is always inline
+//! (a REF text frame would race the image frame onto the wire and flip
+//! legacy peers' final state to text); the image frame may still use REF.
+//! Outbound compound text is deliberately limited to nonempty inline text:
+//! empty text is equivalent to no caption, and an oversized caption is omitted.
+//! This is a supported-content snapshot, not a lossless OS MIME-format mirror.
+//! A standalone inbound empty text frame remains valid as a remote clear.
+//!
+//! Echo suppression compares the complete current clipboard, including absent
+//! flavors. Reads and inbound writes share the state lock so a watcher cannot
+//! record an intermediate snapshot as a new local change.
 
-use std::collections::VecDeque;
+use std::collections::HashMap;
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, AtomicI64, AtomicU8, Ordering},
@@ -60,12 +75,31 @@ const MAX_IMAGE_PIXELS: u64 = 32 * 1024 * 1024;
 /// ~65525 bytes of payload, so 60000 leaves comfortable headroom.
 const INLINE_THRESHOLD: usize = 60_000;
 
-const MIME_TEXT: &str = "text/plain; charset=utf-8";
+/// The service rejects /item bodies above 65500 bytes; a burst text frame
+/// (10-byte header + payload) must stay inline, so larger text degrades the
+/// change to image-only rather than racing a REF text frame.
+const BURST_TEXT_MAX_INLINE: usize = 65_490;
+
+/// How long burst text stays retained after its frame applied — purely a
+/// memory bound; application is immediate on arrival (see module docs).
+const BURST_RETENTION: Duration = Duration::from_secs(5);
+const MAX_PENDING_BURSTS: usize = 32;
+
+// The blob endpoint accepts MIME types without parameters. Wire text is UTF-8.
+const MIME_TEXT: &str = "text/plain";
 const MIME_PNG: &str = "image/png";
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(15);
 const SSE_RECONNECT_BACKOFF: Duration = Duration::from_secs(3);
-const ECHO_TTL: Duration = Duration::from_secs(5);
+
+// Supervisor cadence and stuck thresholds. The supervisor treats each child
+// (sse task / heartbeat task / watcher thread) as independently restartable:
+// a finished task or a wedged watcher is respawned in place, rate-limited by
+// RESPAWN_MIN_GAP so a crash-looping child degrades to periodic retries.
+const SUPERVISOR_INTERVAL: Duration = Duration::from_secs(10);
+const WATCHER_BUSY_STUCK: Duration = Duration::from_secs(60);
+const SSE_DISCONNECTED_STUCK: Duration = Duration::from_secs(180);
+const RESPAWN_MIN_GAP: Duration = Duration::from_secs(30);
 
 const TRANSPORT_STOPPED: u8 = 0;
 const TRANSPORT_CONNECTING: u8 = 1;
@@ -75,9 +109,19 @@ const TRANSPORT_DISCONNECTED: u8 = 3;
 static TRANSPORT_STATE: AtomicU8 = AtomicU8::new(TRANSPORT_STOPPED);
 static LAST_CONNECTED_AT_MS: AtomicI64 = AtomicI64::new(0);
 static LAST_TRANSPORT_ERROR: Mutex<Option<String>> = Mutex::new(None);
+/// Epoch ms since the transport entered (and continuously stayed in)
+/// TRANSPORT_DISCONNECTED; 0 when connected/connecting/stopped.
+static DISCONNECTED_SINCE_MS: AtomicI64 = AtomicI64::new(0);
+
+fn now_ms() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as i64
+}
 
 fn create_sse_client() -> Result<reqwest::Client, String> {
-    create_sse_https_client().map_err(|e| format!("创建 SSE HTTP 客户端失败: {}", e))
+    create_sse_https_client().map_err(|e| format!("Failed to create SSE HTTP client: {}", e))
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -148,35 +192,42 @@ fn decode_frame(bytes: &[u8]) -> Option<Frame> {
     })
 }
 
-#[derive(Clone, Copy)]
-struct EchoEntry {
-    kind: Kind,
-    hash: u64,
-    expires: Instant,
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ImageIdentity {
+    Pixels(u64),
+    Encoded(u64),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ClipboardIdentity {
+    text: Option<u64>,
+    image: Option<ImageIdentity>,
+}
+
+impl ClipboardIdentity {
+    fn new(text: Option<&[u8]>, png: Option<&[u8]>, pixel_hash: Option<u64>) -> Self {
+        Self {
+            // Match the outbound/compound contract: empty text is no caption.
+            // This also suppresses watcher echoes after a standalone clear.
+            text: text.filter(|bytes| !bytes.is_empty()).map(hash_payload),
+            image: png.map(|bytes| match pixel_hash {
+                Some(hash) => ImageIdentity::Pixels(hash),
+                None => ImageIdentity::Encoded(hash_payload(bytes)),
+            }),
+        }
+    }
 }
 
 #[derive(Default)]
 struct EchoState {
-    recent: VecDeque<EchoEntry>,
+    current: Option<ClipboardIdentity>,
 }
 
 impl EchoState {
-    fn record(&mut self, kind: Kind, payload: &[u8]) {
-        if self.recent.len() >= 16 {
-            self.recent.pop_front();
-        }
-        self.recent.push_back(EchoEntry {
-            kind,
-            hash: hash_payload(payload),
-            expires: Instant::now() + ECHO_TTL,
-        });
-    }
-
-    fn is_echo(&mut self, kind: Kind, payload: &[u8]) -> bool {
-        let now = Instant::now();
-        self.recent.retain(|e| e.expires > now);
-        let h = hash_payload(payload);
-        self.recent.iter().any(|e| e.kind == kind && e.hash == h)
+    fn observe(&mut self, identity: ClipboardIdentity) -> bool {
+        let unchanged = self.current == Some(identity);
+        self.current = Some(identity);
+        unchanged
     }
 }
 
@@ -188,15 +239,35 @@ fn hash_payload(bytes: &[u8]) -> u64 {
     h.finish()
 }
 
+/// Pixel identity of an image. The platform clipboard re-encodes image data
+/// on every write/read round trip (Windows stores CF_DIB and macOS
+/// synthesizes new flavors), so payload bytes are not a stable echo key for
+/// images; pixels survive those lossless conversions.
+fn hash_image_pixels(img: &RustImageData) -> Option<u64> {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash as _, Hasher as _};
+    let rgba = img.to_rgba8().ok()?;
+    let mut h = DefaultHasher::new();
+    rgba.dimensions().hash(&mut h);
+    rgba.as_raw().hash(&mut h);
+    Some(h.finish())
+}
+
 #[derive(Default)]
 struct State {
     enabled: bool,
     sse_task: Option<JoinHandle<()>>,
     heartbeat_task: Option<JoinHandle<()>>,
+    supervisor_task: Option<JoinHandle<()>>,
+    /// Liveness of the spawned tasks. tauri's JoinHandle has no
+    /// is_finished(), so each wrapper task clears its flag on exit.
+    sse_alive: Arc<AtomicBool>,
+    heartbeat_alive: Arc<AtomicBool>,
     watcher_shutdown: Option<WatcherShutdown>,
     watcher_thread: Option<std::thread::JoinHandle<()>>,
     stop: Option<Arc<Notify>>,
     echo: Arc<Mutex<EchoState>>,
+    busy: Option<Arc<AtomicI64>>,
     next_token: u32,
 }
 
@@ -217,13 +288,24 @@ pub struct ClipboardStatus {
 
 fn set_transport_state(state: u8, error: Option<String>) {
     TRANSPORT_STATE.store(state, Ordering::Release);
-    *LAST_TRANSPORT_ERROR.lock().unwrap() = error;
+    *LAST_TRANSPORT_ERROR
+        .lock()
+        .unwrap_or_else(|e| e.into_inner()) = error;
+    match state {
+        TRANSPORT_CONNECTED | TRANSPORT_STOPPED => {
+            DISCONNECTED_SINCE_MS.store(0, Ordering::Release)
+        }
+        TRANSPORT_DISCONNECTED => {
+            // Keep the contiguous-disconnected window open across CONNECTING
+            // retries; only a successful connect closes it.
+            DISCONNECTED_SINCE_MS
+                .compare_exchange(0, now_ms(), Ordering::AcqRel, Ordering::Acquire)
+                .ok();
+        }
+        _ => {}
+    }
     if state == TRANSPORT_CONNECTED {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis() as i64;
-        LAST_CONNECTED_AT_MS.store(now, Ordering::Release);
+        LAST_CONNECTED_AT_MS.store(now_ms(), Ordering::Release);
     }
 }
 
@@ -240,13 +322,22 @@ fn transport_state_name(state: u8) -> &'static str {
 
 struct WatcherCallbacks {
     echo: Arc<Mutex<EchoState>>,
-    busy: Arc<AtomicBool>,
+    /// Epoch-ms timestamp of the in-flight snapshot; 0 = idle. Storing the
+    /// time (instead of a bool) lets the supervisor detect a wedged watcher.
+    busy: Arc<AtomicI64>,
 }
 
 impl ClipboardHandler for WatcherCallbacks {
     fn on_clipboard_change(&mut self) {
         // Coalesce: if we're already mid-snapshot drop additional fires.
-        if self.busy.swap(true, Ordering::AcqRel) {
+        // Only claim the 0 -> now transition: refreshing the timestamp on
+        // coalesced events would keep pushing the supervisor's stuck-detection
+        // deadline forward forever while events keep arriving.
+        if self
+            .busy
+            .compare_exchange(0, now_ms(), Ordering::AcqRel, Ordering::Acquire)
+            .is_err()
+        {
             return;
         }
         let echo = self.echo.clone();
@@ -257,12 +348,15 @@ impl ClipboardHandler for WatcherCallbacks {
             tauri::async_runtime::spawn_blocking(move || snapshot_and_post(&echo))
                 .await
                 .ok();
-            busy.store(false, Ordering::Release);
+            busy.store(0, Ordering::Release);
         });
     }
 }
 
 fn snapshot_and_post(echo: &Arc<Mutex<EchoState>>) {
+    // Serialize the complete read with inbound writes. A historical per-flavor
+    // cache loses A -> B -> A changes and splits compound clipboards.
+    let mut st = echo.lock().unwrap_or_else(|e| e.into_inner());
     let ctx = match ClipboardContext::new() {
         Ok(c) => c,
         Err(e) => {
@@ -271,48 +365,166 @@ fn snapshot_and_post(echo: &Arc<Mutex<EchoState>>) {
         }
     };
 
-    if let Ok(text) = ctx.get_text() {
-        if text.is_empty() {
-            return;
+    // Read text and image BEFORE deciding on the file guard: QQ/WeChat
+    // image-message copies attach a cache-file reference (CF_HDROP) AND the
+    // real bitmap, and skipping every file clipboard silently dropped those
+    // syncs. Explorer file copies carry no bitmap at all, so the guard only
+    // needs to fire when nothing transferable came out — a pure file
+    // clipboard must not leak its file names as text.
+    let text = match ctx.get_text() {
+        Ok(t) if !t.is_empty() => Some(t),
+        _ => None,
+    };
+    // A silent get_image failure here is indistinguishable from "the
+    // clipboard had no bitmap" in the logs, which cost a full round of
+    // host-side debugging; surface the distinction.
+    let img = match ctx.get_image() {
+        Ok(i) if !i.is_empty() => Some(i),
+        Ok(_) => {
+            debug!("clipboard snapshot: image flavor present but empty");
+            None
         }
-        let bytes = text.into_bytes();
-        if bytes.len() > MAX_TEXT_BYTES {
+        Err(e) => {
+            debug!("clipboard snapshot: get_image failed: {e}");
+            None
+        }
+    };
+    // Bound the pixel count BEFORE encoding: to_png() on a stray huge
+    // bitmap allocates the full encoded buffer only to fail the byte cap
+    // below. Mirrors the inbound MAX_IMAGE_PIXELS guard.
+    if let Some(i) = &img {
+        let (w, h) = i.get_size();
+        if (w as u64) * (h as u64) > MAX_IMAGE_PIXELS {
             warn!(
-                "local clipboard text {}B exceeds {}B cap; dropped",
-                bytes.len(),
-                MAX_TEXT_BYTES
+                "local clipboard image {}x{} exceeds {} pixel cap; dropped",
+                w, h, MAX_IMAGE_PIXELS
             );
             return;
         }
-        if echo.lock().unwrap().is_echo(Kind::Text, &bytes) {
-            return;
-        }
-        post_outbound(Kind::Text, bytes, MIME_TEXT);
-        return;
     }
+    let png_bytes = img.as_ref().and_then(|i| match i.to_png() {
+        Ok(p) => {
+            let bytes = p.get_bytes().to_vec();
+            if bytes.is_empty() { None } else { Some(bytes) }
+        }
+        Err(e) => {
+            debug!("clipboard image to_png failed: {e}");
+            None
+        }
+    });
+    let pixel_hash = img.as_ref().and_then(hash_image_pixels);
 
-    if let Ok(img) = ctx.get_image() {
-        let png = match img.to_png() {
-            Ok(p) => p,
-            Err(e) => {
-                debug!("clipboard image to_png failed: {e}");
-                return;
-            }
-        };
-        let bytes = png.get_bytes().to_vec();
-        if bytes.len() > MAX_IMAGE_BYTES {
+    if let Some(pb) = &png_bytes {
+        if pb.len() > MAX_IMAGE_BYTES {
             warn!(
                 "local clipboard png {}B exceeds {}B cap; dropped",
-                bytes.len(),
+                pb.len(),
                 MAX_IMAGE_BYTES
             );
             return;
         }
-        if echo.lock().unwrap().is_echo(Kind::Png, &bytes) {
+    }
+
+    let text_bytes = match text {
+        Some(t) => {
+            let bytes = t.into_bytes();
+            if bytes.len() > MAX_TEXT_BYTES {
+                warn!(
+                    "local clipboard text {}B exceeds {}B cap; dropped",
+                    bytes.len(),
+                    MAX_TEXT_BYTES
+                );
+                return;
+            }
+            Some(bytes)
+        }
+        None => None,
+    };
+
+    // File guard, evaluated with the payload in hand: skip only when the
+    // file references came with nothing transferable (Explorer copies carry
+    // no bitmap). QQ/WeChat image-message copies attach CF_HDROP + the real
+    // bitmap and sync the bitmap below; inbound applies keep the strict
+    // guard so remote content never clobbers a pending local file paste.
+    if let Ok(files) = ctx.get_files() {
+        if !files.is_empty() && text_bytes.is_none() && png_bytes.is_none() {
+            st.current = None;
+            debug!("local file clipboard without transferable payload; sync skipped");
             return;
         }
-        post_outbound(Kind::Png, bytes, MIME_PNG);
     }
+
+    if st.observe(ClipboardIdentity::new(
+        text_bytes.as_deref(),
+        png_bytes.as_deref(),
+        pixel_hash,
+    )) {
+        return;
+    }
+
+    // A mixed clipboard (image + fallback text label from browsers/IM, or a
+    // genuinely compound copy) is emitted as a compound burst: text frame
+    // first, image second, one shared non-zero token. Peers without
+    // aggregation apply the frames in order and keep the image — the exact
+    // v1 outcome. Single-flavor changes keep the legacy token=0 single frame.
+    match (text_bytes, png_bytes) {
+        (Some(tb), Some(pb)) => {
+            if tb.len() > BURST_TEXT_MAX_INLINE {
+                // Burst text must stay inline (a REF text frame would race
+                // the image frame onto the wire and flip legacy peers'
+                // final state to text); degrade to image-only.
+                info!(
+                    "clipboard burst text {}B exceeds inline cap; sending image only",
+                    tb.len()
+                );
+                post_outbound(Kind::Png, pb, MIME_PNG);
+                return;
+            }
+
+            post_burst(tb, pb);
+        }
+        (None, Some(pb)) => {
+            post_outbound(Kind::Png, pb, MIME_PNG);
+        }
+        (Some(tb), None) => {
+            post_outbound(Kind::Text, tb, MIME_TEXT);
+        }
+        (None, None) => {
+            debug!("clipboard snapshot produced no text or image payload; nothing to sync");
+        }
+    }
+}
+
+/// Emit a compound burst: one spawned task posting the text frame and then
+/// the image frame with sequential awaits — two independent HTTP POSTs have
+/// no ordering guarantee, and legacy peers rely on text-first ordering to
+/// end with the image.
+fn post_burst(text: Vec<u8>, png: Vec<u8>) {
+    let token = next_token();
+    tauri::async_runtime::spawn(async move {
+        let text_frame = encode_frame(&Frame {
+            kind: Kind::Text,
+            token,
+            payload: text,
+        });
+        if let Err(e) = post_item(text_frame).await {
+            warn!("clipboard burst text POST failed: {e}");
+            return;
+        }
+
+        if png.len() <= INLINE_THRESHOLD {
+            let frame = encode_frame(&Frame {
+                kind: Kind::Png,
+                token,
+                payload: png,
+            });
+            if let Err(e) = post_item(frame).await {
+                warn!("clipboard burst image POST failed: {e}");
+            }
+        } else if let Err(e) = upload_and_post_ref(png, MIME_PNG, token).await {
+            warn!("clipboard burst blob transfer failed: {e}");
+        }
+    });
 }
 
 /// Decide inline vs out-of-band based on payload size, then dispatch.
@@ -325,10 +537,11 @@ fn post_outbound(kind: Kind, payload: Vec<u8>, mime: &'static str) {
 }
 
 fn post_inline(kind: Kind, payload: Vec<u8>) {
-    let token = next_token();
+    // Single-flavor changes stay token=0: standalone frames apply
+    // immediately on aggregating peers and are never coalesced.
     let body = encode_frame(&Frame {
         kind,
-        token,
+        token: 0,
         payload,
     });
     tauri::async_runtime::spawn(async move {
@@ -339,44 +552,35 @@ fn post_inline(kind: Kind, payload: Vec<u8>) {
 }
 
 fn post_via_blob(kind: Kind, payload: Vec<u8>, mime: &'static str) {
-    let size = payload.len() as u64;
     tauri::async_runtime::spawn(async move {
-        let id = match upload_blob(payload, mime).await {
-            Ok(id) => id,
-            Err(e) => {
-                warn!(
-                    "clipboard blob upload failed (kind={:?}, size={}): {e}",
-                    kind, size
-                );
-                return;
-            }
-        };
-        let meta = RefMeta {
-            id,
-            mime: mime.to_string(),
-            size,
-        };
-        let json = match serde_json::to_vec(&meta) {
-            Ok(v) => v,
-            Err(e) => {
-                warn!("clipboard ref json encode failed: {e}");
-                return;
-            }
-        };
-        let token = next_token();
-        let body = encode_frame(&Frame {
-            kind: Kind::Ref,
-            token,
-            payload: json,
-        });
-        if let Err(e) = post_item(body).await {
-            warn!("clipboard /item POST (ref) failed: {e}");
+        if let Err(e) = upload_and_post_ref(payload, mime, 0).await {
+            warn!("clipboard blob upload failed (kind={:?}): {e}", kind);
         }
     });
 }
 
+/// Upload a payload as an out-of-band blob and post the KIND_REF descriptor
+/// frame. Used by single-flavor changes (token 0) and the image frame of a
+/// compound burst (the burst token, so aggregating peers can group it).
+async fn upload_and_post_ref(payload: Vec<u8>, mime: &str, token: u32) -> Result<(), String> {
+    let size = payload.len() as u64;
+    let id = upload_blob(payload, mime).await?;
+    let meta = RefMeta {
+        id,
+        mime: mime.to_string(),
+        size,
+    };
+    let json = serde_json::to_vec(&meta).map_err(|e| format!("ref json encode failed: {e}"))?;
+    let body = encode_frame(&Frame {
+        kind: Kind::Ref,
+        token,
+        payload: json,
+    });
+    post_item(body).await
+}
+
 fn next_token() -> u32 {
-    let mut st = AGENT.lock().unwrap();
+    let mut st = AGENT.lock().unwrap_or_else(|e| e.into_inner());
     st.next_token = st.next_token.wrapping_add(1).max(1);
     st.next_token
 }
@@ -482,10 +686,75 @@ async fn fetch_blob(id: &str) -> Result<(Vec<u8>, String), String> {
 
 // ---------- Inbound apply ----------
 
-fn apply_inbound(frame: Frame, echo: &Arc<Mutex<EchoState>>) {
-    // Non-REF path is fully synchronous; REF path is dispatched by the caller
-    // onto the async runtime instead (see sse_pump).
-    apply_inbound_inline(frame, echo);
+/// Retained text payloads of in-flight compound bursts (frames sharing a
+/// non-zero token). Text applies on arrival; the image later upgrades the
+/// clipboard to one compound write using the retained bytes.
+static BURSTS: once_cell::sync::Lazy<Mutex<HashMap<u32, (Vec<u8>, Instant)>>> =
+    once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
+
+fn prune_bursts(map: &mut HashMap<u32, (Vec<u8>, Instant)>) {
+    map.retain(|_, (_, ts)| ts.elapsed() < BURST_RETENTION);
+}
+
+fn retain_burst_text(token: u32, text: Vec<u8>) {
+    let mut map = BURSTS.lock().unwrap_or_else(|e| e.into_inner());
+    prune_bursts(&mut map);
+    if map.len() >= MAX_PENDING_BURSTS {
+        // Defensive bound against a pathological sender.
+        if let Some(oldest) = map.iter().min_by_key(|(_, (_, ts))| *ts).map(|(k, _)| *k) {
+            map.remove(&oldest);
+        }
+    }
+    map.insert(token, (text, Instant::now()));
+}
+
+fn take_burst_text(token: u32) -> Option<Vec<u8>> {
+    let mut map = BURSTS.lock().unwrap_or_else(|e| e.into_inner());
+    prune_bursts(&mut map);
+    map.remove(&token).map(|(text, _)| text)
+}
+
+/// Frames are applied synchronously here, in SSE stream order: the
+/// compound-upgrade logic relies on text-before-image processing, which
+/// per-frame spawns onto a thread pool cannot guarantee (and which, prior
+/// to this, could reorder plain v1 multi-frame applies too).
+fn handle_inbound_frame(frame: Frame, echo: &Arc<Mutex<EchoState>>) {
+    match frame.kind {
+        Kind::Ref => {
+            let echo = echo.clone();
+            tauri::async_runtime::spawn(async move {
+                apply_inbound_ref(frame, echo).await;
+            });
+        }
+        _ if frame.token == 0 => apply_inbound_inline(frame, echo),
+        Kind::Text => {
+            retain_burst_text(frame.token, frame.payload.clone());
+            apply_inbound_inline(frame, echo);
+        }
+        Kind::Png => {
+            let token = frame.token;
+            deliver_burst_png(token, &frame.payload, echo);
+        }
+        Kind::FileOffer => {
+            // Keep the legacy warn-and-drop path (apply_inbound_inline
+            // rejects file offers on the host agent).
+            apply_inbound_inline(frame, echo);
+        }
+    }
+}
+
+fn deliver_burst_png(token: u32, png: &[u8], echo: &Arc<Mutex<EchoState>>) {
+    match take_burst_text(token) {
+        Some(text) => apply_compound(&text, png, echo),
+        None => apply_inbound_inline(
+            Frame {
+                kind: Kind::Png,
+                token,
+                payload: png.to_vec(),
+            },
+            echo,
+        ),
+    }
 }
 
 async fn apply_inbound_ref(frame: Frame, echo: Arc<Mutex<EchoState>>) {
@@ -517,18 +786,162 @@ async fn apply_inbound_ref(frame: Frame, echo: Arc<Mutex<EchoState>>) {
             return;
         }
     };
+    let token = frame.token;
+
+    if token != 0 && matches!(kind, Kind::Text | Kind::Png) {
+        // Blob payload of a compound burst: route through the aggregator so
+        // the image can upgrade the already-applied text flavor.
+        match kind {
+            Kind::Text => {
+                retain_burst_text(token, bytes.clone());
+                let _ = tauri::async_runtime::spawn_blocking(move || {
+                    apply_inbound_inline(
+                        Frame {
+                            kind: Kind::Text,
+                            token,
+                            payload: bytes,
+                        },
+                        &echo,
+                    )
+                })
+                .await;
+            }
+            Kind::Png => {
+                let _ = tauri::async_runtime::spawn_blocking(move || {
+                    deliver_burst_png(token, &bytes, &echo)
+                })
+                .await;
+            }
+            _ => unreachable!(),
+        }
+        return;
+    }
+
     let frame = Frame {
         kind,
-        token: frame.token,
+        token,
         payload: bytes,
     };
     let echo = echo.clone();
     let _ = tauri::async_runtime::spawn_blocking(move || apply_inbound_inline(frame, &echo)).await;
 }
 
+/// Write text + image flavors in one clipboard transaction. Only remember a
+/// successful write, while excluding the watcher from intermediate states.
+fn apply_compound(text: &[u8], png: &[u8], echo: &Arc<Mutex<EchoState>>) {
+    // Preserve a pending local file paste (mirrors the inline-path guard).
+    if let Ok(ctx) = ClipboardContext::new() {
+        if let Ok(files) = ctx.get_files() {
+            if !files.is_empty() {
+                debug!("local file clipboard detected; inbound compound dropped");
+                return;
+            }
+        }
+    }
+
+    let text_str = match std::str::from_utf8(text) {
+        Ok(s) if !s.is_empty() && !s.contains('\0') => s,
+        _ => {
+            warn!("inbound compound text unusable; applying image only");
+            apply_inbound_inline(
+                Frame {
+                    kind: Kind::Png,
+                    token: 0,
+                    payload: png.to_vec(),
+                },
+                echo,
+            );
+            return;
+        }
+    };
+
+    // Bound decoded pixel count (mirrors the inline PNG path).
+    let cursor = std::io::Cursor::new(png);
+    if let Ok(reader) = image::ImageReader::new(cursor).with_guessed_format() {
+        if let Ok((w, h)) = reader.into_dimensions() {
+            if (w as u64) * (h as u64) > MAX_IMAGE_PIXELS {
+                warn!(
+                    "inbound image {}x{} exceeds {} pixel cap; dropped",
+                    w, h, MAX_IMAGE_PIXELS
+                );
+                return;
+            }
+        }
+    }
+    let img = match RustImageData::from_bytes(png) {
+        Ok(i) => i,
+        Err(e) => {
+            warn!("RustImageData::from_bytes failed: {e}");
+            return;
+        }
+    };
+    let pixel_hash = hash_image_pixels(&img);
+
+    let mut st = echo.lock().unwrap_or_else(|e| e.into_inner());
+
+    #[cfg(windows)]
+    {
+        match img.to_rgba8() {
+            Ok(rgba) => match crate::win_clipboard::write_compound(text_str, &rgba, png) {
+                Ok(()) => {
+                    st.current = Some(ClipboardIdentity::new(Some(text), Some(png), pixel_hash));
+                    debug!(
+                        "applied compound clipboard (text {}B + PNG {}B)",
+                        text.len(),
+                        png.len()
+                    );
+                    return;
+                }
+                Err(e) => {
+                    warn!("compound clipboard write failed: {e}; falling back to image only");
+                }
+            },
+            Err(e) => {
+                warn!("compound rgba conversion failed: {e}; falling back to image only");
+            }
+        }
+        if let Ok(ctx) = ClipboardContext::new() {
+            if ctx.set_image(img).is_ok() {
+                st.current = Some(ClipboardIdentity::new(None, Some(png), pixel_hash));
+            }
+        }
+        return;
+    }
+
+    #[cfg(not(windows))]
+    {
+        // clipboard-rs has no compound write off-Windows; degrade to
+        // sequential writes, image last (v1 outcome).
+        if let Ok(ctx) = ClipboardContext::new() {
+            if ctx.set_text(text_str.to_string()).is_ok() {
+                st.current = Some(ClipboardIdentity::new(Some(text), None, None));
+            }
+            if ctx.set_image(img).is_ok() {
+                st.current = Some(ClipboardIdentity::new(None, Some(png), pixel_hash));
+            }
+        }
+        debug!(
+            "applied compound clipboard via sequential fallback (text {}B + PNG {}B)",
+            text.len(),
+            png.len()
+        );
+    }
+}
+
 fn apply_inbound_inline(frame: Frame, echo: &Arc<Mutex<EchoState>>) {
-    // Record BEFORE writing so the watcher sees the hash and suppresses.
-    echo.lock().unwrap().record(frame.kind, &frame.payload);
+    // Preserve a local file clipboard: Explorer/Finder copies can carry a
+    // thumbnail image, and overwriting them with remote content would
+    // destroy the pending file paste. Mirrors the Qt client's guard.
+    if let Ok(ctx) = ClipboardContext::new() {
+        if let Ok(files) = ctx.get_files() {
+            if !files.is_empty() {
+                debug!("local file clipboard detected; inbound dropped");
+                return;
+            }
+        }
+    }
+
+    let mut st = echo.lock().unwrap_or_else(|e| e.into_inner());
 
     let ctx = match ClipboardContext::new() {
         Ok(c) => c,
@@ -540,6 +953,7 @@ fn apply_inbound_inline(frame: Frame, echo: &Arc<Mutex<EchoState>>) {
 
     match frame.kind {
         Kind::Text => {
+            let identity = ClipboardIdentity::new(Some(&frame.payload), None, None);
             let text = match String::from_utf8(frame.payload) {
                 Ok(s) => s,
                 Err(_) => {
@@ -549,6 +963,8 @@ fn apply_inbound_inline(frame: Frame, echo: &Arc<Mutex<EchoState>>) {
             };
             if let Err(e) = ctx.set_text(text) {
                 warn!("inbound set_text failed: {e}");
+            } else {
+                st.current = Some(identity);
             }
         }
         Kind::Png => {
@@ -572,8 +988,12 @@ fn apply_inbound_inline(frame: Frame, echo: &Arc<Mutex<EchoState>>) {
                     return;
                 }
             };
+            let identity =
+                ClipboardIdentity::new(None, Some(&frame.payload), hash_image_pixels(&img));
             if let Err(e) = ctx.set_image(img) {
                 warn!("inbound set_image failed: {e}");
+            } else {
+                st.current = Some(identity);
             }
         }
         Kind::Ref => {
@@ -667,14 +1087,7 @@ async fn sse_pump(stop: Arc<Notify>, echo: Arc<Mutex<EchoState>>) {
                         while let Some(end) = find_event_end(&buf) {
                             let raw = buf.drain(..end + 2).collect::<Vec<u8>>();
                             if let Some(frame) = parse_sse_event(&raw) {
-                                let echo = echo.clone();
-                                if frame.kind == Kind::Ref {
-                                    tauri::async_runtime::spawn(async move {
-                                        apply_inbound_ref(frame, echo).await;
-                                    });
-                                } else {
-                                    tauri::async_runtime::spawn_blocking(move || apply_inbound(frame, &echo));
-                                }
+                                handle_inbound_frame(frame, &echo);
                             }
                         }
                     }
@@ -743,68 +1156,299 @@ async fn heartbeat_pump(stop: Arc<Notify>) {
     }
 }
 
+// ---------- Supervisor ----------
+//
+// Every child task/thread of the agent is fire-and-forget by nature: a panic
+// or a wedged blocking call produces no signal, and the failure modes are
+// silent (a dead heartbeat keeps transport_state CONNECTED while the service
+// expires gui_alive and drops Mac→host traffic; a wedged watcher snapshot
+// swallows every subsequent local change). The supervisor is the single
+// liveness owner: it periodically checks each child and respawns it in place,
+// rate-limited so a crash-looping child degrades to periodic retries.
+
+static LAST_SSE_RESPAWN_MS: AtomicI64 = AtomicI64::new(0);
+static LAST_HEARTBEAT_RESPAWN_MS: AtomicI64 = AtomicI64::new(0);
+static LAST_WATCHER_RESPAWN_MS: AtomicI64 = AtomicI64::new(0);
+
+fn lock_agent() -> std::sync::MutexGuard<'static, State> {
+    AGENT.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+fn respawn_allowed(now: i64, last: &AtomicI64) -> bool {
+    let l = last.load(Ordering::Acquire);
+    l == 0 || now.saturating_sub(l) >= RESPAWN_MIN_GAP.as_millis() as i64
+}
+
+async fn supervisor(stop: Arc<Notify>) {
+    loop {
+        if wait_or_stop(&stop, SUPERVISOR_INTERVAL).await {
+            return;
+        }
+        supervise_once();
+    }
+}
+
+/// One supervision pass. Locks are taken briefly and never held across an
+/// await; at most one action runs per pass to keep respawn bookkeeping
+/// simple.
+fn supervise_once() {
+    let now = now_ms();
+
+    let (sse_dead, hb_dead, watcher_dead) = {
+        let st = lock_agent();
+        (
+            !st.sse_alive.load(Ordering::Acquire),
+            !st.heartbeat_alive.load(Ordering::Acquire),
+            st.watcher_thread
+                .as_ref()
+                .map(|t| t.is_finished())
+                // A missing thread (failed respawn) must count as dead, or
+                // clipboard monitoring stops forever after one spawn error.
+                .unwrap_or(true),
+        )
+    };
+
+    // Dead tokio task = it panicked or exited outside the stop path. Respawn
+    // a fresh one; abort() on an already-finished handle is a no-op.
+    if sse_dead && respawn_allowed(now, &LAST_SSE_RESPAWN_MS) {
+        warn!("clipboard supervisor: sse task died; respawning");
+        respawn_sse(now);
+        return;
+    }
+    if hb_dead && respawn_allowed(now, &LAST_HEARTBEAT_RESPAWN_MS) {
+        warn!("clipboard supervisor: heartbeat task died; respawning");
+        respawn_heartbeat(now);
+        return;
+    }
+    if watcher_dead && respawn_allowed(now, &LAST_WATCHER_RESPAWN_MS) {
+        warn!("clipboard supervisor: watcher thread died; respawning");
+        respawn_watcher(now);
+        return;
+    }
+
+    // Wedged watcher: a snapshot that never returns swallows every
+    // subsequent change. Read the flag in a short scope — the MutexGuard
+    // temporary of an `if let` scrutinee would stay alive across the branch
+    // body and deadlock respawn_watcher's own lock_agent() — then let
+    // respawn_watcher re-validate `enabled` under its own lock.
+    let busy_started = {
+        let st = lock_agent();
+        st.busy
+            .as_ref()
+            .map(|b| b.load(Ordering::Acquire))
+            .unwrap_or(0)
+    };
+    if busy_started != 0
+        && now.saturating_sub(busy_started) > WATCHER_BUSY_STUCK.as_millis() as i64
+        && respawn_allowed(now, &LAST_WATCHER_RESPAWN_MS)
+    {
+        warn!(
+            "clipboard supervisor: watcher snapshot stuck {}ms; restarting watcher",
+            now - busy_started
+        );
+        respawn_watcher(now);
+        return;
+    }
+
+    // Transport wedged in DISCONNECTED while enabled: the sse task is alive
+    // but its retry loop keeps failing. Recycle it for a fresh client stack.
+    let since = DISCONNECTED_SINCE_MS.load(Ordering::Acquire);
+    if since != 0 && now.saturating_sub(since) > SSE_DISCONNECTED_STUCK.as_millis() as i64 {
+        if respawn_allowed(now, &LAST_SSE_RESPAWN_MS) {
+            warn!(
+                "clipboard supervisor: transport disconnected {}ms; recycling sse task",
+                now - since
+            );
+            respawn_sse(now);
+            DISCONNECTED_SINCE_MS.store(now_ms(), Ordering::Release);
+        }
+    }
+}
+
+fn respawn_sse(now: i64) {
+    let mut st = lock_agent();
+    if !st.enabled {
+        return;
+    }
+    let Some(stop) = st.stop.clone() else {
+        return;
+    };
+    let echo = st.echo.clone();
+    // A fresh flag per generation: abort() cancels asynchronously, so the
+    // dead generation's AliveGuard may drop AFTER the replacement stores
+    // true — sharing the flag would let that late drop mark the healthy
+    // new task as dead and loop the supervisor.
+    let alive = Arc::new(AtomicBool::new(false));
+    if let Some(old) = st.sse_task.take() {
+        old.abort();
+    }
+    st.sse_alive = alive.clone();
+    st.sse_task = Some(spawn_sse_task(&stop, &echo, &alive));
+    LAST_SSE_RESPAWN_MS.store(now, Ordering::Release);
+}
+
+fn respawn_heartbeat(now: i64) {
+    let mut st = lock_agent();
+    if !st.enabled {
+        return;
+    }
+    let Some(stop) = st.stop.clone() else {
+        return;
+    };
+    // Fresh flag per generation (see respawn_sse).
+    let alive = Arc::new(AtomicBool::new(false));
+    if let Some(old) = st.heartbeat_task.take() {
+        old.abort();
+    }
+    st.heartbeat_alive = alive.clone();
+    st.heartbeat_task = Some(spawn_heartbeat_task(&stop, &alive));
+    LAST_HEARTBEAT_RESPAWN_MS.store(now, Ordering::Release);
+}
+
+fn respawn_watcher(now: i64) {
+    // One lock scope covers the enabled check, the take of the old handles
+    // and the store of the new ones: a concurrent stop() can then never
+    // strand a watcher rebuilt after the shutdown finished.
+    let mut st = lock_agent();
+    if !st.enabled {
+        return;
+    }
+    let echo = st.echo.clone();
+    // A fresh busy flag per generation: a wedged old snapshot keeps holding
+    // the previous Arc with a stuck non-zero value, and sharing it would make
+    // the new watcher's compare_exchange(0, ...) reject every event forever.
+    let busy = Arc::new(AtomicI64::new(0));
+    // Signal the old watcher BEFORE building the replacement so the rebuild
+    // window produces at most one in-flight duplicate snapshot (coalesced by
+    // the generation-local busy flag). Signal only — joining here would
+    // block while the AGENT lock is held.
+    if let Some(sd) = st.watcher_shutdown.take() {
+        sd.stop();
+    }
+    st.busy = Some(busy.clone());
+    st.watcher_thread = None;
+    match spawn_watcher_thread(&echo, &busy) {
+        Ok((shutdown, handle)) => {
+            st.watcher_shutdown = Some(shutdown);
+            st.watcher_thread = Some(handle);
+            LAST_WATCHER_RESPAWN_MS.store(now, Ordering::Release);
+        }
+        Err(e) => warn!("clipboard supervisor: watcher respawn failed: {e}"),
+    }
+}
+
 // ---------- Public API: enable / disable / status ----------
 
+/// Clears the owning task's alive flag on every exit path — normal return,
+/// panic unwind, or cancellation — so the supervisor can always detect death.
+/// A plain `store(false)` after the await misses panics and aborts, which are
+/// exactly the failure modes the supervisor exists to catch.
+struct AliveGuard(Arc<AtomicBool>);
+
+impl Drop for AliveGuard {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Release);
+    }
+}
+
+fn spawn_sse_task(
+    stop: &Arc<Notify>,
+    echo: &Arc<Mutex<EchoState>>,
+    alive: &Arc<AtomicBool>,
+) -> JoinHandle<()> {
+    let stop = stop.clone();
+    let echo = echo.clone();
+    let alive = alive.clone();
+    alive.store(true, Ordering::Release);
+    tauri::async_runtime::spawn(async move {
+        let _alive = AliveGuard(alive);
+        sse_pump(stop, echo).await;
+    })
+}
+
+fn spawn_heartbeat_task(stop: &Arc<Notify>, alive: &Arc<AtomicBool>) -> JoinHandle<()> {
+    let stop = stop.clone();
+    let alive = alive.clone();
+    alive.store(true, Ordering::Release);
+    tauri::async_runtime::spawn(async move {
+        let _alive = AliveGuard(alive);
+        heartbeat_pump(stop).await;
+    })
+}
+
+fn spawn_watcher_thread(
+    echo: &Arc<Mutex<EchoState>>,
+    busy: &Arc<AtomicI64>,
+) -> Result<(WatcherShutdown, std::thread::JoinHandle<()>), String> {
+    let mut watcher =
+        ClipboardWatcherContext::new().map_err(|e| format!("ClipboardWatcherContext: {e}"))?;
+    let shutdown = watcher
+        .add_handler(WatcherCallbacks {
+            echo: echo.clone(),
+            busy: busy.clone(),
+        })
+        .get_shutdown_channel();
+    let handle = std::thread::Builder::new()
+        .name("clipboard-watcher".into())
+        .spawn(move || {
+            watcher.start_watch();
+        })
+        .map_err(|e| format!("spawn watcher thread: {e}"))?;
+    Ok((shutdown, handle))
+}
+
+fn spawn_supervisor_task(stop: &Arc<Notify>) -> JoinHandle<()> {
+    let stop = stop.clone();
+    tauri::async_runtime::spawn(async move { supervisor(stop).await })
+}
+
 pub fn start() -> Result<(), String> {
-    let mut st = AGENT.lock().unwrap();
+    let mut st = lock_agent();
     if st.enabled {
         return Ok(());
     }
     set_transport_state(TRANSPORT_CONNECTING, None);
 
     let stop = Arc::new(Notify::new());
-    let echo = st.echo.clone();
-    let busy = Arc::new(AtomicBool::new(false));
+    let busy = Arc::new(AtomicI64::new(0));
 
     // Spawn watcher thread (blocking; the crate's start_watch() is sync).
-    let watcher_echo = echo.clone();
-    let (shutdown_tx, watcher_handle) = {
-        let mut watcher =
-            ClipboardWatcherContext::new().map_err(|e| format!("ClipboardWatcherContext: {e}"))?;
-        let shutdown = watcher
-            .add_handler(WatcherCallbacks {
-                echo: watcher_echo,
-                busy,
-            })
-            .get_shutdown_channel();
-        let handle = std::thread::Builder::new()
-            .name("clipboard-watcher".into())
-            .spawn(move || {
-                watcher.start_watch();
-            })
-            .map_err(|e| format!("spawn watcher thread: {e}"))?;
-        (shutdown, handle)
-    };
+    let (shutdown_tx, watcher_handle) = spawn_watcher_thread(&st.echo, &busy)?;
 
-    let sse_stop = stop.clone();
-    let sse_echo = echo.clone();
-    let sse_task = tauri::async_runtime::spawn(async move { sse_pump(sse_stop, sse_echo).await });
-
-    let hb_stop = stop.clone();
-    let heartbeat_task = tauri::async_runtime::spawn(async move { heartbeat_pump(hb_stop).await });
+    let sse_alive = Arc::new(AtomicBool::new(false));
+    let heartbeat_alive = Arc::new(AtomicBool::new(false));
+    let sse_task = spawn_sse_task(&stop, &st.echo, &sse_alive);
+    let heartbeat_task = spawn_heartbeat_task(&stop, &heartbeat_alive);
+    let supervisor_task = spawn_supervisor_task(&stop);
 
     st.enabled = true;
     st.stop = Some(stop);
+    st.busy = Some(busy);
+    st.sse_alive = sse_alive;
+    st.heartbeat_alive = heartbeat_alive;
     st.sse_task = Some(sse_task);
     st.heartbeat_task = Some(heartbeat_task);
     st.watcher_shutdown = Some(shutdown_tx);
     st.watcher_thread = Some(watcher_handle);
+    st.supervisor_task = Some(supervisor_task);
     info!("clipboard sync agent started");
     Ok(())
 }
 
 #[allow(dead_code)]
 pub fn stop() {
-    let (stop_tx, sse, hb, watcher_shutdown, watcher_thread) = {
-        let mut st = AGENT.lock().unwrap();
+    let (stop_tx, sse, hb, sup, watcher_shutdown, watcher_thread) = {
+        let mut st = lock_agent();
         if !st.enabled {
             return;
         }
         st.enabled = false;
+        st.busy = None;
         (
             st.stop.take(),
             st.sse_task.take(),
             st.heartbeat_task.take(),
+            st.supervisor_task.take(),
             st.watcher_shutdown.take(),
             st.watcher_thread.take(),
         )
@@ -824,12 +1468,15 @@ pub fn stop() {
     if let Some(t) = hb {
         t.abort();
     }
+    if let Some(t) = sup {
+        t.abort();
+    }
     set_transport_state(TRANSPORT_STOPPED, None);
     info!("clipboard sync agent stopped");
 }
 
 fn agent_active() -> bool {
-    AGENT.lock().unwrap().enabled
+    lock_agent().enabled
 }
 
 async fn query_service_allowed() -> Option<bool> {
@@ -879,7 +1526,10 @@ pub async fn clipboard_sync_status() -> ClipboardStatus {
         service_allowed: query_service_allowed().await,
         transport_state: transport_state_name(transport_state),
         last_connected_at_ms: (last_connected_at_ms > 0).then_some(last_connected_at_ms),
-        last_error: LAST_TRANSPORT_ERROR.lock().unwrap().clone(),
+        last_error: LAST_TRANSPORT_ERROR
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone(),
     }
 }
 
@@ -893,5 +1543,97 @@ mod status_tests {
         assert_eq!(transport_state_name(TRANSPORT_CONNECTING), "connecting");
         assert_eq!(transport_state_name(TRANSPORT_CONNECTED), "connected");
         assert_eq!(transport_state_name(TRANSPORT_DISCONNECTED), "disconnected");
+    }
+}
+
+#[cfg(test)]
+mod echo_tests {
+    use super::*;
+
+    #[test]
+    fn empty_caption_is_equivalent_to_absent_caption() {
+        let image_only = ClipboardIdentity::new(None, Some(b"png"), Some(10));
+        let mut state = EchoState {
+            current: Some(image_only),
+        };
+        assert!(state.observe(ClipboardIdentity::new(Some(b""), Some(b"png"), Some(10))));
+        assert!(!state.observe(ClipboardIdentity::new(
+            Some(b"caption"),
+            Some(b"png"),
+            Some(10)
+        )));
+        assert!(!state.observe(image_only));
+    }
+
+    #[test]
+    fn standalone_empty_text_is_still_a_valid_clear_frame() {
+        let frame = decode_frame(&encode_frame(&Frame {
+            kind: Kind::Text,
+            token: 0,
+            payload: Vec::new(),
+        }))
+        .unwrap();
+        assert_eq!(frame.kind, Kind::Text);
+        assert_eq!(frame.token, 0);
+        assert!(frame.payload.is_empty());
+        let mut state = EchoState {
+            current: Some(ClipboardIdentity::new(Some(b"before"), None, None)),
+        };
+        assert!(!state.observe(ClipboardIdentity::new(Some(&frame.payload), None, None)));
+        assert!(state.observe(ClipboardIdentity::new(None, None, None)));
+    }
+
+    #[test]
+    fn a_b_a_is_not_suppressed_by_history() {
+        let mut state = EchoState::default();
+        let a = ClipboardIdentity::new(Some(b"A"), None, None);
+        let b = ClipboardIdentity::new(Some(b"B"), None, None);
+        assert!(!state.observe(a));
+        assert!(state.observe(a));
+        assert!(!state.observe(b));
+        assert!(!state.observe(a));
+    }
+
+    #[test]
+    fn compound_changes_keep_both_flavors() {
+        let mut state = EchoState::default();
+        let image = ClipboardIdentity::new(None, Some(b"png"), Some(10));
+        let caption_a = ClipboardIdentity::new(Some(b"A"), Some(b"png"), Some(10));
+        let caption_b = ClipboardIdentity::new(Some(b"B"), Some(b"png"), Some(10));
+        assert!(!state.observe(image));
+        assert!(!state.observe(caption_a)); // same image, newly added caption
+        assert!(!state.observe(caption_b)); // same image, changed caption
+        assert!(!state.observe(ClipboardIdentity::new(
+            Some(b"B"),
+            Some(b"new png"),
+            Some(20)
+        )));
+        assert!(!state.observe(caption_b)); // back to the earlier image
+        assert!(state.observe(caption_b));
+    }
+
+    #[test]
+    fn removing_a_flavor_is_a_new_clipboard() {
+        let compound = ClipboardIdentity::new(Some(b"caption"), Some(b"png"), Some(10));
+        let mut state = EchoState {
+            current: Some(compound),
+        };
+        assert!(!state.observe(ClipboardIdentity::new(Some(b"caption"), None, None)));
+        assert!(!state.observe(compound));
+        assert!(!state.observe(ClipboardIdentity::new(None, Some(b"png"), Some(10))));
+    }
+
+    #[test]
+    fn applied_compound_does_not_echo_after_image_reencoding() {
+        let applied = ClipboardIdentity::new(Some(b"caption"), Some(b"wire png"), Some(10));
+        let mut state = EchoState {
+            current: Some(applied),
+        };
+        let snapshot = ClipboardIdentity::new(Some(b"caption"), Some(b"reencoded png"), Some(10));
+        assert!(state.observe(snapshot));
+        // Byte hashing remains available when pixel conversion is unavailable.
+        let encoded = ClipboardIdentity::new(None, Some(b"png"), None);
+        assert!(!state.observe(encoded));
+        assert!(state.observe(encoded));
     }
 }
