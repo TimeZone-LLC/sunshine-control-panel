@@ -2,26 +2,26 @@
   <Teleport to="body">
     <Transition name="cover-modal">
       <div v-if="open" class="cover-modal-mask" @click.self="$emit('close')">
-        <div class="cover-modal">
+        <div ref="modalRef" class="cover-modal">
           <div class="modal-header">
-            <h3><Picture /> 更新封面 — {{ appName }}</h3>
-            <button class="modal-close" @click="$emit('close')">✕</button>
+            <h3><Picture /> Update cover art — {{ appName }}</h3>
+            <button class="modal-close" @click="$emit('close')">&times;</button>
           </div>
 
-          <!-- 搜索栏 -->
+          <!-- Search bar -->
           <div class="search-bar">
             <input
               v-model="searchQuery"
               class="search-input"
-              placeholder="搜索 Steam 游戏..."
+              placeholder="Search Steam games..."
               @keyup.enter="doSearch"
             />
             <button class="search-btn" @click="doSearch" :disabled="searching">
-              {{ searching ? '搜索中...' : '搜索' }}
+              {{ searching ? 'Searching...' : 'Search' }}
             </button>
           </div>
 
-          <!-- 搜索结果 -->
+          <!-- Search results -->
           <div v-if="error" class="search-error">{{ error }}</div>
 
           <div v-if="candidates.length > 0" class="candidates-grid">
@@ -41,7 +41,7 @@
           </div>
 
           <div v-else-if="!searching && !error && searched" class="no-results">
-            未找到匹配结果
+            No matches found
           </div>
         </div>
       </div>
@@ -53,6 +53,7 @@
 import { ref, watch } from 'vue'
 import { Picture } from '@element-plus/icons-vue'
 import { tauriInvoke } from '../composables/useTauri'
+import { useModalFocusScope } from '../composables/useFocusNav.js'
 
 const props = defineProps({
   open: { type: Boolean, required: true },
@@ -62,6 +63,9 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'updated'])
 
+const modalRef = ref(null)
+useModalFocusScope(modalRef, () => props.open)
+
 const searchQuery = ref('')
 const candidates = ref([])
 const selected = ref(null)
@@ -70,7 +74,7 @@ const searched = ref(false)
 const error = ref('')
 const uploadingId = ref(null)
 
-// 打开时自动用 app 名搜索
+// Search for the application name automatically when the modal opens.
 watch(() => props.open, (v) => {
   if (v && props.appName) {
     searchQuery.value = props.appName
@@ -118,7 +122,7 @@ async function selectAndUpload(candidate) {
     emit('updated', props.appName)
     emit('close')
   } catch (e) {
-    error.value = `上传失败: ${e}`
+    error.value = `Upload failed: ${e}`
   } finally {
     uploadingId.value = null
   }
@@ -126,122 +130,137 @@ async function selectAndUpload(candidate) {
 </script>
 
 <style lang="less" scoped>
+@import "@/components/spinner.less";
+
 .cover-modal-mask {
   position: fixed;
   inset: 0;
   z-index: 10000;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--scrim);
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(4px);
 }
 
 .cover-modal {
-  background: rgba(var(--fd-bg-primary-rgb, 20, 20, 40), 0.98);
-  border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15);
-  border-radius: 16px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-strong);
   width: 680px;
   max-width: 90vw;
   max-height: 80vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 16px 64px rgba(0, 0, 0, 0.5);
 }
 
 .modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.08);
+  height: var(--row-height);
+  padding: 0 4px 0 10px;
+  border-bottom: 1px solid var(--border);
 
   h3 {
     margin: 0;
-    font-size: 16px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.9);
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    :deep(svg) {
+      width: 12px;
+      height: 12px;
+      color: var(--text-dim);
+    }
   }
 
   .modal-close {
     background: none;
-    border: none;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
-    font-size: 18px;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: var(--font-size);
+    line-height: 1;
     cursor: pointer;
-    padding: 4px 8px;
-    border-radius: 6px;
-    &:hover { color: #fff; background: rgba(255, 255, 255, 0.1); }
+    width: 20px;
+    height: 20px;
+
+    &:hover {
+      color: var(--text);
+      background: var(--bg-hover);
+    }
   }
 }
 
 .search-bar {
   display: flex;
-  gap: 8px;
-  padding: 12px 20px;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
 
   .search-input {
     flex: 1;
-    background: rgba(var(--fd-bg-secondary-rgb, 30, 30, 50), 0.8);
-    border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.12);
-    border-radius: 8px;
-    padding: 8px 12px;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.9);
-    font-size: 14px;
+    height: 24px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    padding: 0 8px;
+    color: var(--text);
+    font-size: var(--font-size-sm);
     outline: none;
-    &:focus { border-color: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.3); }
+
+    &::placeholder { color: var(--text-faint); }
+
+    &:focus { border-color: var(--border-strong); }
   }
 
   .search-btn {
-    padding: 8px 16px;
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15);
-    border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-    border-radius: 8px;
-    color: var(--fd-accent, #00fff5);
-    font-size: 13px;
+    height: 24px;
+    padding: 0 10px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: var(--font-size-sm);
     cursor: pointer;
     white-space: nowrap;
-    &:hover { background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.25); }
-    &:disabled { opacity: 0.5; cursor: default; }
+
+    &:hover:not(:disabled) { background: var(--bg-hover); border-color: var(--border-strong); }
+    &:disabled { color: var(--text-faint); cursor: default; }
   }
 }
 
 .search-error {
-  padding: 8px 20px;
-  color: #ff6b6b;
-  font-size: 13px;
+  padding: 6px 10px;
+  color: var(--error);
+  font-size: var(--font-size-sm);
 }
 
 .candidates-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  padding: 8px 20px 20px;
+  gap: 8px;
+  padding: 8px 10px 10px;
   overflow-y: auto;
   max-height: 50vh;
 }
 
 .candidate-card {
   position: relative;
-  border-radius: 10px;
   overflow: hidden;
   cursor: pointer;
-  border: 2px solid transparent;
-  transition: border-color 0.15s, transform 0.15s;
+  border: 1px solid var(--border);
 
   &:hover {
-    border-color: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.3);
-    transform: scale(1.02);
+    border-color: var(--border-strong);
   }
 
   &.selected {
-    border-color: var(--fd-accent, #00fff5);
+    border-color: var(--border-strong);
   }
 
   &.uploading {
     pointer-events: none;
-    opacity: 0.7;
   }
 
   .candidate-img {
@@ -252,49 +271,38 @@ async function selectAndUpload(candidate) {
   }
 
   .candidate-name {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    padding: 6px 10px;
-    background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
-    color: #fff;
-    font-size: 12px;
-    font-weight: 500;
+    padding: 3px 6px;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    color: var(--text);
+    font-size: var(--font-size-xs);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .uploading-overlay {
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: var(--scrim);
     display: flex;
     align-items: center;
     justify-content: center;
   }
 
   .upload-spinner {
-    width: 32px;
-    height: 32px;
-    border: 3px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-    border-top-color: var(--fd-accent, #00fff5);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
+    .gloss-spinner();
   }
 }
 
-@keyframes spin { to { transform: rotate(360deg); } }
-
 .no-results {
-  text-align: center;
-  padding: 40px 20px;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.35);
-  font-size: 14px;
+  padding: 16px 10px;
+  color: var(--text-faint);
+  font-size: var(--font-size-sm);
 }
 
-// 弹窗动画
-.cover-modal-enter-active { transition: opacity 0.2s ease; }
-.cover-modal-leave-active { transition: opacity 0.15s ease; }
-.cover-modal-enter-from, .cover-modal-leave-to { opacity: 0; }
-.cover-modal-enter-active .cover-modal { transition: transform 0.2s ease; }
-.cover-modal-enter-from .cover-modal { transform: scale(0.95); }
+.cover-modal-enter-active,
+.cover-modal-leave-active {
+  transition: none;
+}
 </style>

@@ -1,6 +1,8 @@
 import { ref, computed, watch } from 'vue'
 import { tauriInvoke } from './useTauri'
 import { useI18n } from '../i18n/index.js'
+import { bigScreenSettings } from './useBigScreenSettings.js'
+import { gameStats, launchTrackedGame, runningGame } from './useGameSession.js'
 
 const STORAGE_KEY = 'foundation-desktop-apps'
 const APP_LIST_REQUEST_TIMEOUT_MS = 10000
@@ -14,20 +16,20 @@ export function useApps() {
   const searchQuery = ref('')
   const launchingApp = ref(null)
   const failedImages = ref(new Set())
-  const coverVersions = ref({}) // 封面版本号，用于强制刷新图片缓存
+  const coverVersions = ref({}) // Cover version counters, used to bust the image cache.
 
-  // 视图选项（持久化）
+  // View options, persisted.
   const viewMode = ref(localStorage.getItem(`${STORAGE_KEY}-view`) || 'grid')
   const gridSize = ref(localStorage.getItem(`${STORAGE_KEY}-grid`) || 'medium')
   const sortMode = ref(localStorage.getItem(`${STORAGE_KEY}-sort`) || 'name')
   const activeFilter = ref('all')
 
-  // 收藏和最近启动（持久化）
+  // Favourites and recently launched, persisted.
   const favorites = ref(JSON.parse(localStorage.getItem(`${STORAGE_KEY}-favorites`) || '[]'))
   const recentHistory = ref(JSON.parse(localStorage.getItem(`${STORAGE_KEY}-recent`) || '[]'))
   let loadRequestId = 0
 
-  // 持久化（防抖批量写入）
+  // Persistence, debounced into batched writes.
   let persistTimer = null
   function persistSettings() {
     clearTimeout(persistTimer)
@@ -45,7 +47,7 @@ export function useApps() {
   watch(favorites, persistSettings, { deep: true })
   watch(recentHistory, persistSettings, { deep: true })
 
-  // 筛选标签
+  // Filter tags
   const filterTabs = computed(() => [
     { id: 'all', label: t.value.apps.filters.all, count: apps.value.length },
     { id: 'favorites', label: t.value.apps.filters.favorites, count: favorites.value.length },
@@ -84,7 +86,7 @@ export function useApps() {
       .slice(0, 6)
   })
 
-  // 排序 + 筛选 + 搜索
+  // Sort, filter and search.
   const displayApps = computed(() => {
     let list = [...apps.value]
 
@@ -120,7 +122,7 @@ export function useApps() {
       })
     }
 
-    // 收藏置顶
+    // Favourites first.
     if (activeFilter.value === 'all') {
       const favSet = new Set(favorites.value)
       list.sort((a, b) => {
@@ -167,7 +169,8 @@ export function useApps() {
   function getAppImageUrl(app) {
     if (failedImages.value.has(app.name)) return null
     const ver = coverVersions.value[app.name]
-    // 如果刚上传了新封面，直接用 appName.png（上传 API 按 app name 保存）
+    // Right after an upload, use appName.png directly: the upload API stores
+    // the file under the application name.
     if (ver) {
       return `${proxyUrl.value}/boxart/${encodeBoxArtName(app.name)}.png?v=${ver}`
     }
@@ -200,7 +203,8 @@ export function useApps() {
     failedImages.value.delete(appName)
     failedImages.value = new Set(failedImages.value)
     coverVersions.value = { ...coverVersions.value, [appName]: Date.now() }
-    // 浅拷贝 apps 触发子组件重新渲染（getAppImageUrl 作为 Function prop 不会触发更新）
+    // Shallow-copy apps to force the children to re-render; getAppImageUrl is a
+    // function prop and does not trigger an update on its own.
     apps.value = [...apps.value]
   }
 
@@ -242,6 +246,12 @@ export function useApps() {
 
   const launchError = ref('')
 
+  /**
+   * 通过受跟踪的会话启动。
+   *
+   * 走 `launch_game` 而不是 `launch_app`：这样 prep-cmd 的 undo 会在游戏退出时执行、
+   * 大屏窗口会让位给游戏、库里也能看到「正在运行」和累计时长。
+   */
   async function launchApp(app) {
     launchError.value = ''
 
@@ -258,16 +268,13 @@ export function useApps() {
     addToRecent(app.name)
 
     try {
-      await tauriInvoke('launch_app', {
-        app,
-        cmd: app.cmd || '',
-        workingDir: app['working-dir'] || null,
-        elevated: app.elevated === true || app.elevated === 'true',
+      await launchTrackedGame(app, {
+        autoYield: bigScreenSettings.value.autoYieldOnLaunch,
+        coverUrl: getAppImageUrl(app) || '',
       })
     } catch (e) {
+      // 失败原因由启动过场层展示，这里只记录细节便于排查
       console.error('Failed to launch app:', e, '\ncmd:', app.cmd, '\nworking-dir:', app['working-dir'])
-      launchError.value = `${t.value.apps.launchFailed.replace('{name}', app.name).replace('{error}', e)}\ncmd: ${app.cmd}`
-      setTimeout(() => { launchError.value = '' }, 8000)
     } finally {
       setTimeout(() => { launchingApp.value = null }, 1500)
     }
@@ -292,6 +299,8 @@ export function useApps() {
     sortLabel,
     recentApps,
     displayApps,
+    gameStats,
+    runningGame,
     isFavorite,
     toggleFavorite,
     cycleSortMode,

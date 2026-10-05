@@ -12,6 +12,7 @@ mod dualsense;
 mod file_mapping;
 mod file_transfer;
 mod fs_utils;
+mod game_session;
 mod github_download;
 mod hwinfo;
 mod logger;
@@ -27,7 +28,6 @@ mod text_context;
 mod toolbar;
 mod tray;
 mod tray_config;
-mod update;
 mod utils;
 mod vdd;
 mod vdd_calibration;
@@ -119,9 +119,6 @@ fn main() {
     if desktop_settings::try_remove_auto_start_from_args() {
         return;
     }
-    if update::try_run_updater_helper_from_args() {
-        return;
-    }
     if sunshine::try_run_core_compatibility_check_from_args() {
         return;
     }
@@ -168,11 +165,13 @@ fn main() {
             system::get_current_dpi,
             system::set_desktop_dpi,
             commands::open_tool_window,
-            commands::launch_app,
+            game_session::launch_game,
+            game_session::get_running_game,
+            game_session::stop_running_game,
+            game_session::get_game_stats,
+            game_session::focus_running_game,
             toolbar::create_toolbar_window,
-            commands::fetch_speech_phrases,
             commands::fetch_remote_bytes,
-            commands::ai_api_proxy,
             commands::capture_screenshot,
             desktop_settings::get_desktop_settings,
             desktop_settings::save_desktop_settings,
@@ -205,8 +204,6 @@ fn main() {
             sunshine::parse_sunshine_config,
             sunshine::get_sunshine_url,
             sunshine::get_command_line_url,
-            sunshine::get_sunshine_locale,
-            sunshine::set_sunshine_locale,
             sunshine::get_active_sessions,
             sunshine::change_bitrate,
             sunshine::toggle_sunshine_mode,
@@ -248,13 +245,6 @@ fn main() {
             fs_utils::search_steam_covers,
             fs_utils::upload_steam_cover,
             fs_utils::save_text_file,
-            update::check_for_updates,
-            update::check_for_updates_for_channel,
-            update::start_update_checker_when_ui_ready,
-            update::get_include_prerelease_preference,
-            update::set_include_prerelease_preference,
-            update::download_update,
-            update::install_update,
             logger::get_all_logs,
             logger::clear_logs,
             logger::export_logs,
@@ -302,8 +292,6 @@ fn main() {
             hwinfo::hwinfo_get_sensors,
             hwinfo::hwinfo_get_readings,
             hwinfo::hwinfo_check_available,
-            tray::set_locale_preferences,
-            tray::get_tray_locale,
             tray::main_panel_loading,
             tray::main_panel_ready,
         ])

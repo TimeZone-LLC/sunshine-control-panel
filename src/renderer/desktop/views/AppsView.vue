@@ -24,13 +24,13 @@
       @contextmenu="openContextMenu"
     />
 
-    <!-- 加载状态 -->
+    <!-- Loading state -->
     <div v-if="loading" class="apps-loading">
       <div class="loading-spinner"></div>
       <span>{{ t.apps.loading }}</span>
     </div>
 
-    <!-- 加载失败状态 -->
+    <!-- Load failure state -->
     <div v-else-if="loadFailed" class="apps-empty apps-error" role="alert">
       <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <circle cx="12" cy="12" r="9"/><path d="M12 7v6"/><path d="M12 17h.01"/>
@@ -39,11 +39,11 @@
       <button class="retry-btn" type="button" @click="loadApps">{{ t.apps.retry }}</button>
     </div>
 
-    <!-- 空状态 -->
+    <!-- Empty state -->
     <div v-else-if="displayApps.length === 0 && !loading" class="apps-empty">
       <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <rect x="2" y="2" width="8" height="8" rx="2"/><rect x="14" y="2" width="8" height="8" rx="2"/>
-        <rect x="2" y="14" width="8" height="8" rx="2"/><rect x="14" y="14" width="8" height="8" rx="2"/>
+        <rect x="2" y="2" width="8" height="8"/><rect x="14" y="2" width="8" height="8"/>
+        <rect x="2" y="14" width="8" height="8"/><rect x="14" y="14" width="8" height="8"/>
       </svg>
       <p v-if="searchQuery">{{ t.apps.searchNoMatch }}</p>
       <p v-else-if="activeFilter === 'favorites'">{{ t.apps.noFavorites }}</p>
@@ -60,6 +60,7 @@
       :getAppImageUrl="getAppImageUrl"
       :handleImageError="handleImageError"
       :helperIds="getActiveHelperIds"
+      :stats="gameStats"
       @launch="launchApp"
       @contextmenu="openContextMenu"
       @toggleFavorite="toggleFavorite"
@@ -72,6 +73,7 @@
       :isFavorite="isFavorite"
       :getAppImageUrl="getAppImageUrl"
       :handleImageError="handleImageError"
+      :stats="gameStats"
       @launch="launchApp"
       @contextmenu="openContextMenu"
     />
@@ -89,6 +91,7 @@
       @openDir="ctxOpenDir"
       @configHelpers="ctxConfigHelpers"
       @updateCover="ctxUpdateCover"
+      @close="closeContextMenu"
     />
 
     <LaunchHelperPanel
@@ -108,22 +111,26 @@
       @updated="onCoverUpdated"
     />
 
-    <!-- 启动错误提示 -->
+    <!-- Launch error notice -->
     <Transition name="toast">
       <div v-if="launchError" class="launch-error-toast">
-        <span class="toast-icon">⚠️</span>
+        <span class="toast-icon">!</span>
         <span class="toast-msg">{{ launchError }}</span>
-        <button class="toast-close" @click="launchError = ''">✕</button>
+        <button class="toast-close" @click="launchError = ''">&times;</button>
       </div>
     </Transition>
   </div>
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useApps } from '../composables/useApps'
 import { useLaunchHelpers } from '../composables/useLaunchHelpers'
 import { tauriInvoke } from '../composables/useTauri'
+import { gamepadConnected, onGamepadAction } from '../composables/useGamepad.js'
+import { clearViewActions, setViewActions } from '../composables/useGamepadActions.js'
+import { editInputWithOsk } from '../composables/useOsk.js'
+import { focusElement } from '../composables/useFocusNav.js'
 import { useI18n } from '../i18n/index.js'
 
 const { t } = useI18n()
@@ -149,6 +156,7 @@ const {
   proxyUrl,
   recentApps,
   displayApps,
+  gameStats,
   isFavorite,
   toggleFavorite,
   cycleSortMode,
@@ -160,22 +168,23 @@ const {
   launchApp,
 } = useApps()
 
-// 右键菜单
+// Context menu
 const contextMenu = ref({ visible: false, x: 0, y: 0, app: null })
 
-// 启动助手面板
+// Launch helper panel
 const helperPanel = ref({ open: false, appName: '', app: null })
 const { getActiveHelperIds, helperPanelOpen } = useLaunchHelpers(t)
 
-// 同步面板状态到共享 composable（供 DesktopApp 控制器返回使用）
+// Mirror the panel state into the shared composable so the DesktopApp back
+// action can use it.
 watch(() => helperPanel.value.open, (v) => { helperPanelOpen.value = v })
 watch(helperPanelOpen, (v) => { if (!v) helperPanel.value.open = false })
 
 function openContextMenu(event, app) {
   contextMenu.value = {
     visible: true,
-    x: Math.min(event.clientX, window.innerWidth - 200),
-    y: Math.min(event.clientY, window.innerHeight - 200),
+    x: event.clientX,
+    y: event.clientY,
     app,
   }
 }
@@ -234,7 +243,7 @@ async function ctxOpenDir() {
   closeContextMenu()
 }
 
-// 封面选择弹窗
+// Cover picker modal
 const coverPicker = ref({ open: false, appName: '' })
 
 async function ctxUpdateCover() {
@@ -253,109 +262,219 @@ function onDocClick() {
   closeContextMenu()
 }
 
+// === 手柄动作 ===
+
+/** 当前焦点落在哪个应用卡片上。网格、列表、最近条都带 data-app-name。 */
+function focusedApp() {
+  const host = document.activeElement?.closest?.('[data-app-name]')
+  if (!host) return null
+  const name = host.dataset.appName
+  return {
+    element: host,
+    app: displayApps.value.find((entry) => entry.name === name)
+      || recentApps.value.find((entry) => entry.name === name)
+      || null,
+  }
+}
+
+/** Y 键：在焦点卡片下方打开上下文菜单，不再依赖鼠标坐标。 */
+function openContextMenuForFocus() {
+  const focused = focusedApp()
+  if (!focused?.app) return false
+  const rect = focused.element.getBoundingClientRect()
+  contextMenu.value = {
+    visible: true,
+    x: rect.left,
+    y: rect.bottom + 6,
+    app: focused.app,
+  }
+  return true
+}
+
+function toggleFavoriteForFocus() {
+  const focused = focusedApp()
+  if (!focused?.app) return false
+  toggleFavorite(focused.app.name)
+  return true
+}
+
+async function focusSearchWithOsk() {
+  const input = document.querySelector('[data-focus-key="apps-search"]')
+  if (!input) return
+  focusElement(input)
+  await editInputWithOsk(input, { title: t.value.apps.searchPlaceholder })
+}
+
+function handleGamepadAction(action) {
+  // B 键：从内到外逐层关闭本视图拥有的弹层
+  if (action === 'back' || action === 'backRoot') {
+    if (contextMenu.value.visible) closeContextMenu()
+    else if (coverPicker.value.open) coverPicker.value.open = false
+    else if (helperPanel.value.open) helperPanel.value.open = false
+    return
+  }
+
+  // 弹层打开时其余按键留给弹层自己处理
+  if (contextMenu.value.visible || coverPicker.value.open || helperPanel.value.open) return
+
+  switch (action) {
+    case 'menu':
+      openContextMenuForFocus()
+      break
+    case 'favorite':
+      toggleFavoriteForFocus()
+      break
+    case 'search':
+      focusSearchWithOsk()
+      break
+  }
+}
+
+/**
+ * 首屏把焦点放在第一张卡片上（有「最近启动」时就是上次玩的那个），
+ * 这样手柄第一次按方向键是从有意义的位置开始移动，而不是跳到元素 0。
+ * 没插手柄时不做，避免干扰鼠标用户。
+ */
+async function focusFirstApp() {
+  if (!gamepadConnected.value) return
+  await nextTick()
+  if (document.activeElement && document.activeElement !== document.body) return
+  const first = document.querySelector('.apps-view [data-app-name]')
+  if (first) focusElement(first)
+}
+
+let disposeGamepadActions = null
+
 onMounted(async () => {
   document.addEventListener('click', onDocClick)
+  disposeGamepadActions = onGamepadAction(handleGamepadAction)
+  setViewActions(['search', 'favorite', 'menu'])
   await loadApps()
+  await focusFirstApp()
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', onDocClick)
+  clearViewActions()
+  disposeGamepadActions?.()
 })
 </script>
 
 <style lang="less" scoped>
+@import "@/components/spinner.less";
+
 .apps-view {
   max-width: 1600px;
-  margin: 0 auto;
 }
 
-// === 加载 & 空状态 ===
+// === Loading and empty states ===
 .apps-loading {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  padding: 100px 0;
-  gap: 16px;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
+  padding: 24px 0;
+  gap: 8px;
+  color: var(--text-dim);
+  font-size: var(--font-size-sm);
 
   .loading-spinner {
-    width: 36px;
-    height: 36px;
-    border: 3px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
-    border-top-color: var(--fd-accent, #00fff5);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
+    .gloss-spinner();
   }
 }
-
-@keyframes spin { to { transform: rotate(360deg); } }
 
 .apps-empty {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 100px 0;
-  gap: 10px;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.35);
+  align-items: flex-start;
+  padding: 24px 0;
+  gap: 6px;
+  color: var(--text-dim);
 
-  .empty-icon { width: 56px; height: 56px; opacity: 0.25; margin-bottom: 8px; }
-  p { margin: 0; font-size: 16px; }
-  .empty-hint { font-size: 13px; color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.2); }
+  // No illustration in an empty state; the words are enough.
+  .empty-icon { display: none; }
+
+  p { margin: 0; font-size: var(--font-size); }
+
+  .empty-hint { font-size: var(--font-size-sm); color: var(--text-faint); }
 
   .retry-btn {
-    margin-top: 8px;
-    padding: 8px 20px;
-    border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.45);
-    border-radius: 8px;
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
-    color: var(--fd-accent, #00fff5);
+    margin-top: 4px;
+    height: 24px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    font-size: var(--font-size-sm);
     cursor: pointer;
-    transition: background 0.2s, border-color 0.2s;
 
-    &:hover,
+    &:hover {
+      background: var(--bg-hover);
+      border-color: var(--border-strong);
+    }
+
     &:focus-visible {
-      border-color: var(--fd-accent, #00fff5);
-      background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.18);
-      outline: none;
+      outline: 1px solid var(--border-strong);
+      outline-offset: 0;
     }
   }
 }
 
-.apps-error { color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.55); }
+.apps-error {
+  color: var(--error);
 
-// === 启动错误 Toast ===
-.launch-error-toast {
-  position: fixed;
-  bottom: 32px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 20px;
-  background: rgba(220, 50, 50, 0.92);
-  color: #fff;
-  border-radius: 10px;
-  font-size: 14px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(8px);
-
-  .toast-icon { font-size: 18px; }
-  .toast-msg { max-width: 600px; word-break: break-all; white-space: pre-line; font-size: 13px; line-height: 1.5; }
-  .toast-close {
-    background: none;
-    border: none;
-    color: rgba(255, 255, 255, 0.7);
-    cursor: pointer;
-    font-size: 16px;
-    padding: 0 4px;
-    &:hover { color: #fff; }
+  .retry-btn {
+    color: var(--text);
   }
 }
 
-.toast-enter-active { transition: all 0.3s ease-out; }
-.toast-leave-active { transition: all 0.25s ease-in; }
-.toast-enter-from { opacity: 0; transform: translateX(-50%) translateY(20px); }
-.toast-leave-to { opacity: 0; transform: translateX(-50%) translateY(10px); }
+// === Launch error notice ===
+.launch-error-toast {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--error);
+  color: var(--error);
+  font-size: var(--font-size-sm);
+
+  .toast-icon {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .toast-msg {
+    flex: 1;
+    max-width: 900px;
+    word-break: break-all;
+    white-space: pre-line;
+    font-family: var(--font-mono);
+    font-size: var(--font-size-xs);
+    line-height: var(--line-height);
+    color: var(--text);
+  }
+
+  .toast-close {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: var(--font-size);
+    line-height: 1;
+    padding: 0 4px;
+    flex-shrink: 0;
+
+    &:hover { color: var(--text); }
+  }
+}
+
+.toast-enter-active,
+.toast-leave-active {
+  transition: none;
+}
 </style>

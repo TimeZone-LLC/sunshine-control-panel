@@ -1,10 +1,10 @@
 <template>
   <div class="recent-section fade-in">
     <div class="section-label">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="section-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="section-icon">
         <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
       </svg>
-      最近启动
+      {{ t.apps.recentSection }}
     </div>
     <div class="recent-strip">
       <div
@@ -12,6 +12,8 @@
         :key="'recent-' + app.name"
         class="recent-tile"
         tabindex="0"
+        :data-app-name="app.name"
+        :data-focus-key="'recent-' + app.name"
         @click="$emit('launch', app)"
         @keydown.enter="$emit('launch', app)"
         @contextmenu.prevent="$emit('contextmenu', $event, app)"
@@ -34,6 +36,10 @@
 </template>
 
 <script setup>
+import { useI18n } from '../i18n/index.js'
+
+const { t } = useI18n()
+
 defineProps({
   apps: { type: Array, required: true },
   getAppImageUrl: { type: Function, required: true },
@@ -45,66 +51,67 @@ defineEmits(['launch', 'contextmenu'])
 
 <style lang="less" scoped>
 .recent-section {
-  margin-bottom: 28px;
+  margin-bottom: 12px;
 }
 
 .section-label {
-  font-size: 14px;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.4);
-  margin-bottom: 12px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 
   .section-icon {
-    width: 16px;
-    height: 16px;
+    width: 12px;
+    height: 12px;
+    color: var(--text-faint);
   }
 }
 
 .recent-strip {
   display: flex;
-  gap: 16px;
+  gap: 6px;
   overflow-x: auto;
-  padding-bottom: 4px;
+  padding-bottom: 2px;
 
-  &::-webkit-scrollbar { height: 4px; }
-  &::-webkit-scrollbar-thumb { background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15); border-radius: 2px; }
+  &::-webkit-scrollbar { height: 6px; }
+  &::-webkit-scrollbar-thumb { background: var(--border); }
 }
 
 .recent-tile {
   content-visibility: auto;
-  contain-intrinsic-size: auto 112px;
+  contain-intrinsic-size: auto 80px;
   flex-shrink: 0;
-  width: 80px;
+  width: 56px;
   cursor: pointer;
-  text-align: center;
-  transition: transform 0.2s ease, opacity 0.2s ease;
 
-  &:hover {
-    transform: translateY(-3px);
-    .recent-name { color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.9); }
-  }
-
-  &:active {
-    transform: scale(0.95);
+  &:hover .recent-name,
+  &:focus-visible .recent-name {
+    color: var(--text);
   }
 
   .recent-cover {
-    width: 80px;
-    height: 80px;
-    border-radius: 12px;
+    width: 56px;
+    height: 56px;
     overflow: hidden;
-    background: rgba(var(--fd-bg-secondary-rgb, 26, 26, 46), 0.7);
-    border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.08);
-    margin-bottom: 6px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    margin-bottom: 3px;
 
     img { width: 100%; height: 100%; object-fit: cover; }
   }
 
+  &:hover .recent-cover {
+    border-color: var(--border-strong);
+  }
+
   .recent-name {
-    font-size: 11px;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.6);
+    font-size: var(--font-size-xs);
+    color: var(--text-dim);
     display: block;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -118,18 +125,9 @@ defineEmits(['launch', 'contextmenu'])
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
-  font-weight: 700;
-  color: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.3);
+  font-family: var(--font-mono);
+  font-size: var(--font-size);
+  color: var(--text-faint);
   text-transform: uppercase;
-}
-
-.fade-in {
-  animation: fadeInUp 0.35s ease both;
-}
-
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 </style>

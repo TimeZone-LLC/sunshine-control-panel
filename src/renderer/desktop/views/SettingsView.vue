@@ -15,6 +15,14 @@
       @update-value="setSettingValue"
     />
 
+    <SettingsToggleSection
+      :title="t.settings.bigScreen"
+      :icon="Monitor"
+      :items="bigScreenItems"
+      :values="bigScreenSettings"
+      @update-value="setBigScreenSetting"
+    />
+
     <SettingsLaunchAssistantCard :has-tauri="hasTauri" />
 
     <SettingsFileSharingCard />
@@ -32,14 +40,7 @@
       @update-value="setSettingValue"
     />
 
-    <SettingsPetCard />
-
-    <SettingsAboutCard
-      :app-version="appVersion"
-      :checking="checking"
-      @open-link="openLink"
-      @check-update="checkUpdate"
-    />
+    <SettingsAboutCard :app-version="appVersion" />
 
     <SettingsNotice :notice="statusNotice" />
 
@@ -49,8 +50,9 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted } from 'vue'
-import { Bell, Promotion } from '@element-plus/icons-vue'
+import { Bell, Monitor, Promotion } from '@element-plus/icons-vue'
 import { useSettingsState } from '../composables/useSettingsState'
+import { bigScreenSettings, setBigScreenSetting } from '../composables/useBigScreenSettings.js'
 import { useI18n } from '../i18n/index.js'
 import SettingsActions from '../components/settings/SettingsActions.vue'
 import SettingsAboutCard from '../components/settings/SettingsAboutCard.vue'
@@ -59,21 +61,17 @@ import SettingsAppearanceCard from '../components/settings/SettingsAppearanceCar
 import SettingsFileSharingCard from '../components/settings/SettingsFileSharingCard.vue'
 import SettingsLaunchAssistantCard from '../components/settings/SettingsLaunchAssistantCard.vue'
 import SettingsNotice from '../components/settings/SettingsNotice.vue'
-import SettingsPetCard from '../components/settings/SettingsPetCard.vue'
 import SettingsToggleSection from '../components/settings/SettingsToggleSection.vue'
 
 const { t } = useI18n()
 
 const {
   appVersion,
-  checking,
   hasTauri,
   settings,
   statusNotice,
-  checkUpdate,
   disposeSettingsState,
   initializeSettingsState,
-  openLink,
   resetSettings,
   saveSettings,
 } = useSettingsState(t)
@@ -96,8 +94,25 @@ const startupSettings = computed(() => [
   },
 ])
 
-const notificationSettings = computed(() => [
+const bigScreenItems = computed(() => [
   {
+    key: 'autoYieldOnLaunch',
+    name: t.value.settings.autoYield,
+    description: t.value.settings.autoYieldDesc,
+  },
+  {
+    key: 'gamepadCursorEnabled',
+    name: t.value.settings.gamepadCursor,
+    description: t.value.settings.gamepadCursorDesc,
+  },
+  {
+    key: 'oskAutoOpen',
+    name: t.value.settings.oskAutoOpen,
+    description: t.value.settings.oskAutoOpenDesc,
+  },
+])
+
+const notificationSettings = computed(() => [  {
     key: 'notifications',
     name: t.value.settings.desktopNotifications,
     description: t.value.settings.desktopNotificationsDesc,
@@ -106,12 +121,6 @@ const notificationSettings = computed(() => [
     key: 'connectionNotify',
     name: t.value.settings.connectionNotify,
     description: t.value.settings.connectionNotifyDesc,
-    disabled: !settings.value.notifications,
-  },
-  {
-    key: 'updateNotify',
-    name: t.value.settings.updateNotify,
-    description: t.value.settings.updateNotifyDesc,
     disabled: !settings.value.notifications,
   },
 ])
@@ -136,26 +145,7 @@ onUnmounted(() => {
 
 <style lang="less" scoped>
 .settings-view {
-  max-width: 1000px;
-  margin: 0 auto;
+  max-width: 900px;
 }
-
-.page-header {
-  margin-bottom: 32px;
-
-  .page-title {
-    font-size: 36px;
-    font-weight: 700;
-    color: var(--fd-text-primary, #fff);
-    margin: 0 0 10px 0;
-  }
-
-  .page-subtitle {
-    font-size: 18px;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
-    margin: 0;
-  }
-}
-
 </style>
 

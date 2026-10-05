@@ -5,11 +5,11 @@
     </Transition>
 
     <Transition name="slide">
-      <div v-if="open" class="helper-panel" @click.stop @keydown.escape="$emit('close')">
+      <div v-if="open" ref="panelRef" class="helper-panel" @click.stop @keydown.escape="$emit('close')">
         <div class="panel-header">
           <h2>{{ t.launchHelper.title }}</h2>
           <span class="app-name-tag">{{ appName }}</span>
-          <button class="close-btn" @click="$emit('close')">✕</button>
+          <button class="close-btn" @click="$emit('close')">&times;</button>
         </div>
 
         <div class="panel-body">
@@ -24,7 +24,7 @@
             :class="{ active: helper.enabled }"
           >
             <div class="helper-header">
-              <!-- 排序按钮（仅启用时显示） -->
+              <!-- Reorder buttons, shown only when enabled -->
               <div v-if="helper.enabled" class="order-buttons">
                 <button
                   class="order-btn"
@@ -96,10 +96,10 @@
                     ><FolderOpened /></button>
                   </div>
                   <div v-if="hasFieldError(helper.templateId, param.key)" class="field-error-msg">
-                    ⚠ {{ getFieldError(helper.templateId, param.key) }}
+                    {{ getFieldError(helper.templateId, param.key) }}
                   </div>
                   <div v-else-if="pathWarnings[`${helper.templateId}.${param.key}`]" class="field-path-warn">
-                    ⚠ {{ pathWarnings[`${helper.templateId}.${param.key}`] }}
+                    {{ pathWarnings[`${helper.templateId}.${param.key}`] }}
                   </div>
                   <div v-else-if="getGlobalHint(helper.templateId, param.key)" class="field-hint">
                     {{ t.launchHelper.globalDefault }}{{ getGlobalHint(helper.templateId, param.key) }}
@@ -109,13 +109,13 @@
             </Transition>
           </div>
 
-          <!-- 预览生成的命令 -->
+          <!-- Preview of the generated commands -->
           <div v-if="hasAnyEnabled" class="preview-section">
 
-          <!-- 全局路径保存通知 -->
+          <!-- Global path save notice -->
           <Transition name="fade">
             <div v-if="globalSaveNotice" class="global-save-notice">
-              ✓ {{ globalSaveNotice }}
+              {{ globalSaveNotice }}
             </div>
           </Transition>
             <div class="preview-header" @click="showPreview = !showPreview">
@@ -147,6 +147,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { FolderOpened } from '@element-plus/icons-vue'
 import { useLaunchHelpers } from '../composables/useLaunchHelpers.js'
 import { isTauriRuntime } from '../composables/useTauri.js'
+import { useModalFocusScope } from '../composables/useFocusNav.js'
 import { useI18n } from '../i18n/index.js'
 import LaunchHelperIcon from './LaunchHelperIcon.vue'
 
@@ -158,6 +159,10 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'saved'])
+
+// 手柄导航只在栈顶作用域内移动，避免焦点跑到面板背后的卡片上
+const panelRef = ref(null)
+useModalFocusScope(panelRef, () => props.open)
 
 const { t } = useI18n()
 const lhText = computed(() => t.value.launchHelper)
@@ -178,16 +183,16 @@ const saving = ref(false)
 const showPreview = ref(false)
 const validationErrors = ref([]) // { templateId, paramKey, message }[]
 const pathWarnings = ref({}) // { "templateId.paramKey": "message" }
-const globalSaveNotice = ref('') // 全局路径自动保存通知
+const globalSaveNotice = ref('') // Notice shown when a global path is auto-saved.
 
-// 编辑中的助手列表（本地副本）
+// Local working copy of the helper list.
 const editingHelpers = ref([])
 
-// 当面板打开/应用变化时，加载配置
+// Load the configuration when the panel opens or the application changes.
 watch(() => [props.open, props.appName], ([isOpen]) => {
   if (isOpen && props.appName) {
     const stored = getAppHelpers(props.appName)
-    // 为每个模板创建一个条目
+    // Create one entry per template.
     editingHelpers.value = templates.value.map(tmpl => {
       const existing = stored.find(h => h.templateId === tmpl.id)
       return {
@@ -230,18 +235,19 @@ function setParamValue(templateId, paramKey, value) {
   const h = editingHelpers.value.find(h => h.templateId === templateId)
   if (h) {
     h.params = { ...h.params, [paramKey]: value }
-    // 仅当全局路径为空时才自动回写，避免 app 级修改污染其他应用
+    // Only write back when the global path is empty, so an app-level edit does
+    // not leak into other applications.
     if (paramKey === 'path' && value && !getGlobalPath(templateId, paramKey)) {
       setGlobalPath(templateId, paramKey, value)
       const tmpl = getTemplate(templateId)
       globalSaveNotice.value = (lhText.value.globalSaved || '').replace('{name}', tmpl?.name || templateId)
       setTimeout(() => { globalSaveNotice.value = '' }, 3000)
     }
-    // 清除该字段的验证错误
+    // Clear the validation error for this field.
     validationErrors.value = validationErrors.value.filter(
       e => !(e.templateId === templateId && e.paramKey === paramKey)
     )
-    // 异步校验路径是否存在
+    // Check asynchronously whether the path exists.
     if (paramKey === 'path' && value) {
       checkPathExists(templateId, paramKey, value)
     } else if (paramKey === 'path') {
@@ -260,22 +266,22 @@ async function checkPathExists(templateId, paramKey, filePath) {
       const { exists } = await import('@tauri-apps/plugin-fs')
       const found = await exists(filePath)
       if (!found) {
-        pathWarnings.value = { ...pathWarnings.value, [key]: lhText.value.fileNotFound || '文件不存在' }
+        pathWarnings.value = { ...pathWarnings.value, [key]: lhText.value.fileNotFound || 'File not found' }
       } else {
         const { [key]: _, ...rest } = pathWarnings.value
         pathWarnings.value = rest
       }
     } catch {
-      // fs plugin 不可用，忽略
+      // The fs plugin is unavailable; ignore.
     }
-  }, 500) // 延迟 500ms 防抖
+  }, 500) // Debounced by 500ms.
 }
 
 function getGlobalHint(templateId, paramKey) {
   const h = editingHelpers.value.find(h => h.templateId === templateId)
   const localVal = h?.params?.[paramKey]
   const globalVal = getGlobalPath(templateId, paramKey)
-  // 只在有全局默认且本地没有覆盖时显示
+  // Only shown when a global default exists and is not overridden locally.
   if (globalVal && !localVal) return globalVal
   return ''
 }
@@ -312,7 +318,7 @@ const previewCommands = computed(() => {
 })
 
 async function handleSave() {
-  // 验证必填字段
+  // Validate the required fields.
   const errors = validateHelpers(editingHelpers.value)
   validationErrors.value = errors
   if (errors.length > 0) {
@@ -321,13 +327,13 @@ async function handleSave() {
 
   saving.value = true
   try {
-    // 1. 保存到本地
+    // 1. Save locally.
     setAppHelpers(props.appName, editingHelpers.value)
 
-    // 2. 生成 prep-cmd 并保存到服务器
+    // 2. Generate the prep-cmds and save them to the server.
     const { prepCmds, wrapCmd } = generateAppCommands(props.appName)
 
-    // 获取当前所有应用数据
+    // Read every application.
     const resp = await fetch(`${props.proxyUrl}/api/apps`)
     if (!resp.ok) throw new Error('Failed to fetch apps')
     const data = await resp.json()
@@ -339,12 +345,12 @@ async function handleSave() {
     const app = { ...allApps[appIndex] }
     const MARKER = '& REM launch-helper'
 
-    // 移除旧的 helper prep-cmd
+    // Remove the previous helper prep-cmds.
     app['prep-cmd'] = (app['prep-cmd'] || []).filter(
       c => !c.do?.includes('REM launch-helper') && !c.undo?.includes('REM launch-helper')
     )
 
-    // 添加新的 helper prep-cmd
+    // Add the new helper prep-cmds.
     const helperPrepCmds = prepCmds.map(c => ({
       do: `${c.do} ${MARKER}`,
       undo: c.undo ? `${c.undo} ${MARKER}` : '',
@@ -352,16 +358,16 @@ async function handleSave() {
     }))
     app['prep-cmd'] = [...helperPrepCmds, ...app['prep-cmd']]
 
-    // 应用命令包装器
+    // Apply the command wrapper.
     if (wrapCmd) {
       const originalCmd = app._originalCmd || app.cmd
       app.cmd = wrapCmd(originalCmd)
     }
 
-    // 删除内部字段，不发给服务器
+    // Strip the internal fields before sending to the server.
     delete app._originalCmd
 
-    // 按 Sunshine API 格式保存：{ apps: [...], editApp: { ...app, index } }
+    // Save in the Sunshine API shape: { apps: [...], editApp: { ...app, index } }.
     const editApp = { ...app, index: appIndex }
     const saveResp = await fetch(`${props.proxyUrl}/api/apps`, {
       method: 'POST',
@@ -385,7 +391,7 @@ onMounted(async () => {
   hasTauri.value = await isTauriRuntime()
 })
 
-// Escape 键全局监听（面板打开时）
+// Global Escape handler, active while the panel is open.
 function onKeydown(e) {
   if (e.key === 'Escape' && props.open) {
     emit('close')
@@ -407,7 +413,7 @@ onUnmounted(() => {
 .helper-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--scrim);
   z-index: 9998;
 }
 
@@ -416,56 +422,57 @@ onUnmounted(() => {
   top: 0;
   right: 0;
   bottom: 0;
-  width: 400px;
-  max-width: 90vw;
-  background: rgba(var(--fd-bg-primary-rgb, 15, 15, 35), 0.97);
-  backdrop-filter: blur(20px);
-  box-shadow: -8px 0 40px rgba(0, 0, 0, 0.5);
+  width: 460px;
+  max-width: 92vw;
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border);
   z-index: 9999;
   display: flex;
   flex-direction: column;
-  border-left: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
+  font-family: var(--font-sans);
+  font-size: var(--font-size);
+  color: var(--text);
 }
 
 .panel-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 20px 24px;
-  border-bottom: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
+  gap: 8px;
+  height: var(--row-height);
+  padding: 0 4px 0 10px;
+  border-bottom: 1px solid var(--border);
 
   h2 {
-    font-size: 18px;
     margin: 0;
-    color: var(--fd-text-primary, #fff);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--text);
   }
 
   .app-name-tag {
-    font-size: 12px;
-    padding: 2px 8px;
-    border-radius: 4px;
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15);
-    color: var(--fd-accent, #00fff5);
-    max-width: 150px;
+    flex: 1;
+    min-width: 0;
+    font-family: var(--font-mono);
+    font-size: var(--font-size-xs);
+    color: var(--text-dim);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .close-btn {
-    margin-left: auto;
-    background: none;
-    border: none;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
+    width: 20px;
+    height: 20px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    font-size: var(--font-size);
+    line-height: 1;
     cursor: pointer;
-    font-size: 18px;
-    padding: 4px 8px;
-    border-radius: 6px;
-    transition: all 0.2s;
 
     &:hover {
-      background: rgba(255, 100, 100, 0.15);
-      color: #ff6b6b;
+      background: var(--bg-hover);
+      color: var(--text);
     }
   }
 }
@@ -473,384 +480,347 @@ onUnmounted(() => {
 .panel-body {
   flex: 1;
   overflow-y: auto;
-  padding: 20px 24px;
-
-  &::-webkit-scrollbar { width: 6px; }
-  &::-webkit-scrollbar-thumb {
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-    border-radius: 3px;
-  }
+  padding: 8px 10px;
 }
 
 .panel-desc {
-  font-size: 13px;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
-  margin: 0 0 20px 0;
-  line-height: 1.5;
+  margin: 0 0 8px;
+  font-size: var(--font-size-sm);
+  color: var(--text-dim);
+
+  small {
+    color: var(--text-faint);
+    font-size: var(--font-size-xs);
+  }
 }
 
 .helper-card {
-  border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.08);
-  border-radius: 12px;
-  margin-bottom: 12px;
-  overflow: hidden;
-  transition: all 0.2s ease;
+  border: 1px solid var(--border);
+  background: transparent;
+  margin-bottom: 6px;
 
   &.active {
-    border-color: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.25);
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.03);
-  }
-
-  &:hover {
-    border-color: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15);
+    border-color: var(--border-strong);
   }
 }
 
 .helper-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
+  gap: 8px;
+  padding: 4px 8px;
+  min-height: var(--row-height);
   cursor: pointer;
-  user-select: none;
 
-  .order-buttons {
+  &:hover {
+    background: var(--bg-hover);
+  }
+
+  .order-buttons,
+  .order-placeholder {
+    width: 14px;
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    flex-shrink: 0;
+    gap: 1px;
   }
 
   .order-btn {
-    width: 22px;
-    height: 18px;
-    border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15);
-    border-radius: 4px;
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.05);
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
-    cursor: pointer;
-    font-size: 10px;
-    line-height: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.15s;
+    width: 14px;
+    height: 10px;
     padding: 0;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 7px;
+    line-height: 1;
+    cursor: pointer;
 
     &:hover:not(:disabled) {
-      background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15);
-      color: var(--fd-accent, #00fff5);
-      border-color: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.3);
+      background: var(--bg-hover);
+      color: var(--text);
     }
 
     &:disabled {
-      opacity: 0.2;
-      cursor: not-allowed;
+      color: var(--text-faint);
+      cursor: default;
     }
   }
 
-  .order-placeholder {
-    width: 22px;
-    flex-shrink: 0;
-  }
-
   .helper-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    color: var(--fd-accent, #00fff5);
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.08);
+    color: var(--text-dim);
+    flex-shrink: 0;
   }
 
   .helper-info {
     flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
 
-    .helper-name {
-      display: block;
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--fd-text-primary, #fff);
+  .helper-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--font-size);
+    color: var(--text);
+  }
+
+  .type-badge {
+    font-size: var(--font-size-xs);
+    line-height: 14px;
+    padding: 0 4px;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+
+    &.elevated {
+      border-color: var(--warn);
+      color: var(--warn);
     }
+  }
 
-    .type-badge {
-      display: inline-block;
-      font-size: 10px;
-      font-weight: 500;
-      padding: 1px 6px;
-      border-radius: 4px;
-      margin-left: 6px;
-      vertical-align: middle;
-      background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.12);
-      color: var(--fd-accent, #00fff5);
-      border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-
-      &.elevated {
-        background: rgba(251, 191, 36, 0.12);
-        color: #fbbf24;
-        border-color: rgba(251, 191, 36, 0.3);
-      }
-    }
-
-    .helper-desc {
-      display: block;
-      font-size: 11px;
-      color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.4);
-      margin-top: 2px;
-    }
+  .helper-desc {
+    font-size: var(--font-size-sm);
+    color: var(--text-dim);
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 
+// The same square switch the settings screen uses.
 .helper-switch {
-  width: 40px;
-  height: 22px;
-  border-radius: 11px;
-  background: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.15);
   position: relative;
-  transition: all 0.2s ease;
+  width: 28px;
+  height: 14px;
   flex-shrink: 0;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  cursor: pointer;
 
   .switch-thumb {
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.6);
     position: absolute;
-    top: 2px;
-    left: 2px;
-    transition: all 0.2s ease;
+    top: 1px;
+    left: 1px;
+    width: 10px;
+    height: 10px;
+    background: var(--off);
   }
 
   &.on {
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.4);
+    border-color: var(--border-strong);
 
     .switch-thumb {
-      left: 20px;
-      background: var(--fd-accent, #00fff5);
-      box-shadow: 0 0 8px rgba(var(--fd-accent-rgb, 0, 255, 245), 0.5);
+      left: 15px;
+      background: var(--on);
     }
   }
 }
 
 .helper-config {
-  padding: 0 16px 14px;
+  padding: 6px 8px 8px;
+  border-top: 1px solid var(--border);
 }
 
 .config-field {
-  margin-bottom: 12px;
-
-  &:last-child { margin-bottom: 0; }
+  margin-bottom: 6px;
 }
 
 .field-label {
   display: block;
-  font-size: 12px;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.6);
-  margin-bottom: 6px;
+  font-size: var(--font-size-sm);
+  color: var(--text-dim);
+  margin-bottom: 2px;
 
   .required {
-    color: #ff6b6b;
-    margin-left: 2px;
+    color: var(--error);
   }
 }
 
 .field-input-row {
   display: flex;
-  gap: 6px;
+  gap: 4px;
 }
 
 .field-input {
   flex: 1;
-  background: rgba(var(--fd-bg-primary-rgb, 15, 15, 35), 0.6);
-  border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.12);
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 13px;
-  color: var(--fd-text-primary, #fff);
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
   outline: none;
-  transition: border-color 0.2s;
 
-  &::placeholder {
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.25);
-  }
+  &::placeholder { color: var(--text-faint); }
 
-  &:focus {
-    border-color: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.4);
-  }
+  &:focus { border-color: var(--border-strong); }
 }
 
 .browse-btn {
-  padding: 8px 10px;
-  background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.08);
-  border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15);
-  border-radius: 8px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
   cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  :deep(svg) {
+    width: 12px;
+    height: 12px;
+  }
 
   &:hover {
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15);
+    background: var(--bg-hover);
+    color: var(--text);
+    border-color: var(--border-strong);
   }
 }
 
 .field-hint {
-  font-size: 11px;
-  color: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.5);
-  margin-top: 4px;
-  font-style: italic;
+  font-size: var(--font-size-xs);
+  color: var(--text-faint);
+  margin-top: 2px;
+  word-break: break-all;
 }
 
 .field-error-msg {
-  font-size: 11px;
-  color: #ff6b6b;
-  margin-top: 4px;
+  font-size: var(--font-size-xs);
+  color: var(--error);
+  margin-top: 2px;
 }
 
 .field-input.field-error {
-  border-color: rgba(255, 107, 107, 0.6);
-  box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.1);
+  border-color: var(--error);
 }
 
 .field-path-warn {
-  font-size: 11px;
-  color: #fbbf24;
-  margin-top: 4px;
+  font-size: var(--font-size-xs);
+  color: var(--warn);
+  margin-top: 2px;
 }
 
 .field-input.field-warn {
-  border-color: rgba(251, 191, 36, 0.5);
+  border-color: var(--warn);
 }
 
-// 命令预览
 .preview-section {
-  margin-top: 20px;
-  border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.08);
-  border-radius: 10px;
-  overflow: hidden;
+  margin-top: 8px;
+  border: 1px solid var(--border);
 }
 
 .global-save-notice {
-  padding: 8px 14px;
-  background: rgba(74, 222, 128, 0.12);
-  border: 1px solid rgba(74, 222, 128, 0.3);
-  border-radius: 8px;
-  font-size: 12px;
-  color: #4ade80;
-  margin-top: 12px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--font-size-xs);
+  color: var(--text-dim);
 }
 
 .preview-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 10px 14px;
+  justify-content: space-between;
+  height: 24px;
+  padding: 0 8px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
   cursor: pointer;
-  font-size: 13px;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.6);
-  user-select: none;
+  font-size: var(--font-size-sm);
+  color: var(--text-dim);
 
-  &:hover { color: var(--fd-accent, #00fff5); }
+  &:hover {
+    background: var(--bg-hover);
+    color: var(--text);
+  }
 
-  .preview-toggle { font-size: 10px; }
+  .preview-toggle {
+    font-size: var(--font-size-xs);
+    color: var(--text-faint);
+  }
 }
 
 .preview-content {
-  padding: 0 14px 14px;
+  padding: 6px 8px;
 }
 
 .preview-cmd {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 
-  &:last-child { margin-bottom: 0; }
+  &:last-child {
+    margin-bottom: 0;
+  }
 
   .cmd-label {
-    font-size: 11px;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.4);
-    margin-bottom: 4px;
+    font-size: var(--font-size-xs);
+    color: var(--text-dim);
+    margin-bottom: 2px;
   }
 
   .cmd-code {
     display: block;
-    font-size: 12px;
-    font-family: 'Consolas', 'Monaco', monospace;
-    color: var(--fd-accent, #00fff5);
-    background: rgba(0, 0, 0, 0.3);
-    padding: 6px 10px;
-    border-radius: 6px;
+    padding: 4px 6px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-xs);
+    white-space: pre-wrap;
     word-break: break-all;
   }
 }
 
-// 面板底部
 .panel-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  padding: 16px 24px;
-  border-top: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
+  gap: 6px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--border);
 }
 
-.btn-secondary {
-  padding: 8px 20px;
-  border-radius: 8px;
+.btn-secondary,
+.btn-primary {
+  height: 24px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
   background: transparent;
-  border: 1px solid rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.15);
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.7);
+  color: var(--text);
+  font-size: var(--font-size-sm);
   cursor: pointer;
-  font-size: 13px;
-  transition: all 0.2s;
 
-  &:hover {
-    border-color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.3);
-    color: var(--fd-text-primary, #fff);
+  &:hover:not(:disabled) {
+    background: var(--bg-hover);
+    border-color: var(--border-strong);
+  }
+
+  &:disabled {
+    color: var(--text-faint);
+    cursor: not-allowed;
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--border-strong);
+    outline-offset: 0;
   }
 }
 
 .btn-primary {
-  padding: 8px 20px;
-  border-radius: 8px;
-  background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-  border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.3);
-  color: var(--fd-accent, #00fff5);
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-  transition: all 0.2s;
-
-  &:hover:not(:disabled) {
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.3);
-    box-shadow: 0 0 16px rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
+  border-color: var(--border-strong);
+  font-weight: 600;
 }
 
-// Transition
-.slide-enter-from, .slide-leave-to {
-  transform: translateX(100%);
-}
-.slide-enter-active, .slide-leave-active {
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.fade-enter-from, .fade-leave-to { opacity: 0; }
-.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
-
-.expand-enter-from, .expand-leave-to {
-  opacity: 0;
-  max-height: 0;
-  padding-top: 0;
-  padding-bottom: 0;
-}
-.expand-enter-active, .expand-leave-active {
-  transition: all 0.25s ease;
-  overflow: hidden;
-}
-.expand-enter-to, .expand-leave-from {
-  max-height: 300px;
-  opacity: 1;
+.slide-enter-active,
+.slide-leave-active,
+.fade-enter-active,
+.fade-leave-active,
+.expand-enter-active,
+.expand-leave-active {
+  transition: none;
 }
 </style>
