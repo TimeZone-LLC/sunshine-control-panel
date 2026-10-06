@@ -1,13 +1,13 @@
 <template>
   <SectionPanel :title="t.rtssTool.osdControl">
-    <template #icon><ChatDotRound /></template>
+    <template #icon><ChatLineSquare /></template>
     <template #actions>
       <button v-if="hasCli" class="overlay-btn" @click="onToggleOverlay">
         {{ t.rtssTool.toggleOverlay }}
       </button>
     </template>
 
-    <!-- 格式工具栏 -->
+    <!-- Formatting toolbar -->
     <div class="format-toolbar">
       <div class="format-group">
         <button class="fmt-btn" @click="insertTag('B')" title="Bold"><b>B</b></button>
@@ -32,9 +32,9 @@
         </select>
       </div>
       <div class="format-group">
-        <button class="fmt-btn fmt-tag" @click="insertRawTag('<C=>')" title="Color">&lt;C=&gt;</button>
-        <button class="fmt-btn fmt-tag" @click="insertRawTag('<S=>')" title="Size">&lt;S=&gt;</button>
-        <button class="fmt-btn fmt-tag" @click="insertRawTag('\\n')" title="Newline">↵</button>
+        <button type="button" class="fmt-btn fmt-tag" title="Color" aria-label="Color" @click="insertRawTag('<C=>')">&lt;C=&gt;</button>
+        <button type="button" class="fmt-btn fmt-tag" title="Size" aria-label="Size" @click="insertRawTag('<S=>')">&lt;S=&gt;</button>
+        <button type="button" class="fmt-btn fmt-tag" title="Newline" aria-label="Newline" @click="insertRawTag('\\n')">↵</button>
       </div>
     </div>
 
@@ -63,7 +63,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { ChatDotRound, Brush } from '@element-plus/icons-vue'
+import { ChatLineSquare, Brush } from '@element-plus/icons-vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useI18n } from '../../../desktop/i18n/index.js'
 import SectionPanel from '../../components/SectionPanel.vue'
@@ -81,7 +81,7 @@ const textarea = ref(null)
 const color = ref('FFFFFF')
 const fontSize = ref(0)
 
-// ─── 格式标签插入 ───
+// ─── Format tag insertion ───
 function insertTag(tag) {
   const ta = textarea.value
   if (!ta) return
@@ -117,7 +117,7 @@ function insertRawTag(tag) {
   requestAnimationFrame(() => { ta.focus(); ta.setSelectionRange(newPos, newPos) })
 }
 
-// ─── OSD 操作 ───
+// ─── OSD actions ───
 async function applyOsd() {
   applying.value = true
   try {
@@ -159,17 +159,16 @@ async function onToggleOverlay() {
 <style lang="less" scoped>
 .overlay-btn {
   padding: 4px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--text);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
   flex-shrink: 0;
 
-  &:hover { background: rgba(255, 255, 255, 0.14); color: white; }
+  &:hover { background: var(--bg-hover); color: var(--text); }
 }
 
 // Format toolbar
@@ -178,9 +177,8 @@ async function onToggleOverlay() {
   flex-wrap: wrap;
   gap: 4px;
   padding: 6px 8px;
-  background: rgba(0, 0, 0, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
 }
 
 .format-group {
@@ -188,28 +186,27 @@ async function onToggleOverlay() {
   align-items: center;
   gap: 3px;
   padding-right: 6px;
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  border-right: 1px solid var(--border);
 
   &:last-child { border-right: none; padding-right: 0; }
 }
 
 .fmt-btn {
   padding: 4px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--text-dim);
   font-size: 12px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
   min-width: 28px;
   text-align: center;
 
-  &:hover { background: rgba(255, 255, 255, 0.16); color: white; }
+  &:hover { background: var(--bg-hover); color: var(--text); }
 }
 
 .fmt-tag {
-  font-family: 'Consolas', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   padding: 4px 6px;
 }
@@ -219,22 +216,21 @@ async function onToggleOverlay() {
   align-items: center;
   gap: 4px;
   padding: 4px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--text-dim);
   font-size: 12px;
   cursor: pointer;
   position: relative;
 
-  &:hover { background: rgba(255, 255, 255, 0.16); color: white; }
+  &:hover { background: var(--bg-hover); color: var(--text); }
+  &:focus-within { border-color: var(--border-strong); outline: 2px solid var(--text); outline-offset: 0; }
 }
 
 .color-preview {
   width: 14px;
   height: 14px;
-  border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  border: 1px solid var(--border-strong);
 }
 
 .hidden-input {
@@ -247,15 +243,15 @@ async function onToggleOverlay() {
 
 .fmt-select {
   padding: 4px 6px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--text-dim);
   font-size: 12px;
   cursor: pointer;
   outline: none;
 
-  option { background: #1e1e2e; color: white; }
+  &:focus-visible { border-color: var(--border-strong); outline: 2px solid var(--text); outline-offset: 0; }
+  option { background: var(--bg-panel); color: var(--text); }
 }
 
 // OSD input
@@ -268,31 +264,30 @@ async function onToggleOverlay() {
 .field-label {
   font-size: 12px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-dim);
 }
 
 .osd-textarea {
   width: 100%;
   padding: 8px 10px;
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 10px;
-  color: white;
-  font-family: 'Consolas', 'Monaco', monospace;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.5;
   resize: vertical;
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color 120ms ease;
   box-sizing: border-box;
 
-  &:focus { border-color: rgba(96, 165, 250, 0.6); box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.15); }
-  &::placeholder { color: rgba(255, 255, 255, 0.3); }
+  &:focus-visible { border-color: var(--border-strong); outline: 2px solid var(--text); outline-offset: 0; }
+  &::placeholder { color: var(--text-faint); }
 }
 
 .osd-hint {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--text-faint);
 }
 
 // Actions
@@ -303,32 +298,32 @@ async function onToggleOverlay() {
 }
 
 .apply-btn {
-  padding: 6px 20px;
-  border: none;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #60a5fa, #818cf8);
-  color: white;
-  font-size: 12px;
-  font-weight: 600;
+  height: @control-height;
+  padding: 0 20px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-active);
+  color: var(--text);
+  font-size: @font-size-base;
+  font-weight: @font-weight-normal;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
 
-  &:hover { opacity: 0.9; transform: translateY(-1px); }
-  &:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  &:hover { background: var(--bg-hover); }
+  &:disabled { color: var(--text-faint); border-color: var(--border); cursor: not-allowed; }
 }
 
 .reset-btn {
-  padding: 6px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 12px;
-  font-weight: 500;
+  height: @control-height;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--text-dim);
+  font-size: @font-size-base;
+  font-weight: @font-weight-normal;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
 
-  &:hover { background: rgba(255, 255, 255, 0.14); color: white; }
-  &:disabled { opacity: 0.4; cursor: not-allowed; }
+  &:hover { background: var(--bg-hover); color: var(--text); }
+  &:disabled { color: var(--text-faint); cursor: not-allowed; }
 }
 </style>

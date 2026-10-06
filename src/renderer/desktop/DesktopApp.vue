@@ -542,7 +542,7 @@ watch(
     width: 100%;
     height: 100%;
     fill: var(--fd-text-primary);
-    stroke: var(--fd-bg-deep);
+    stroke: var(--bg-page);
     stroke-width: 1.4;
   }
 }

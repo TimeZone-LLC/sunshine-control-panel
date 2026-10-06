@@ -2,7 +2,7 @@
   <SectionPanel :title="t.rtssTool.osdSettings">
     <template #icon><Setting /></template>
     <template #actions>
-      <button class="refresh-btn" @click="load" :title="t.rtssTool.refresh">↻</button>
+      <button type="button" class="refresh-btn" :title="t.rtssTool.refresh" :aria-label="t.rtssTool.refresh" @click="load">↻</button>
     </template>
 
     <div class="prop-grid">
@@ -102,7 +102,7 @@ async function load() {
     const data = await invoke('rtss_get_osd_properties', { profile: null })
     Object.assign(props, data)
   } catch (e) {
-    console.warn('获取 OSD 属性失败:', e)
+    console.warn('Failed to read the OSD properties:', e)
   }
 }
 
@@ -127,14 +127,13 @@ defineExpose({ load })
 .refresh-btn {
   background: none;
   border: none;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-dim);
   font-size: 16px;
   cursor: pointer;
   padding: 2px 6px;
-  border-radius: 8px;
-  transition: all 0.2s;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
 
-  &:hover { color: white; background: rgba(255, 255, 255, 0.1); }
+  &:hover { color: var(--text); background: var(--bg-hover); }
 }
 
 .prop-grid {
@@ -151,7 +150,7 @@ defineExpose({ load })
 
   > label {
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.8);
+    color: var(--text-dim);
     flex-shrink: 0;
   }
 }
@@ -163,18 +162,17 @@ defineExpose({ load })
 
 .preset-btn {
   padding: 4px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--text-dim);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
 
-  &:hover { background: rgba(255, 255, 255, 0.14); color: white; }
-  &.active { background: rgba(147, 197, 253, 0.25); border-color: #93c5fd; color: #c4b5fd; }
-  &.small { padding: 3px 8px; font-size: 12px; }
+  &:hover { background: var(--bg-hover); color: var(--text); }
+  &.active { background: var(--bg-active); border-color: var(--border-strong); color: var(--text); }
+  &.small { padding: 4px 8px; font-size: @font-size-sm; }
 }
 
 .pos-inputs {
@@ -190,38 +188,37 @@ defineExpose({ load })
 
 .pos-label {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-dim);
   font-weight: 600;
 }
 
 .pos-input {
   width: 60px;
   padding: 4px 8px;
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
-  color: white;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   outline: none;
   text-align: center;
 
-  &:focus { border-color: rgba(96, 165, 250, 0.6); box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.15); }
+  &:focus-visible { border-color: var(--border-strong); outline: 2px solid var(--text); outline-offset: 0; }
   &::-webkit-inner-spin-button,
   &::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 }
 
 .fmt-select {
   padding: 4px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.2);
-  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
   font-size: 12px;
   cursor: pointer;
   outline: none;
 
+  &:focus-visible { border-color: var(--border-strong); outline: 2px solid var(--text); outline-offset: 0; }
   &.wide { min-width: 80px; }
-  option { background: #1e1e2e; color: white; }
+  option { background: var(--bg-panel); color: var(--text); }
 }
 </style>

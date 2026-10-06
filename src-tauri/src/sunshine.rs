@@ -239,14 +239,12 @@ pub async fn get_sunshine_version() -> Result<String, String> {
     let stderr = String::from_utf8_lossy(&output.stderr);
     let combined = format!("{}{}", stdout, stderr);
 
-    // 按优先级匹配版本号模式
+    // Match the most specific version forms first.
     let patterns = [
-        r"v?(\d+\.\d+\.\d+\.杂鱼)",              // 完整版本号（含"杂鱼"）
-        r"(\d+\.\d+\.\d+\.杂鱼)",                // 不带 v 前缀
-        r"Sunshine\s+v?([\d.]+(?:\.杂鱼)?)",     // "Sunshine v..." 格式
-        r"version\s*:?\s*v?([\d.]+(?:\.杂鱼)?)", // "version: ..." 格式
-        r"v?(\d+\.\d+\.\d+(?:\.杂鱼)?)",         // 标准版本号
-        r"(\d+\.\d+(?:\.杂鱼)?)",                // 简化版本号
+        r"Sunshine\s+v?(\d+\.\d+\.\d+(?:\.\d+)?)",
+        r"version\s*:?\s*v?(\d+\.\d+\.\d+(?:\.\d+)?)",
+        r"v?(\d+\.\d+\.\d+(?:\.\d+)?)",
+        r"(\d+\.\d+)",
     ];
 
     for pattern_str in &patterns {

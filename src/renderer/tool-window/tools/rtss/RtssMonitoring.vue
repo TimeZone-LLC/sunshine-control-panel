@@ -114,7 +114,7 @@ watch(config, (v) => {
 const metricGroups = computed(() => {
   const groups = [
     { id: 'session', label: 'Streaming', metrics: [] },
-    { id: 'host_perf', label: 'Host Performance', metrics: [] },
+    { id: 'host_perf', label: 'Host performance', metrics: [] },
     { id: 'process', label: 'Process', metrics: [] },
   ]
   for (const m of availableMetrics.value) {
@@ -139,7 +139,7 @@ async function toggleMonitoring(val) {
 
 async function startMonitoring() {
   try {
-    // 深拷贝 config，避免 reactive Proxy 序列化问题
+    // Deep-copy the config so the reactive proxy does not break serialisation.
     const rawConfig = JSON.parse(JSON.stringify(config))
     await invoke('rtss_start_monitoring', { config: rawConfig })
     active.value = true
@@ -187,7 +187,7 @@ async function loadState() {
     if (snap.active) {
       active.value = true
       Object.assign(snapshot, snap)
-      // 同步后端运行中的 config（若存在）
+      // Adopt the config the backend is running, when there is one.
       if (snap.config) {
         Object.assign(config, snap.config)
       }
@@ -211,10 +211,10 @@ defineExpose({ loadState })
 
 .metric-group-label {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-dim);
   margin-bottom: 3px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  text-transform: none;
+  letter-spacing: normal;
   font-weight: 600;
 }
 
@@ -225,22 +225,20 @@ defineExpose({ loadState })
 }
 
 .metric-chip {
-  padding: 3px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.75);
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--text-dim);
   font-size: 11px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
 
-  &:hover { background: rgba(255, 255, 255, 0.14); color: white; }
+  &:hover { background: var(--bg-hover); color: var(--text); }
   &.active {
-    background: rgba(96, 165, 250, 0.35);
-    border-color: rgba(96, 165, 250, 0.7);
-    color: #60a5fa;
+    background: var(--bg-active);
+    border-color: var(--border-strong);
+    color: var(--text);
     font-weight: 600;
-    box-shadow: 0 0 6px rgba(96, 165, 250, 0.25);
   }
 }
 
@@ -258,7 +256,7 @@ defineExpose({ loadState })
   font-size: 12px;
 
   > label {
-    color: rgba(255, 255, 255, 0.8);
+    color: var(--text-dim);
     min-width: 65px;
     flex-shrink: 0;
   }
@@ -267,15 +265,14 @@ defineExpose({ loadState })
 .style-input {
   flex: 1;
   padding: 4px 8px;
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
-  color: white;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text);
   font-size: 12px;
   outline: none;
 
-  &:focus { border-color: rgba(96, 165, 250, 0.6); box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.15); }
-  &::placeholder { color: rgba(255, 255, 255, 0.3); }
+  &:focus-visible { border-color: var(--border-strong); outline: 2px solid var(--text); outline-offset: 0; }
+  &::placeholder { color: var(--text-faint); }
 }
 
 .colors-row {
@@ -290,58 +287,56 @@ defineExpose({ loadState })
 
   label {
     font-size: 11px;
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--text-dim);
     min-width: unset;
   }
 
   input[type="color"] {
     width: 24px;
     height: 24px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 6px;
+    border: 1px solid var(--border);
     background: none;
     cursor: pointer;
     padding: 0;
 
     &::-webkit-color-swatch-wrapper { padding: 2px; }
-    &::-webkit-color-swatch { border-radius: 4px; border: none; }
+    &::-webkit-color-swatch { border: none; }
   }
 }
 
 .fmt-select {
   padding: 4px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.2);
-  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
   font-size: 12px;
   cursor: pointer;
   outline: none;
 
+  &:focus-visible { border-color: var(--border-strong); outline: 2px solid var(--text); outline-offset: 0; }
   &.wide { min-width: 80px; }
-  option { background: #1e1e2e; color: white; }
+  option { background: var(--bg-panel); color: var(--text); }
 }
 
 .osd-preview {
-  background: rgba(0, 0, 0, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
   padding: 8px 12px;
 }
 
 .osd-preview-label {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-dim);
   margin-bottom: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  text-transform: none;
+  letter-spacing: normal;
   font-weight: 600;
 }
 
 .osd-preview-text {
-  font-family: 'Consolas', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
-  color: #4ade80;
+  color: var(--on);
   white-space: pre-wrap;
   word-break: break-all;
   margin: 0;

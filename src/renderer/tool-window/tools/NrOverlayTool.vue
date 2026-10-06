@@ -1,7 +1,7 @@
 <template>
   <section ref="surface" class="nr-overlay" :class="{ expanded, settled }" :style="{ '--panel-alpha': (expanded ? opacity : Math.max(35, opacity - 12)) / 100 }">
     <header class="nr-head">
-      <span class="drag-handle" data-tauri-drag-region @pointerdown="touchDrag.onTouchWindowDragStart" :title="text.drag"><svg viewBox="0 0 16 24" aria-hidden="true"><circle v-for="(point, i) in [[5,6],[11,6],[5,12],[11,12],[5,18],[11,18]]" :key="i" :cx="point[0]" :cy="point[1]" r="1.5" /></svg></span>
+      <span class="drag-handle" data-tauri-drag-region @pointerdown="touchDrag.onTouchWindowDragStart" :title="text.drag"><svg viewBox="0 0 16 24" aria-hidden="true"><path d="M3 5h10v2H3zM3 11h10v2H3zM3 17h10v2H3z" /></svg></span>
       <button class="pill" :aria-expanded="expanded" :aria-label="text.states[state] + (state === 'active' ? ' · ' + (pipeline?.nr_scale_percent ?? 100) + '%' : '')" @click="expanded = !expanded">
         <span class="dot" :class="state" />
         <span>{{ expanded ? 'DLSS NR' : compactLabel }}</span>

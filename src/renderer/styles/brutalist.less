@@ -1,0 +1,2447 @@
+// ============================================================================
+// gloss design system - Sunshine control panel
+//
+// One authoritative palette, one type scale, one density. A quiet professional
+// tool: structure comes from 1px hairlines and small tonal steps between
+// bg / panel / surface, never from colour, glow or motion. Everything stays
+// square. Colour appears only where it carries meaning a user must not miss
+// (--error, --warn).
+//
+// Elevation IS permitted here, but only as the three neutral tokens below:
+// --shadow-xs on a resting surface at most, --shadow-sm / --shadow-md for
+// things that genuinely float (dialog, drawer, dropdown, popover, message).
+// Never a glow, never a coloured shadow.
+//
+// Import once per window entry point:
+//     import '@/styles/brutalist.less'
+// (or a relative path, e.g. '../styles/brutalist.less')
+//
+// This file is also the Element Plus neutraliser: Element Plus ships from
+// node_modules and cannot be edited, so its CSS variables are rebound to the
+// tokens below and the surfaces variables cannot reach are overridden by
+// selector.
+// ============================================================================
+
+// ---------------------------------------------------------------------------
+// 0. FONTS
+//
+// Self-hosted Geist / Geist Mono. The woff2 files live in src/assets/fonts/,
+// two directories up from here; Vite fingerprints and emits them next to the
+// bundle, so the relative URL below survives the build for every one of the
+// window entry points. No CDN: the panel runs inside a Tauri webview that is
+// frequently offline.
+//
+// This file is imported exactly once per entry point, which is why the faces
+// can live here rather than in the (injected-everywhere) variables.less.
+// ---------------------------------------------------------------------------
+@font-face {
+  font-family: 'Geist';
+  src: url('../../assets/fonts/Geist-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('../../assets/fonts/Geist-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('../../assets/fonts/Geist-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('../../assets/fonts/Geist-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('../../assets/fonts/GeistMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('../../assets/fonts/GeistMono-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+// ---------------------------------------------------------------------------
+// 1. TOKENS - dark (default, and the primary look)
+//
+// These are the canonical names. Every other stylesheet in the app should use
+// them. The alias block further down keeps older names compiling.
+//
+// The dark ground is LAYERED near-black, not pure #000: the step from #0a0a0b
+// page to #111113 panel to #141416 surface to #1d1d21 raised is what gives the
+// app its structure. Flattening it to black would throw all of that away.
+// ---------------------------------------------------------------------------
+:root {
+  --bg: #0a0a0b;
+  --bg-panel: #111113;
+  --bg-panel-soft: #17171a;
+  --bg-input: #141416;
+  --bg-hover: #1d1d21;
+  --bg-active: #26262b;
+
+  --border: #303036;
+  --border-soft: #242429;
+  --border-strong: #3f3f47;
+
+  --text: #ededf0;
+  --text-dim: #9a9aa4;
+  --text-faint: #6e6e78;
+
+  // "enabled / running" is brighter text or a filled square, never a hue.
+  --on: #ededf0;
+  --off: #6e6e78;
+
+  // The only two hues in the system. Meaning only, never decoration. Lifted
+  // just far enough to clear 4.5:1 on the near-black surfaces above.
+  --error: #e05a52;
+  --warn: #d0a054;
+
+  // Typography - self-hosted Geist, declared above, with the full fallback
+  // stack behind it so the UI is readable before the face swaps in.
+  --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-size: 13px;
+  --font-size-sm: 12px;
+  --font-size-xs: 11px;
+  --line-height: 1.5;
+
+  // Density - IDE tight. --control-height is the gloss control contract:
+  // inputs, buttons and selects are all 32px. --row-height stays at 28 for
+  // list and table rows, which are data, not controls.
+  --control-height: 32px;
+  --row-height: 28px;
+  --pad-x: 10px;
+  --pad-y: 6px;
+  --gap: 8px;
+  --radius: 0;
+  --radius-sm: 0;
+
+  // Spacing scale: 4 / 8 / 12 / 16 / 20.
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+
+  // Rail (sidebar) width.
+  --rail-width: 240px;
+
+  // Motion budget: 120ms ease, and only colour / border may animate.
+  --dur: 120ms;
+  --ease: ease;
+  --transition: 120ms ease;
+
+  // Elevation. xs is the ceiling for a resting surface; sm and md belong to
+  // things that float. Neutral only - never a glow, never a hue.
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.22);
+  --shadow-sm: 0 10px 26px rgb(0 0 0 / 0.24);
+  --shadow-md: 0 24px 60px rgb(0 0 0 / 0.32);
+
+  // Composite triplets for the handful of rgba() call sites in the app.
+  --bg-rgb: 10, 10, 11;
+  --bg-panel-rgb: 17, 17, 19;
+  --bg-hover-rgb: 29, 29, 33;
+  --text-rgb: 237, 237, 240;
+  --error-rgb: 224, 90, 82;
+  --warn-rgb: 208, 160, 84;
+
+  // Scrim behind modal surfaces. Flat, no blur.
+  --scrim: rgba(0, 0, 0, 0.66);
+}
+
+// ---------------------------------------------------------------------------
+// 2. TOKENS - light
+//
+// The same system, inverted. Still greyscale, still stark.
+// ---------------------------------------------------------------------------
+:root[data-theme='light'],
+:root[data-bs-theme='light'],
+:root.theme-light {
+  --bg: #f7f7f8;
+  --bg-panel: #ffffff;
+  --bg-panel-soft: #eeeeef;
+  --bg-input: #ffffff;
+  --bg-hover: #eeeeef;
+  --bg-active: #e4e4e7;
+
+  --border: #cfcfd3;
+  --border-soft: #dedee2;
+  --border-strong: #a8a8b0;
+
+  --text: #15151a;
+  --text-dim: #5c5c66;
+  --text-faint: #85858f;
+
+  --on: #15151a;
+  --off: #85858f;
+
+  --error: #b3352c;
+  --warn: #a06022;
+
+  // The light elevation is barely there on purpose: on a pale ground the
+  // hairline already does the separating, and a heavy shadow reads as dirt.
+  --shadow-xs: 0 1px 2px rgb(20 20 24 / 0.04);
+  --shadow-sm: 0 8px 22px rgb(20 20 24 / 0.08);
+  --shadow-md: 0 18px 48px rgb(20 20 24 / 0.13);
+
+  --bg-rgb: 247, 247, 248;
+  --bg-panel-rgb: 255, 255, 255;
+  --bg-hover-rgb: 238, 238, 239;
+  --text-rgb: 21, 21, 26;
+  --error-rgb: 179, 53, 44;
+  --warn-rgb: 160, 96, 34;
+
+  --scrim: rgba(20, 20, 24, 0.42);
+}
+
+// ---------------------------------------------------------------------------
+// 3. COMPATIBILITY ALIASES
+//
+// Around 750 call sites across components this file does not own still read
+// the previous token names. Repointing them here greyscales every one of those
+// files without editing them. Do not use these names in new code.
+// ---------------------------------------------------------------------------
+:root {
+  --bg-page: var(--bg);
+  --bg-surface: var(--bg-panel);
+  --bg-surface-soft: var(--bg-panel-soft);
+  --bg-raised: var(--bg-hover);
+  --bg-sunken: var(--bg-input);
+
+  --text-muted: var(--text-dim);
+  --text-primary: var(--text);
+  --text-secondary: var(--text-dim);
+
+  // There is no accent hue. "Accent" now means "the brightest text".
+  --accent: var(--text);
+  --accent-fg: var(--bg);
+  --accent-secondary: var(--text-dim);
+
+  --danger: var(--error);
+  --warning: var(--warn);
+  // Success is deliberately NOT green. Emphasis is brightness, not hue.
+  --success: var(--on);
+  --info: var(--text-dim);
+
+  // --fd-* theme engine. The five presets are collapsed to the two themes
+  // above, and every token is repointed at the greyscale system so the desktop
+  // shell, the tool windows and the dashboard inherit it for free.
+  --fd-bg-primary: var(--bg);
+  --fd-bg-secondary: var(--bg-panel);
+  --fd-bg-tertiary: var(--bg-hover);
+  --fd-bg-input: var(--bg-input);
+  --fd-bg-primary-rgb: var(--bg-rgb);
+  --fd-bg-secondary-rgb: var(--bg-panel-rgb);
+  --fd-bg-tertiary-rgb: var(--bg-hover-rgb);
+
+  --fd-border: var(--border);
+  --fd-border-strong: var(--border-strong);
+
+  --fd-text-primary: var(--text);
+  --fd-text-secondary: var(--text-dim);
+  --fd-text-muted: var(--text-faint);
+  --fd-text-primary-rgb: var(--text-rgb);
+
+  --fd-accent: var(--text);
+  --fd-accent-rgb: var(--text-rgb);
+  --fd-accent-secondary: var(--text-dim);
+  --fd-accent-secondary-rgb: var(--text-rgb);
+
+  --fd-status-success: var(--on);
+  --fd-status-success-rgb: var(--text-rgb);
+  --fd-status-online: var(--on);
+  --fd-status-offline: var(--text-faint);
+  --fd-status-warning: var(--warn);
+  --fd-status-warning-rgb: var(--warn-rgb);
+  --fd-status-danger: var(--error);
+  --fd-status-danger-rgb: var(--error-rgb);
+  --fd-status-error: var(--error);
+  --fd-status-error-rgb: var(--error-rgb);
+  --fd-status-info: var(--text-dim);
+  --fd-status-info-rgb: var(--text-rgb);
+
+  --fd-card-radius: 0;
+  --fd-font-size: 13px;
+  --fd-font-sans: var(--font-sans);
+  --fd-font-mono: var(--font-mono);
+  --fd-shadow-xs: var(--shadow-xs);
+  --fd-shadow-sm: var(--shadow-sm);
+  --fd-shadow-md: var(--shadow-md);
+  --fd-control-height: var(--control-height);
+  --fd-transition: var(--transition);
+
+  // Panel-local scales that a few tool windows declare against.
+  --ai-accent: var(--text);
+  --ai-border: var(--border);
+  --ai-muted: var(--text-dim);
+  --ai-panel: var(--bg-panel);
+  --ai-surface: var(--bg-panel);
+  --ai-text: var(--text);
+  --ai-heading: var(--text);
+
+  --badge-rgb: var(--text-rgb);
+  --detection-accent: var(--text);
+  --detection-accent-rgb: var(--text-rgb);
+  --detection-copy: var(--text-dim);
+
+  --perf-surface: var(--bg-panel);
+  --perf-border: var(--border);
+  --perf-border-muted: var(--border);
+  --perf-text: var(--text);
+  --perf-text-muted: var(--text-dim);
+  --perf-accent: var(--text);
+  --perf-accent-hover: var(--text);
+  --perf-accent-soft: var(--bg-hover);
+  --perf-accent-text: var(--text);
+  --perf-good: var(--on);
+  --perf-warning: var(--warn);
+  --perf-danger: var(--error);
+  --perf-danger-text: var(--error);
+  --perf-danger-border: var(--error);
+
+  --prerequisite-accent: var(--text);
+  --prerequisite-accent-soft: var(--bg-hover);
+  --prerequisite-title: var(--text);
+  --prerequisite-copy: var(--text-dim);
+
+  --vdd-tab-active-text: var(--text);
+}
+
+// ---------------------------------------------------------------------------
+// 4. FLATTENING RESET
+//
+// !important because this also has to defeat the Element Plus stylesheets
+// bundled from node_modules. Nothing here is decorative; it is the ruleset
+// that makes the whole app square in one pass.
+//
+// The blanket box-shadow kill stays even though gloss permits elevation: it is
+// what stops Element Plus focus glows and leftover coloured shadows in
+// component stylesheets from coming back. The permitted elevation is then
+// handed back explicitly, on a named allow-list, immediately below. Anything
+// that needs elevation should use .gloss-elevated / .gloss-elevated-overlay
+// rather than declaring a shadow of its own.
+// ---------------------------------------------------------------------------
+*,
+*::before,
+*::after {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-sizing: border-box;
+}
+
+// Loading indicators are the only deliberate round shapes. Keep this
+// allow-list after the flattening reset so mixin-generated spinners remain
+// circular without permitting component-level rounding elsewhere.
+.brutalist-spinner,
+.spinner,
+.loading-spinner,
+.upload-spinner,
+.launch-spinner,
+.dot.warming_up,
+.dot.stopping,
+.dot.scaling {
+  border-radius: 50% !important;
+}
+
+// Resting surfaces: the smallest step, and never more than one per stack.
+.el-card,
+.gloss-elevated {
+  box-shadow: var(--shadow-xs) !important;
+}
+
+// Things that genuinely float. A hairline alone cannot say "this is in front
+// of that", so these get real separation from the page beneath them.
+.el-dialog,
+.el-drawer,
+.el-message-box,
+.el-message,
+.el-notification,
+.el-popper,
+.el-popover,
+.el-select-dropdown,
+.el-dropdown-menu,
+.el-picker-panel,
+.el-autocomplete-suggestion,
+.el-color-picker__panel,
+.gloss-elevated-overlay {
+  box-shadow: var(--shadow-md) !important;
+}
+
+html {
+  // rem stays anchored at a sane value; density comes from the px scale below
+  // rather than from shrinking the root, which would resize every fixed layout
+  // in components this file does not own.
+  font-size: 14px;
+  line-height: var(--line-height);
+  color-scheme: dark;
+}
+
+:root[data-theme='light'],
+:root[data-bs-theme='light'],
+:root.theme-light {
+  color-scheme: light;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--font-size);
+  line-height: var(--line-height);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+// Focus is a 1px outline. Every interactive element keeps one - non-negotiable.
+:focus-visible {
+  outline: 1px solid var(--border-strong);
+  outline-offset: 0;
+}
+
+// Values, identifiers, paths, logs.
+code,
+kbd,
+pre,
+samp,
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: var(--gap) 0;
+}
+
+// ---------------------------------------------------------------------------
+// 5. MOTION BUDGET
+//
+// Only background-color, color and border-color may animate, and never for
+// longer than 120ms ease. Everything else - transform, opacity,
+// filter, width - is pinned off globally, so decorative transitions declared
+// in components this file does not own simply stop happening.
+// ---------------------------------------------------------------------------
+// The clamp is on transitions only. Animations are NOT killed wholesale here:
+// the only @keyframes left in the app are loading spinners, and blanking them
+// would make the app look hung. Decorative keyframes get deleted at their
+// definition site instead.
+*,
+*::before,
+*::after {
+  transition-property: background-color, color, border-color;
+  transition-duration: var(--dur);
+  transition-timing-function: var(--ease);
+  transition-delay: 0s;
+}
+
+// Element Plus animates collapse by transitioning height. With the clamp above
+// that transition can never fire, so it is switched off explicitly - otherwise
+// Vue waits out a transition that will not arrive before running its
+// after-enter hook.
+.el-collapse-transition,
+.collapse-transition,
+.horizontal-collapse-transition {
+  transition: none !important;
+}
+
+// Element Plus component CSS is auto-imported after this file. Keep these
+// deliberately specific and important so its late shorthands cannot restore
+// movement outside the three permitted colour properties.
+html body .el-button,
+html body .el-button:focus-visible,
+html body .el-button.is-text:not(.is-disabled):focus-visible {
+  transition: background-color var(--transition), color var(--transition),
+    border-color var(--transition) !important;
+}
+
+html body .el-switch .el-switch__label,
+html body .el-switch .el-switch__core,
+html body .el-switch .el-switch__core .el-switch__inner,
+html body .el-switch .el-switch__core .el-switch__action {
+  transition-property: background-color, color, border-color !important;
+  transition-duration: var(--dur) !important;
+  transition-timing-function: var(--ease) !important;
+  transition-delay: 0s !important;
+}
+
+html body .el-select .el-select__caret,
+html body .el-select .el-select__caret.is-reverse {
+  transition: color var(--transition) !important;
+  transform: none !important;
+}
+
+html body .el-select .el-select__wrapper {
+  transition: border-color var(--transition) !important;
+}
+
+html body .el-checkbox .el-checkbox__inner {
+  transition: background-color var(--transition), border-color var(--transition) !important;
+}
+
+html body .el-checkbox .el-checkbox__inner::after {
+  // The check stays in its final geometry and is revealed by border colour;
+  // there is no scale-in state change.
+  transition: none !important;
+  transform: translate(-45%, -60%) rotate(45deg) !important;
+}
+
+html body .el-checkbox__input.is-indeterminate .el-checkbox__inner::before {
+  left: 3px !important;
+  right: 3px !important;
+  transform: none !important;
+}
+
+html body .v-modal-enter,
+html body .v-modal-leave,
+html body .dialog-fade-enter-active,
+html body .dialog-fade-leave-active,
+html body .fade-in-linear-enter-active,
+html body .fade-in-linear-leave-active,
+html body .el-drawer-fade-enter-active,
+html body .el-drawer-fade-leave-active {
+  animation: none !important;
+  transition: none !important;
+  transform: none !important;
+}
+
+html body .dialog-fade-enter-active .el-overlay-dialog,
+html body .dialog-fade-leave-active .el-overlay-dialog,
+html body .fade-in-linear-enter-active .el-overlay-message-box,
+html body .fade-in-linear-leave-active .el-overlay-message-box,
+html body .el-drawer-fade-enter-active .el-drawer,
+html body .el-drawer-fade-leave-active .el-drawer {
+  animation: none !important;
+  transition: none !important;
+  transform: none !important;
+}
+
+// The only motion the system keeps is a plain rotation for genuine loading
+// states. Determinate progress updates immediately.
+@keyframes brutalist-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// Opt-in spinner. Components that do not already own a rotation can just add
+// this class; nothing is force-rotated by tag or by a generic class name.
+// The one deliberate round shape in the system: a square spinner reads as a
+// glitching block rather than as progress. Matches .gloss-spinner() in
+// components/spinner.less - keep the two in step.
+.brutalist-spinner {
+  display: inline-block;
+  box-sizing: border-box;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--border);
+  border-top-color: var(--text-dim);
+  border-radius: 50%;
+  animation: brutalist-spin 0.8s linear infinite;
+}
+
+// Determinate progress fills may animate their width.
+progress,
+.el-progress-bar__inner,
+.progress-fill,
+.progress-bar__fill {
+  transition-property: background-color;
+  transition-duration: var(--dur);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 6. ELEMENT PLUS - VARIABLE REBIND
+//
+// Element Plus exposes its whole palette as custom properties. Rebinding them
+// is far more robust than chasing selectors, so it is done first and
+// exhaustively; the selector block in section 7 only mops up what variables
+// cannot reach (hard-coded paddings, brand-blue fills, transforms).
+// ---------------------------------------------------------------------------
+html:root,
+html:root.dark,
+.el-popper,
+.el-overlay {
+  // Brand colours -> greyscale. Primary is simply "the text colour".
+  --el-color-primary: var(--text);
+  --el-color-primary-rgb: var(--text-rgb);
+  --el-color-primary-light-3: var(--text-dim);
+  --el-color-primary-light-5: var(--text-dim);
+  --el-color-primary-light-7: var(--border-strong);
+  --el-color-primary-light-8: var(--border);
+  --el-color-primary-light-9: var(--bg-hover);
+  --el-color-primary-dark-2: var(--text);
+
+  --el-color-success: var(--on);
+  --el-color-success-light-3: var(--text-dim);
+  --el-color-success-light-5: var(--text-dim);
+  --el-color-success-light-7: var(--border-strong);
+  --el-color-success-light-8: var(--border);
+  --el-color-success-light-9: var(--bg-hover);
+  --el-color-success-dark-2: var(--on);
+
+  --el-color-info: var(--text-dim);
+  --el-color-info-light-3: var(--text-dim);
+  --el-color-info-light-5: var(--text-faint);
+  --el-color-info-light-7: var(--border-strong);
+  --el-color-info-light-8: var(--border);
+  --el-color-info-light-9: var(--bg-hover);
+  --el-color-info-dark-2: var(--text-dim);
+
+  --el-color-warning: var(--warn);
+  --el-color-warning-light-3: var(--warn);
+  --el-color-warning-light-5: var(--warn);
+  --el-color-warning-light-7: var(--border-strong);
+  --el-color-warning-light-8: var(--border);
+  --el-color-warning-light-9: var(--bg-hover);
+  --el-color-warning-dark-2: var(--warn);
+
+  --el-color-danger: var(--error);
+  --el-color-danger-light-3: var(--error);
+  --el-color-danger-light-5: var(--error);
+  --el-color-danger-light-7: var(--border-strong);
+  --el-color-danger-light-8: var(--border);
+  --el-color-danger-light-9: var(--bg-hover);
+  --el-color-danger-dark-2: var(--error);
+
+  --el-color-error: var(--error);
+  --el-color-error-light-3: var(--error);
+  --el-color-error-light-5: var(--error);
+  --el-color-error-light-7: var(--border-strong);
+  --el-color-error-light-8: var(--border);
+  --el-color-error-light-9: var(--bg-hover);
+  --el-color-error-dark-2: var(--error);
+
+  --el-color-black: #000000;
+  --el-color-white: #ffffff;
+
+  // Surfaces
+  --el-bg-color: var(--bg-panel);
+  --el-bg-color-page: var(--bg);
+  --el-bg-color-overlay: var(--bg-panel);
+
+  --el-fill-color: var(--bg-hover);
+  --el-fill-color-light: var(--bg-hover);
+  --el-fill-color-lighter: var(--bg-panel);
+  --el-fill-color-extra-light: var(--bg-panel);
+  --el-fill-color-dark: var(--bg-active);
+  --el-fill-color-darker: var(--bg-active);
+  --el-fill-color-blank: var(--bg-input);
+
+  --el-mask-color: var(--scrim);
+  --el-mask-color-extra-light: var(--scrim);
+  --el-overlay-color: var(--scrim);
+  --el-overlay-color-light: var(--scrim);
+  --el-overlay-color-lighter: var(--scrim);
+
+  // Text
+  --el-text-color-primary: var(--text);
+  --el-text-color-regular: var(--text);
+  --el-text-color-secondary: var(--text-dim);
+  --el-text-color-placeholder: var(--text-faint);
+  --el-text-color-disabled: var(--text-faint);
+
+  // Borders - hairlines do all the structural work.
+  --el-border-color: var(--border);
+  --el-border-color-light: var(--border);
+  --el-border-color-lighter: var(--border);
+  --el-border-color-extra-light: var(--border);
+  --el-border-color-dark: var(--border-strong);
+  --el-border-color-darker: var(--border-strong);
+  --el-border-color-hover: var(--border-strong);
+  --el-border-width: 1px;
+  --el-border-style: solid;
+  --el-border: 1px solid var(--border);
+  --el-border-radius-base: 0;
+  --el-border-radius-small: 0;
+  --el-border-radius-round: 0;
+  --el-border-radius-circle: 0;
+
+  // Elevation: the three gloss tokens, so any Element Plus surface that reads
+  // one of these and survives the allow-list gets the right neutral shadow
+  // rather than the library default (which is bluish and much too heavy).
+  --el-box-shadow: var(--shadow-sm);
+  --el-box-shadow-light: var(--shadow-xs);
+  --el-box-shadow-lighter: var(--shadow-xs);
+  --el-box-shadow-dark: var(--shadow-md);
+
+  // Motion
+  --el-transition-duration: var(--dur);
+  --el-transition-duration-fast: var(--dur);
+  --el-transition-function-ease-in-out-bezier: var(--ease);
+  --el-transition-function-fast-bezier: var(--ease);
+  --el-transition-all: background-color var(--transition), color var(--transition),
+    border-color var(--transition);
+  --el-transition-fade: none;
+  --el-transition-md-fade: none;
+  --el-transition-fade-linear: none;
+  --el-transition-border: border-color var(--transition);
+  --el-transition-box-shadow: none;
+  --el-transition-color: color var(--transition);
+
+  // Typography and density
+  --el-font-family: var(--font-sans);
+  --el-font-size-extra-large: 16px;
+  --el-font-size-large: 14px;
+  --el-font-size-medium: 13px;
+  --el-font-size-base: 13px;
+  --el-font-size-small: 12px;
+  --el-font-size-extra-small: 11px;
+  --el-font-weight-primary: 500;
+  --el-font-line-height-primary: var(--line-height);
+
+  // gloss control contract: 32px is the default control height.
+  --el-component-size-large: 36px;
+  --el-component-size: var(--control-height);
+  --el-component-size-small: 26px;
+
+  // Button
+  --el-button-bg-color: transparent;
+  --el-button-text-color: var(--text);
+  --el-button-border-color: var(--border-strong);
+  --el-button-hover-bg-color: var(--bg-hover);
+  --el-button-hover-text-color: var(--text);
+  --el-button-hover-border-color: var(--border-strong);
+  --el-button-active-bg-color: var(--bg-active);
+  --el-button-active-text-color: var(--text);
+  --el-button-active-border-color: var(--border-strong);
+  --el-button-disabled-text-color: var(--text-faint);
+  --el-button-disabled-bg-color: transparent;
+  --el-button-disabled-border-color: var(--border);
+  --el-button-outline-color: var(--border-strong);
+  --el-button-hover-link-text-color: var(--text);
+  --el-button-divide-border-color: var(--border);
+
+  // Input
+  --el-input-bg-color: var(--bg-input);
+  --el-input-text-color: var(--text);
+  --el-input-border: 1px solid var(--border);
+  --el-input-border-color: var(--border);
+  --el-input-hover-border-color: var(--border-strong);
+  --el-input-focus-border-color: var(--border-strong);
+  --el-input-transparent-border: 1px solid var(--border);
+  --el-input-border-radius: 0;
+  --el-input-placeholder-color: var(--text-faint);
+  --el-input-icon-color: var(--text-dim);
+  --el-input-clear-hover-color: var(--text);
+  --el-input-height: 28px;
+  --el-input-inner-height: 26px;
+  --el-input-disabled-fill: var(--bg-panel);
+  --el-input-disabled-border: var(--border);
+  --el-input-disabled-text-color: var(--text-faint);
+  --el-input-disabled-placeholder-color: var(--text-faint);
+
+  // Select
+  --el-select-input-focus-border-color: var(--border-strong);
+  --el-select-border-color-hover: var(--border-strong);
+  --el-select-disabled-color: var(--text-faint);
+  --el-select-disabled-border: var(--border);
+  --el-select-multiple-input-color: var(--text);
+  --el-select-input-color: var(--text-dim);
+  --el-select-close-hover-color: var(--text);
+  --el-select-option-selected-font-color: var(--text);
+  --el-select-dropdown-bg-color: var(--bg-panel);
+  --el-select-dropdown-border: 1px solid var(--border);
+
+  // Switch
+  --el-switch-on-color: var(--on);
+  --el-switch-off-color: var(--bg-input);
+  --el-switch-border-color: var(--border-strong);
+
+  // Checkbox
+  --el-checkbox-font-size: 13px;
+  --el-checkbox-font-weight: 400;
+  --el-checkbox-text-color: var(--text);
+  --el-checkbox-input-height: 14px;
+  --el-checkbox-input-width: 14px;
+  --el-checkbox-border-radius: 0;
+  --el-checkbox-bg-color: var(--bg-input);
+  --el-checkbox-input-border: 1px solid var(--border-strong);
+  --el-checkbox-disabled-border-color: var(--border);
+  --el-checkbox-disabled-input-fill: var(--bg-panel);
+  --el-checkbox-disabled-icon-color: var(--text-faint);
+  --el-checkbox-disabled-checked-input-fill: var(--bg-panel);
+  --el-checkbox-disabled-checked-input-border-color: var(--border);
+  --el-checkbox-disabled-checked-icon-color: var(--text-faint);
+  --el-checkbox-checked-text-color: var(--text);
+  --el-checkbox-checked-input-border-color: var(--border-strong);
+  --el-checkbox-checked-bg-color: var(--on);
+  --el-checkbox-checked-icon-color: var(--bg);
+  --el-checkbox-input-border-color-hover: var(--border-strong);
+
+  // Radio
+  --el-radio-font-size: 13px;
+  --el-radio-font-weight: 400;
+  --el-radio-text-color: var(--text);
+  --el-radio-input-height: 14px;
+  --el-radio-input-width: 14px;
+  --el-radio-input-border-radius: 0;
+  --el-radio-input-bg-color: var(--bg-input);
+  --el-radio-input-border: 1px solid var(--border-strong);
+  --el-radio-input-border-color: var(--border-strong);
+  --el-radio-input-border-color-hover: var(--border-strong);
+  --el-radio-checked-text-color: var(--text);
+  --el-radio-checked-input-border-color: var(--border-strong);
+  --el-radio-checked-bg-color: var(--on);
+  --el-radio-checked-icon-color: var(--on);
+  --el-radio-disabled-input-border-color: var(--border);
+  --el-radio-disabled-input-fill: var(--bg-panel);
+  --el-radio-disabled-icon-color: var(--text-faint);
+
+  // Slider
+  --el-slider-main-bg-color: var(--on);
+  --el-slider-runway-bg-color: var(--bg-input);
+  --el-slider-stop-bg-color: var(--border-strong);
+  --el-slider-disabled-color: var(--text-faint);
+  --el-slider-border-radius: 0;
+  --el-slider-height: 4px;
+  --el-slider-button-size: 12px;
+  --el-slider-button-wrapper-size: 28px;
+
+  // Dialog / drawer
+  --el-dialog-bg-color: var(--bg-panel);
+  --el-dialog-box-shadow: none;
+  --el-dialog-title-font-size: 14px;
+  --el-dialog-content-font-size: 13px;
+  --el-dialog-font-line-height: var(--line-height);
+  --el-dialog-padding-primary: 12px;
+  --el-dialog-border-radius: 0;
+  --el-drawer-bg-color: var(--bg-panel);
+  --el-drawer-padding-primary: 12px;
+
+  // Card
+  --el-card-border-color: var(--border);
+  --el-card-border-radius: 0;
+  --el-card-padding: 12px;
+  --el-card-bg-color: var(--bg-panel);
+
+  // Table
+  --el-table-border-color: var(--border);
+  --el-table-border: 1px solid var(--border);
+  --el-table-text-color: var(--text);
+  --el-table-header-text-color: var(--text-dim);
+  --el-table-row-hover-bg-color: var(--bg-hover);
+  --el-table-current-row-bg-color: var(--bg-active);
+  --el-table-header-bg-color: var(--bg-panel);
+  --el-table-fixed-box-shadow: none;
+  --el-table-bg-color: var(--bg);
+  --el-table-tr-bg-color: var(--bg);
+  --el-table-expanded-cell-bg-color: var(--bg);
+
+  // Tag
+  --el-tag-font-size: 11px;
+  --el-tag-border-radius: 0;
+  --el-tag-bg-color: var(--bg-hover);
+  --el-tag-border-color: var(--border);
+  --el-tag-text-color: var(--text);
+  --el-tag-hover-color: var(--border-strong);
+
+  // Tooltip / popover
+  --el-tooltip-bg-color: var(--bg-panel);
+  --el-tooltip-text-color: var(--text);
+  --el-tooltip-border-color: var(--border-strong);
+  --el-popover-bg-color: var(--bg-panel);
+  --el-popover-font-size: 13px;
+  --el-popover-border-color: var(--border);
+  --el-popover-padding: 10px;
+  --el-popover-padding-large: 12px;
+  --el-popover-title-font-size: 13px;
+  --el-popover-title-text-color: var(--text);
+
+  // Collapse
+  --el-collapse-border-color: var(--border);
+  --el-collapse-header-height: 28px;
+  --el-collapse-header-bg-color: var(--bg-panel);
+  --el-collapse-header-text-color: var(--text);
+  --el-collapse-header-font-size: 13px;
+  --el-collapse-content-bg-color: var(--bg);
+  --el-collapse-content-font-size: 13px;
+  --el-collapse-content-text-color: var(--text);
+
+  // Message box
+  --el-messagebox-title-color: var(--text);
+  --el-messagebox-width: 400px;
+  --el-messagebox-border-radius: 0;
+  --el-messagebox-font-size: 14px;
+  --el-messagebox-content-font-size: 13px;
+  --el-messagebox-content-color: var(--text);
+  --el-messagebox-error-font-size: 12px;
+
+  // Message
+  --el-message-bg-color: var(--bg-panel);
+  --el-message-border-color: var(--border);
+  --el-message-padding: 8px 12px;
+  --el-message-text-color: var(--text);
+  --el-message-close-size: 14px;
+  --el-message-close-icon-color: var(--text-dim);
+  --el-message-close-hover-color: var(--text);
+
+  // Notification
+  --el-notification-width: 320px;
+  --el-notification-padding: 12px;
+  --el-notification-radius: 0;
+  --el-notification-shadow: none;
+  --el-notification-border-color: var(--border);
+  --el-notification-icon-size: 16px;
+  --el-notification-close-font-size: 14px;
+  --el-notification-group-margin-left: 12px;
+  --el-notification-group-margin-right: 8px;
+  --el-notification-content-font-size: 13px;
+  --el-notification-content-color: var(--text-dim);
+  --el-notification-title-font-size: 13px;
+  --el-notification-title-color: var(--text);
+  --el-notification-close-color: var(--text-dim);
+  --el-notification-close-hover-color: var(--text);
+
+  // Alert
+  --el-alert-padding: 8px 12px;
+  --el-alert-border-radius-base: 0;
+  --el-alert-title-font-size: 13px;
+  --el-alert-description-font-size: 12px;
+  --el-alert-close-font-size: 12px;
+  --el-alert-close-customed-font-size: 13px;
+  --el-alert-icon-size: 16px;
+  --el-alert-icon-large-size: 24px;
+
+  // Tabs / menu
+  --el-tabs-header-height: 30px;
+  --el-menu-active-color: var(--text);
+  --el-menu-text-color: var(--text-dim);
+  --el-menu-hover-text-color: var(--text);
+  --el-menu-bg-color: var(--bg-panel);
+  --el-menu-hover-bg-color: var(--bg-hover);
+  --el-menu-item-height: 28px;
+  --el-menu-sub-item-height: 28px;
+  --el-menu-horizontal-height: 32px;
+  --el-menu-horizontal-sub-item-height: 28px;
+  --el-menu-item-font-size: 13px;
+  --el-menu-border-color: var(--border);
+  --el-menu-base-level-padding: 12px;
+  --el-menu-level-padding: 12px;
+  --el-menu-icon-width: 20px;
+
+  // Tree
+  --el-tree-node-hover-bg-color: var(--bg-hover);
+  --el-tree-text-color: var(--text);
+  --el-tree-expand-icon-color: var(--text-dim);
+
+  // Pagination
+  --el-pagination-font-size: 12px;
+  --el-pagination-bg-color: transparent;
+  --el-pagination-text-color: var(--text);
+  --el-pagination-border-radius: 0;
+  --el-pagination-button-color: var(--text);
+  --el-pagination-button-width: 28px;
+  --el-pagination-button-height: 28px;
+  --el-pagination-button-disabled-color: var(--text-faint);
+  --el-pagination-button-disabled-bg-color: transparent;
+  --el-pagination-hover-bg-color: var(--bg-hover);
+  --el-pagination-font-size-small: 11px;
+  --el-pagination-button-width-small: 22px;
+  --el-pagination-button-height-small: 22px;
+  --el-pagination-item-gap: 4px;
+
+  // Badge / progress / scrollbar / loading
+  --el-badge-bg-color: var(--bg-active);
+  --el-badge-radius: 0;
+  --el-badge-font-size: 11px;
+  --el-badge-padding: 4px;
+  --el-badge-size: 16px;
+  --el-progress-bar-radius: 0;
+  --el-scrollbar-opacity: 1;
+  --el-scrollbar-bg-color: var(--border);
+  --el-scrollbar-hover-opacity: 1;
+  --el-scrollbar-hover-bg-color: var(--border-strong);
+  --el-loading-spinner-size: 24px;
+  --el-loading-fullscreen-spinner-size: 36px;
+
+  // Empty state
+  --el-empty-padding: 24px 0;
+  --el-empty-image-width: 96px;
+  --el-empty-description-margin-top: 12px;
+
+  // Date picker / cascader
+  --el-datepicker-text-color: var(--text);
+  --el-datepicker-off-text-color: var(--text-faint);
+  --el-datepicker-header-text-color: var(--text-dim);
+  --el-datepicker-icon-color: var(--text-dim);
+  --el-datepicker-border-color: var(--border);
+  --el-datepicker-inner-border-color: var(--border);
+  --el-datepicker-inrange-bg-color: var(--bg-hover);
+  --el-datepicker-inrange-hover-bg-color: var(--bg-active);
+  --el-datepicker-active-color: var(--text);
+  --el-datepicker-hover-text-color: var(--text);
+  --el-cascader-menu-text-color: var(--text);
+  --el-cascader-menu-selected-text-color: var(--text);
+  --el-cascader-menu-fill: var(--bg-panel);
+  --el-cascader-menu-border: 1px solid var(--border);
+  --el-cascader-node-background-hover: var(--bg-hover);
+  --el-cascader-node-color-disabled: var(--text-faint);
+  --el-cascader-tag-background: var(--bg-hover);
+
+  // Segmented / skeleton / avatar / rate / timeline / transfer
+  --el-segmented-color: var(--text-dim);
+  --el-segmented-bg-color: var(--bg-input);
+  --el-segmented-item-selected-color: var(--text);
+  --el-segmented-item-selected-bg-color: var(--bg-active);
+  --el-segmented-item-hover-color: var(--text);
+  --el-segmented-item-hover-bg-color: var(--bg-hover);
+  --el-segmented-item-active-bg-color: var(--bg-active);
+  --el-segmented-item-disabled-color: var(--text-faint);
+  --el-segmented-padding: 2px;
+  --el-skeleton-color: var(--bg-hover);
+  --el-skeleton-to-color: var(--bg-active);
+  --el-avatar-text-color: var(--text);
+  --el-avatar-bg-color: var(--bg-hover);
+  --el-avatar-text-size: 13px;
+  --el-avatar-icon-size: 16px;
+  --el-avatar-border-radius: 0;
+  --el-rate-height: 16px;
+  --el-rate-font-size: 12px;
+  --el-rate-icon-size: 16px;
+  --el-rate-icon-margin: 4px;
+  --el-rate-void-color: var(--border-strong);
+  --el-rate-fill-color: var(--text);
+  --el-rate-disabled-void-color: var(--border);
+  --el-rate-text-color: var(--text-dim);
+  --el-timeline-node-color: var(--border-strong);
+  --el-timeline-node-size-normal: 8px;
+  --el-timeline-node-size-large: 10px;
+  --el-transfer-border-color: var(--border);
+  --el-transfer-border-radius: 0;
+  --el-transfer-panel-body-height: 200px;
+  --el-transfer-panel-header-height: 28px;
+  --el-transfer-panel-header-bg-color: var(--bg-panel);
+  --el-transfer-item-height: 26px;
+  --el-transfer-filter-height: 26px;
+
+  // Descriptions / carousel / modal / disabled
+  --el-descriptions-table-border: 1px solid var(--border);
+  --el-descriptions-item-bordered-label-background: var(--bg-panel);
+  --el-carousel-arrow-font-size: 12px;
+  --el-carousel-arrow-size: 28px;
+  --el-carousel-arrow-background: var(--bg-panel);
+  --el-carousel-arrow-hover-background: var(--bg-hover);
+  --el-carousel-indicator-out-color: var(--border-strong);
+  --el-popup-modal-bg-color: #000000;
+  --el-popup-modal-opacity: 0.66;
+  --el-disabled-bg-color: var(--bg-panel);
+  --el-disabled-text-color: var(--text-faint);
+  --el-disabled-border-color: var(--border);
+}
+
+// ---------------------------------------------------------------------------
+// 7. ELEMENT PLUS - SELECTOR OVERRIDES
+//
+// What the variables cannot reach: hard-coded paddings, brand-blue fills,
+// gradients, transforms, the button voice, and the components that paint
+// themselves rather than reading a variable.
+// ---------------------------------------------------------------------------
+
+// --- Button ----------------------------------------------------------------
+.el-button {
+  height: var(--row-height);
+  min-height: var(--row-height);
+  padding: 0 var(--pad-x);
+  background-color: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--font-size);
+  font-weight: 400;
+  // IDE buttons are sentence case. No shouting.
+  text-transform: none;
+  letter-spacing: normal;
+  outline-offset: 0;
+
+  &:hover,
+  &:focus {
+    background-color: var(--bg-hover);
+    border-color: var(--border-strong);
+    color: var(--text);
+  }
+
+  &:active {
+    background-color: var(--bg-active);
+    border-color: var(--border-strong);
+    color: var(--text);
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--border-strong);
+  }
+
+  &.is-disabled,
+  &.is-disabled:hover,
+  &.is-disabled:focus,
+  &.is-disabled:active {
+    background-color: transparent;
+    border-color: var(--border);
+    color: var(--text-faint);
+  }
+
+  &.is-round,
+  &.is-circle {
+    padding: 0 var(--pad-x);
+  }
+
+  &.is-loading::before {
+    background-color: transparent;
+  }
+
+  + .el-button {
+    margin-left: 6px;
+  }
+}
+
+.el-button--large {
+  height: 32px;
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: var(--font-size);
+}
+
+.el-button--small {
+  height: 24px;
+  min-height: 24px;
+  padding: 0 8px;
+  font-size: var(--font-size-sm);
+}
+
+// The filled variants become one inverted block; every semantic variant other
+// than warning and danger is the same neutral chip.
+.el-button.el-button--primary,
+.el-button.el-button--success,
+.el-button.el-button--info {
+  background-color: var(--bg-active);
+  border-color: var(--border-strong);
+  color: var(--text);
+
+  &:hover,
+  &:focus {
+    background-color: var(--bg-hover);
+    border-color: var(--border-strong);
+    color: var(--text);
+  }
+}
+
+.el-button.el-button--warning {
+  background-color: transparent;
+  border-color: var(--warn);
+  color: var(--warn);
+
+  &:hover,
+  &:focus {
+    background-color: var(--bg-hover);
+    border-color: var(--warn);
+    color: var(--warn);
+  }
+}
+
+.el-button.el-button--danger {
+  background-color: transparent;
+  border-color: var(--error);
+  color: var(--error);
+
+  &:hover,
+  &:focus {
+    background-color: var(--bg-hover);
+    border-color: var(--error);
+    color: var(--error);
+  }
+}
+
+.el-button.is-text,
+.el-button.is-link {
+  border-color: transparent;
+  background-color: transparent;
+  color: var(--text-dim);
+
+  &:hover,
+  &:focus {
+    background-color: var(--bg-hover);
+    color: var(--text);
+  }
+}
+
+.el-button.is-plain {
+  background-color: transparent;
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.el-button-group > .el-button {
+  border-color: var(--border-strong);
+
+  &:not(:first-child) {
+    margin-left: -1px;
+  }
+}
+
+// --- Input / textarea / number ---------------------------------------------
+.el-input,
+.el-textarea {
+  font-size: var(--font-size);
+}
+
+.el-input__wrapper,
+.el-select__wrapper,
+.el-input-number,
+.el-date-editor,
+.el-autocomplete {
+  background-color: var(--bg-input);
+  border: 1px solid var(--border);
+  padding: 0 var(--pad-x);
+  transition: border-color var(--dur) linear;
+}
+
+.el-textarea__inner {
+  background-color: var(--bg-input);
+  border: 1px solid var(--border);
+  padding: var(--pad-y) var(--pad-x);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--text);
+  resize: vertical;
+}
+
+.el-input__inner,
+.el-select__placeholder,
+.el-select__selected-item {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  height: 26px;
+  line-height: 26px;
+}
+
+.el-input__wrapper:hover,
+.el-select__wrapper:hover,
+.el-textarea__inner:hover {
+  border-color: var(--border-strong);
+}
+
+.el-input__wrapper.is-focus,
+.el-select__wrapper.is-focused,
+.el-textarea__inner:focus,
+.el-input__wrapper:focus-within {
+  border-color: var(--border-strong);
+  outline: 1px solid var(--border-strong);
+  outline-offset: 0;
+}
+
+.el-input.is-disabled .el-input__wrapper,
+.el-textarea.is-disabled .el-textarea__inner,
+.el-select__wrapper.is-disabled {
+  background-color: var(--bg-panel);
+  border-color: var(--border);
+  color: var(--text-faint);
+}
+
+.el-input__prefix,
+.el-input__suffix,
+.el-input__icon {
+  color: var(--text-dim);
+}
+
+.el-input-group__prepend,
+.el-input-group__append {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 0 var(--pad-x);
+}
+
+.el-input-number__increase,
+.el-input-number__decrease {
+  background-color: var(--bg-panel);
+  border-color: var(--border);
+  color: var(--text-dim);
+
+  &:hover {
+    background-color: var(--bg-hover);
+    color: var(--text);
+  }
+}
+
+// --- Select / dropdown / option --------------------------------------------
+.el-select-dropdown,
+.el-dropdown-menu,
+.el-autocomplete-suggestion,
+.el-cascader-menu {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border);
+  padding: 0;
+}
+
+.el-select-dropdown__item,
+.el-dropdown-menu__item,
+.el-cascader-node {
+  height: var(--row-height);
+  line-height: var(--row-height);
+  padding: 0 var(--pad-x);
+  color: var(--text);
+  font-size: var(--font-size);
+
+  &:hover,
+  &.is-hovering,
+  &:not(.is-disabled):focus {
+    background-color: var(--bg-hover);
+    color: var(--text);
+  }
+
+  &.is-selected,
+  &.selected,
+  &.is-active {
+    background-color: var(--bg-active);
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  &.is-disabled {
+    color: var(--text-faint);
+  }
+}
+
+.el-select-dropdown__item.is-selected::after {
+  background-color: var(--text);
+}
+
+.el-select__tags .el-tag {
+  background-color: var(--bg-hover);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+// --- Switch ----------------------------------------------------------------
+// An IDE switch is a square track with a square knob. No pill, no colour.
+.el-switch {
+  height: 18px;
+  line-height: 18px;
+
+  .el-switch__core {
+    background-color: var(--bg-input);
+    border: 1px solid var(--border-strong);
+    min-width: 34px;
+    width: 34px;
+    height: 16px;
+  }
+
+  .el-switch__action {
+    background-color: var(--text-faint);
+    width: 10px;
+    height: 10px;
+    left: 2px;
+    transition: background-color var(--dur) linear;
+  }
+
+  &.is-checked .el-switch__core {
+    background-color: var(--bg-active);
+    border-color: var(--border-strong);
+  }
+
+  &.is-checked .el-switch__action {
+    background-color: var(--on);
+    left: calc(100% - 12px);
+  }
+
+  &.is-disabled {
+    opacity: 1;
+
+    .el-switch__core {
+      border-color: var(--border);
+    }
+
+    .el-switch__action {
+      background-color: var(--border);
+    }
+  }
+
+  .el-switch__label {
+    color: var(--text-dim);
+    font-size: var(--font-size-sm);
+
+    &.is-active {
+      color: var(--text);
+    }
+  }
+}
+
+// --- Checkbox / radio ------------------------------------------------------
+.el-checkbox,
+.el-radio {
+  height: var(--row-height);
+  margin-right: 12px;
+  font-weight: 400;
+  color: var(--text);
+}
+
+.el-checkbox__inner,
+.el-radio__inner {
+  width: 14px;
+  height: 14px;
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-strong);
+}
+
+.el-checkbox__input.is-checked .el-checkbox__inner {
+  background-color: var(--on);
+  border-color: var(--on);
+
+  &::after {
+    border-color: var(--bg);
+  }
+}
+
+.el-checkbox__input.is-indeterminate .el-checkbox__inner {
+  background-color: var(--on);
+  border-color: var(--on);
+
+  &::before {
+    background-color: var(--bg);
+  }
+}
+
+.el-radio__input.is-checked .el-radio__inner {
+  background-color: var(--bg-input);
+  border-color: var(--on);
+
+  &::after {
+    background-color: var(--on);
+    width: 6px;
+    height: 6px;
+  }
+}
+
+.el-checkbox__input.is-checked + .el-checkbox__label,
+.el-radio__input.is-checked + .el-radio__label {
+  color: var(--text);
+}
+
+.el-checkbox__input.is-focus .el-checkbox__inner,
+.el-radio__input.is-focus .el-radio__inner {
+  border-color: var(--border-strong);
+  outline: 1px solid var(--border-strong);
+  outline-offset: 0;
+}
+
+.el-checkbox-button__inner,
+.el-radio-button__inner {
+  background-color: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  font-weight: 400;
+  padding: 0 var(--pad-x);
+  height: var(--row-height);
+  line-height: calc(var(--row-height) - 2px);
+
+  &:hover {
+    background-color: var(--bg-hover);
+    color: var(--text);
+  }
+}
+
+.el-checkbox-button.is-checked .el-checkbox-button__inner,
+.el-radio-button__original-radio:checked + .el-radio-button__inner {
+  background-color: var(--bg-active);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+// --- Slider ----------------------------------------------------------------
+.el-slider__runway {
+  background-color: var(--bg-input);
+  border: 1px solid var(--border);
+  height: 6px;
+}
+
+.el-slider__bar {
+  background-color: var(--on);
+  height: 4px;
+}
+
+.el-slider__button {
+  width: 10px;
+  height: 16px;
+  background-color: var(--text);
+  border: 1px solid var(--bg);
+
+  &:hover,
+  &.hover,
+  &.dragging {
+    // No scale-up. The handle does not grow.
+    transform: none;
+    background-color: var(--text);
+  }
+}
+
+.el-slider__button-wrapper {
+  width: 24px;
+  height: 24px;
+}
+
+.el-slider__stop {
+  background-color: var(--border-strong);
+  width: 1px;
+  height: 6px;
+}
+
+.el-slider__marks-text {
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+}
+
+.el-slider.is-disabled {
+  .el-slider__bar,
+  .el-slider__button {
+    background-color: var(--text-faint);
+  }
+}
+
+// --- Dialog / drawer / message box -----------------------------------------
+.el-overlay,
+.el-overlay-dialog {
+  background-color: var(--scrim);
+}
+
+.el-dialog,
+.el-drawer,
+.el-message-box {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-strong);
+  padding: 0;
+}
+
+.el-dialog__header,
+.el-drawer__header,
+.el-message-box__header {
+  margin: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background-color: var(--bg-panel);
+}
+
+.el-dialog__title,
+.el-drawer__title,
+.el-message-box__title {
+  color: var(--text);
+  font-size: var(--font-size);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.el-dialog__body,
+.el-drawer__body,
+.el-message-box__content {
+  color: var(--text);
+  padding: 12px;
+  font-size: var(--font-size);
+  line-height: var(--line-height);
+}
+
+.el-dialog__footer,
+.el-drawer__footer,
+.el-message-box__btns {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  text-align: right;
+}
+
+.el-dialog__headerbtn,
+.el-drawer__close-btn,
+.el-message-box__headerbtn {
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  color: var(--text-dim);
+
+  &:hover .el-dialog__close,
+  &:hover .el-message-box__close {
+    color: var(--text);
+  }
+}
+
+.el-message-box__status {
+  color: var(--text-dim);
+
+  &.el-message-box-icon--error {
+    color: var(--error);
+  }
+
+  &.el-message-box-icon--warning {
+    color: var(--warn);
+  }
+
+  &.el-message-box-icon--success,
+  &.el-message-box-icon--info {
+    color: var(--text-dim);
+  }
+}
+
+// Dialogs must not fly in.
+.dialog-fade-enter-active,
+.dialog-fade-leave-active,
+.el-drawer-fade-enter-active,
+.el-drawer-fade-leave-active {
+  transition: none !important;
+
+  .el-overlay-dialog,
+  .el-dialog,
+  .el-drawer {
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
+// --- Card ------------------------------------------------------------------
+.el-card {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.el-card__header {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--font-size);
+  font-weight: 500;
+  color: var(--text);
+}
+
+.el-card__body {
+  padding: 12px;
+}
+
+// --- Table -----------------------------------------------------------------
+.el-table {
+  background-color: var(--bg);
+  color: var(--text);
+  font-size: var(--font-size);
+  border: 1px solid var(--border);
+
+  &::before,
+  &::after,
+  .el-table__inner-wrapper::before,
+  .el-table__inner-wrapper::after {
+    background-color: var(--border);
+  }
+
+  th.el-table__cell {
+    background-color: var(--bg-panel);
+    color: var(--text-dim);
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: normal;
+    height: var(--row-height);
+    padding: 0;
+  }
+
+  td.el-table__cell {
+    height: var(--row-height);
+    padding: 0;
+  }
+
+  td.el-table__cell,
+  th.el-table__cell {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .cell {
+    padding: 0 var(--pad-x);
+    line-height: var(--row-height);
+    word-break: normal;
+  }
+
+  tr {
+    background-color: var(--bg);
+  }
+
+  .el-table__body tr:hover > td.el-table__cell,
+  .el-table__body tr.hover-row > td.el-table__cell {
+    background-color: var(--bg-hover);
+  }
+
+  .el-table__body tr.current-row > td.el-table__cell {
+    background-color: var(--bg-active);
+  }
+
+  .el-table__empty-block {
+    background-color: var(--bg);
+  }
+
+  .el-table__empty-text {
+    color: var(--text-faint);
+  }
+}
+
+.el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+  background-color: var(--bg-panel);
+}
+
+.el-table--border .el-table__cell {
+  border-right: 1px solid var(--border);
+}
+
+// --- Tabs ------------------------------------------------------------------
+.el-tabs__header {
+  margin: 0 0 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.el-tabs__nav-wrap::after {
+  background-color: var(--border);
+  height: 1px;
+}
+
+.el-tabs__item {
+  height: 30px;
+  line-height: 30px;
+  padding: 0 12px !important;
+  color: var(--text-dim);
+  font-size: var(--font-size);
+  font-weight: 400;
+  border: 0;
+
+  &:hover {
+    color: var(--text);
+    background-color: var(--bg-hover);
+  }
+
+  &.is-active {
+    color: var(--text);
+    background-color: var(--bg-active);
+  }
+
+  &.is-disabled {
+    color: var(--text-faint);
+  }
+}
+
+.el-tabs__active-bar {
+  background-color: var(--text);
+  height: 1px;
+}
+
+.el-tabs--card > .el-tabs__header .el-tabs__item {
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  margin-right: -1px;
+
+  &.is-active {
+    border-color: var(--border-strong);
+    background-color: var(--bg-active);
+  }
+}
+
+// --- Tag -------------------------------------------------------------------
+.el-tag {
+  height: 18px;
+  line-height: 16px;
+  padding: 0 6px;
+  background-color: var(--bg-hover);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: none;
+
+  .el-tag__close {
+    color: var(--text-dim);
+
+    &:hover {
+      background-color: var(--bg-active);
+      color: var(--text);
+    }
+  }
+}
+
+.el-tag--success,
+.el-tag--info,
+.el-tag--primary {
+  background-color: var(--bg-hover);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.el-tag--warning {
+  background-color: transparent;
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.el-tag--danger {
+  background-color: transparent;
+  border-color: var(--error);
+  color: var(--error);
+}
+
+// --- Tooltip / popover / popper --------------------------------------------
+.el-popper,
+.el-popper.is-dark,
+.el-popper.is-light,
+.el-popover {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  font-size: var(--font-size-sm);
+  padding: 6px 8px;
+  max-width: 360px;
+}
+
+.el-popper__arrow,
+.el-popper .el-popper__arrow::before {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-strong);
+}
+
+.el-popover__title {
+  color: var(--text);
+  font-size: var(--font-size);
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+// Poppers appear; they do not zoom or fade in from a transform.
+.el-zoom-in-top-enter-active,
+.el-zoom-in-top-leave-active,
+.el-zoom-in-bottom-enter-active,
+.el-zoom-in-bottom-leave-active,
+.el-zoom-in-center-enter-active,
+.el-zoom-in-center-leave-active,
+.el-fade-in-enter-active,
+.el-fade-in-leave-active,
+.el-fade-in-linear-enter-active,
+.el-fade-in-linear-leave-active {
+  transition: none !important;
+  transform: none !important;
+  animation: none !important;
+}
+
+// --- Collapse --------------------------------------------------------------
+.el-collapse,
+.el-collapse-item__wrap,
+.el-collapse-item__header {
+  border-color: var(--border);
+  background-color: transparent;
+}
+
+.el-collapse-item__header {
+  height: var(--row-height);
+  line-height: var(--row-height);
+  padding: 0 var(--pad-x);
+  background-color: var(--bg-panel);
+  color: var(--text);
+  font-size: var(--font-size);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border);
+
+  &:hover {
+    background-color: var(--bg-hover);
+  }
+}
+
+.el-collapse-item__content {
+  padding: 8px var(--pad-x) 12px;
+  color: var(--text);
+  font-size: var(--font-size);
+}
+
+.el-collapse-item__arrow {
+  color: var(--text-dim);
+}
+
+// --- Form ------------------------------------------------------------------
+.el-form-item {
+  margin-bottom: 10px;
+}
+
+.el-form-item__label {
+  color: var(--text-dim);
+  font-size: var(--font-size);
+  font-weight: 400;
+  line-height: var(--row-height);
+  padding-right: 8px;
+}
+
+.el-form-item__content {
+  line-height: var(--row-height);
+  font-size: var(--font-size);
+}
+
+.el-form-item__error {
+  color: var(--error);
+  font-size: var(--font-size-xs);
+  padding-top: 2px;
+}
+
+.el-form-item.is-error {
+  .el-input__wrapper,
+  .el-textarea__inner,
+  .el-select__wrapper {
+    border-color: var(--error);
+  }
+}
+
+.el-form-item.is-required:not(.is-no-asterisk) > .el-form-item__label::before {
+  color: var(--error);
+}
+
+.el-divider {
+  border-color: var(--border);
+  background-color: var(--border);
+  margin: 12px 0;
+}
+
+.el-divider__text {
+  background-color: var(--bg);
+  color: var(--text-dim);
+  font-size: var(--font-size-sm);
+}
+
+// --- Message / notification ------------------------------------------------
+.el-message,
+.el-notification {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  padding: 8px 12px;
+  min-width: 240px;
+}
+
+.el-message__content,
+.el-notification__content {
+  color: var(--text);
+  font-size: var(--font-size);
+}
+
+.el-notification__title {
+  color: var(--text);
+  font-size: var(--font-size);
+  font-weight: 500;
+}
+
+body .el-message .el-message__icon,
+body .el-notification .el-notification__icon {
+  // Element Plus status glyphs are circular. The copy, signal-colour border,
+  // and notification title already communicate severity without adding the
+  // one shape this design reserves for progress spinners.
+  display: none !important;
+}
+
+.el-message--success .el-message__icon,
+.el-notification__icon.el-icon-success {
+  color: var(--on);
+}
+
+.el-message--info .el-message__icon {
+  color: var(--text-dim);
+}
+
+.el-message--warning .el-message__icon,
+.el-notification__icon.el-icon-warning {
+  color: var(--warn);
+}
+
+.el-message--error .el-message__icon,
+.el-notification__icon.el-icon-error {
+  color: var(--error);
+}
+
+.el-message-fade-enter-active,
+.el-message-fade-leave-active,
+.el-notification-fade-enter-active,
+.el-notification-fade-leave-active {
+  transition: none !important;
+  transform: none !important;
+}
+
+// --- Alert -----------------------------------------------------------------
+.el-alert {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 12px;
+}
+
+.el-alert__title {
+  color: var(--text);
+  font-size: var(--font-size);
+  font-weight: 500;
+}
+
+.el-alert__description {
+  color: var(--text-dim);
+  font-size: var(--font-size-sm);
+  margin: 2px 0 0;
+}
+
+.el-alert__icon {
+  color: var(--text-dim);
+}
+
+// Element Plus emits its component skin after this shared stylesheet in
+// production builds. Keep light alerts on the fork's neutral surface with a
+// selector specific enough to preserve contrast regardless of bundle order.
+body .el-alert.is-light {
+  background-color: var(--bg-panel);
+  color: var(--text);
+
+  .el-alert__description {
+    color: var(--text-dim);
+  }
+}
+
+.el-alert--warning {
+  border-left: 2px solid var(--warn);
+
+  .el-alert__icon {
+    color: var(--warn);
+  }
+}
+
+.el-alert--error {
+  border-left: 2px solid var(--error);
+
+  .el-alert__icon {
+    color: var(--error);
+  }
+}
+
+// CircleCloseFilled is a round decorative glyph. The error remains explicit
+// through its copy and semantic left border, without introducing the one shape
+// this design reserves exclusively for progress spinners.
+.el-alert.el-alert--error .el-alert__icon {
+  display: none;
+}
+
+.el-alert__closebtn {
+  color: var(--text-dim);
+
+  &:hover {
+    color: var(--text);
+  }
+}
+
+// --- Progress --------------------------------------------------------------
+.el-progress-bar__outer {
+  background-color: var(--bg-input);
+  border: 1px solid var(--border);
+  height: 6px !important;
+}
+
+.el-progress-bar__inner {
+  background-color: var(--on);
+}
+
+.el-progress__text {
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs) !important;
+}
+
+.el-progress--success .el-progress-bar__inner {
+  background-color: var(--on);
+}
+
+.el-progress--warning .el-progress-bar__inner {
+  background-color: var(--warn);
+}
+
+.el-progress--exception .el-progress-bar__inner {
+  background-color: var(--error);
+}
+
+// --- Scrollbar -------------------------------------------------------------
+.el-scrollbar__bar {
+  opacity: 1;
+}
+
+.el-scrollbar__thumb {
+  background-color: var(--border);
+  opacity: 1;
+
+  &:hover {
+    background-color: var(--border-strong);
+  }
+}
+
+// --- Tree ------------------------------------------------------------------
+.el-tree {
+  background-color: transparent;
+  color: var(--text);
+  font-size: var(--font-size);
+}
+
+.el-tree-node__content {
+  height: 24px;
+  padding-left: 4px;
+
+  &:hover {
+    background-color: var(--bg-hover);
+  }
+}
+
+.el-tree-node.is-current > .el-tree-node__content,
+.el-tree-node:focus > .el-tree-node__content {
+  background-color: var(--bg-active);
+}
+
+.el-tree-node__expand-icon {
+  color: var(--text-dim);
+  padding: 4px;
+}
+
+// --- Pagination ------------------------------------------------------------
+.el-pagination {
+  color: var(--text-dim);
+  font-size: var(--font-size-sm);
+
+  button,
+  .el-pager li {
+    background-color: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    min-width: 24px;
+    height: 24px;
+    line-height: 22px;
+    margin: 0 2px;
+    font-weight: 400;
+
+    &:hover {
+      background-color: var(--bg-hover);
+      color: var(--text);
+    }
+
+    &.is-active,
+    &.active {
+      background-color: var(--bg-active);
+      border-color: var(--border-strong);
+      color: var(--text);
+    }
+
+    &:disabled,
+    &.is-disabled {
+      color: var(--text-faint);
+      background-color: transparent;
+    }
+  }
+}
+
+// --- Badge -----------------------------------------------------------------
+.el-badge__content {
+  background-color: var(--bg-active);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  height: 16px;
+  line-height: 14px;
+  padding: 0 4px;
+}
+
+.el-badge__content--danger {
+  background-color: transparent;
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.el-badge__content--warning {
+  background-color: transparent;
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+// --- Loading ---------------------------------------------------------------
+.el-loading-mask {
+  background-color: var(--scrim);
+}
+
+.el-loading-spinner .path {
+  stroke: var(--text);
+  stroke-width: 2;
+}
+
+.el-loading-spinner .el-loading-text {
+  color: var(--text-dim);
+  font-size: var(--font-size-sm);
+}
+
+// --- Menu ------------------------------------------------------------------
+.el-menu {
+  background-color: var(--bg-panel);
+  border-right: 1px solid var(--border);
+}
+
+.el-menu-item,
+.el-sub-menu__title {
+  height: var(--row-height);
+  line-height: var(--row-height);
+  color: var(--text-dim);
+  font-size: var(--font-size);
+
+  &:hover {
+    background-color: var(--bg-hover);
+    color: var(--text);
+  }
+
+  &.is-active {
+    background-color: var(--bg-active);
+    color: var(--text);
+  }
+}
+
+// --- Misc surfaces ---------------------------------------------------------
+.el-empty__description p {
+  color: var(--text-faint);
+  font-size: var(--font-size-sm);
+}
+
+// No illustration in an empty state; the words are enough.
+.el-empty__image {
+  width: 0;
+  height: 0;
+
+  svg,
+  img {
+    display: none;
+  }
+}
+
+.el-descriptions__body {
+  background-color: var(--bg);
+  color: var(--text);
+}
+
+.el-descriptions__label,
+.el-descriptions__cell {
+  color: var(--text-dim);
+  font-size: var(--font-size-sm);
+}
+
+.el-skeleton__item {
+  background-color: var(--bg-hover);
+}
+
+.el-segmented {
+  background-color: var(--bg-input);
+  border: 1px solid var(--border);
+  padding: 0;
+}
+
+.el-segmented__item {
+  height: 24px;
+  color: var(--text-dim);
+  font-size: var(--font-size-sm);
+}
+
+.el-segmented__item-selected {
+  background-color: var(--bg-active);
+}
+
+.el-link {
+  color: var(--text);
+  font-size: var(--font-size);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+
+  &:hover {
+    color: var(--text-dim);
+  }
+}
+
+.el-avatar {
+  background-color: var(--bg-hover);
+  color: var(--text-dim);
+}
+
+.el-upload-dragger {
+  background-color: var(--bg-input);
+  border: 1px dashed var(--border-strong);
+  padding: 16px;
+
+  &:hover {
+    border-color: var(--border-strong);
+    background-color: var(--bg-hover);
+  }
+}
+
+.el-upload-list__item {
+  color: var(--text);
+  font-size: var(--font-size-sm);
+
+  &:hover {
+    background-color: var(--bg-hover);
+  }
+}
+
+.el-steps .el-step__head.is-process,
+.el-steps .el-step__head.is-finish {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.el-step__title {
+  font-size: var(--font-size);
+  font-weight: 400;
+  color: var(--text-dim);
+
+  &.is-process,
+  &.is-finish {
+    color: var(--text);
+  }
+}
+
+.el-timeline-item__node {
+  background-color: var(--border-strong);
+}
+
+.el-timeline-item__tail {
+  border-left-color: var(--border);
+}
+
+// Element Plus icons inherit the surrounding text colour; never a brand hue.
+.el-icon {
+  color: inherit;
+}
+
+// ---------------------------------------------------------------------------
+// 8. SCROLLBARS AND SELECTION
+// ---------------------------------------------------------------------------
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: var(--bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border: 0;
+
+  &:hover {
+    background: var(--border-strong);
+  }
+}
+
+::selection {
+  background: var(--bg-active);
+  color: var(--text);
+}
+
+// ---------------------------------------------------------------------------
+// 9. SHARED UTILITY CLASSES
+//
+// The small vocabulary every screen in the panel can reuse.
+// ---------------------------------------------------------------------------
+.bru-panel {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border);
+}
+
+.bru-row {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  min-height: var(--row-height);
+  padding: 0 var(--pad-x);
+  border-bottom: 1px solid var(--border);
+}
+
+.bru-header {
+  height: var(--row-height);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--pad-x);
+  background-color: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+.bru-mono {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+
+.bru-dim {
+  color: var(--text-dim);
+}
+
+.bru-faint {
+  color: var(--text-faint);
+}
+
+.bru-error {
+  color: var(--error);
+}
+
+.bru-warn {
+  color: var(--warn);
+}
+
+// "Running / enabled" indicator: a filled square, never a coloured dot.
+.bru-on,
+.bru-off {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  vertical-align: middle;
+}
+
+.bru-on {
+  background-color: var(--on);
+}
+
+.bru-off {
+  background-color: transparent;
+  border: 1px solid var(--off);
+}

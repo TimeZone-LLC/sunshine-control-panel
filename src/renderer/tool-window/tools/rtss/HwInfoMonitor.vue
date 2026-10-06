@@ -8,17 +8,17 @@
       <ToggleSwitch :modelValue="injecting" @update:modelValue="toggleInject" :disabled="!available" />
     </template>
 
-    <!-- 不可用提示 -->
+    <!-- Unavailable notice -->
     <div v-if="!available && !loading" class="unavailable-hint">
       <WarningFilled class="warn-icon" />
       <span>{{ t.hwinfo.unavailable }}</span>
       <div class="hint-sub">{{ t.hwinfo.enableHint }}</div>
     </div>
 
-    <!-- 加载中 -->
+    <!-- Loading -->
     <div v-else-if="loading" class="loading-hint">{{ t.hwinfo.loading }}</div>
 
-    <!-- 传感器选择 -->
+    <!-- Sensor selection -->
     <template v-else>
       <input
         v-model="searchQuery"
@@ -79,7 +79,7 @@ const selectedIds = ref(new Set())
 const sensorGroups = ref([])
 let pollTimer = null
 
-// 传感器分组结构
+// Sensor grouping
 function buildGroups(data) {
   const groups = []
   if (!data) return groups
@@ -150,7 +150,7 @@ async function toggleInject(val) {
 
 async function startInject() {
   if (selectedIds.value.size === 0) {
-    emit('message', '请先选择要监控的传感器', 'warning')
+    emit('message', 'Select the sensors to monitor first', 'warning')
     return
   }
   injecting.value = true
@@ -161,7 +161,7 @@ async function startInject() {
 function stopInject() {
   injecting.value = false
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
-  // 清除 OSD 中的 HWiNFO 数据
+  // Clear the HWiNFO data from the OSD.
   try { invoke('rtss_set_osd', { text: '' }).catch(() => {}) } catch {}
 }
 
@@ -169,7 +169,7 @@ async function pollAndInject() {
   try {
     const ids = [...selectedIds.value]
     const readings = await invoke('hwinfo_get_readings', { readingIds: ids })
-    // 构建 OSD 文本
+    // Build the OSD text.
     const lines = readings.map(r => {
       const label = r.label_user || r.label_original
       const val = r.value.toFixed(1)
@@ -177,7 +177,7 @@ async function pollAndInject() {
     })
     const osdText = lines.join('\n')
     await invoke('rtss_set_osd', { text: osdText })
-    // 同时更新显示值
+    // Update the displayed values as well.
     await refreshValues()
   } catch (e) {
     emit('message', String(e), 'error')
@@ -202,79 +202,77 @@ onUnmounted(() => {
 .unavailable-hint {
   text-align: center;
   padding: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-dim);
   font-size: 12px;
-  .warn-icon { width: 16px; height: 16px; color: #f59e0b; vertical-align: middle; margin-right: 4px; }
-  .hint-sub { font-size: 11px; color: rgba(255, 255, 255, 0.35); margin-top: 4px; }
+  .warn-icon { width: 16px; height: 16px; color: var(--warn); vertical-align: middle; margin-right: 4px; }
+  .hint-sub { font-size: 11px; color: var(--text-faint); margin-top: 4px; }
 }
 
 .loading-hint {
   text-align: center;
   padding: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-dim);
   font-size: 12px;
 }
 
 .search-input {
   width: 100%;
-  padding: 5px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.2);
-  color: white;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
   font-size: 11px;
   margin-bottom: 6px;
   outline: none;
-  &:focus { border-color: rgba(147, 197, 253, 0.5); }
+  &:focus-visible { border-color: var(--border-strong); outline: 2px solid var(--text); outline-offset: 0; }
 }
 
 .sensor-list {
   max-height: 240px;
   overflow-y: auto;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
 }
 
 .sensor-group-header {
-  padding: 5px 8px;
+  padding: 4px 8px;
   font-size: 11px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-dim);
+  background: var(--bg-panel);
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 6px;
   user-select: none;
-  &:hover { background: rgba(255, 255, 255, 0.08); }
+  &:hover { background: var(--bg-panel); }
   .collapse-arrow { font-size: 8px; width: 10px; }
   .sensor-count {
     margin-left: auto;
     font-size: 10px;
-    color: rgba(255, 255, 255, 0.4);
+    color: var(--text-faint);
   }
 }
 
 .reading-item {
   display: flex;
   align-items: center;
-  padding: 3px 8px 3px 20px;
+  padding: 4px 8px 4px 20px;
   font-size: 11px;
   cursor: pointer;
   gap: 6px;
-  color: rgba(255, 255, 255, 0.7);
-  &:hover { background: rgba(255, 255, 255, 0.06); }
-  &.selected { background: rgba(147, 197, 253, 0.08); }
-  input[type="checkbox"] { accent-color: #93c5fd; width: 12px; height: 12px; }
+  color: var(--text-dim);
+  &:hover { background: var(--bg-panel); }
+  &.selected { background: var(--bg-active); }
+  input[type="checkbox"] { accent-color: var(--text-dim); width: 12px; height: 12px; }
   .reading-label { flex: 1; }
-  .reading-value { font-family: monospace; font-size: 10px; color: rgba(255, 255, 255, 0.5); }
+  .reading-value { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); }
 }
 
 .selection-bar {
   margin-top: 6px;
   font-size: 11px;
-  color: rgba(147, 197, 253, 0.8);
+  color: var(--text);
   text-align: center;
 }
 
@@ -282,19 +280,19 @@ onUnmounted(() => {
   padding: 12px;
   text-align: center;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-faint);
 }
 
 .refresh-btn {
   background: none;
   border: none;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-dim);
   cursor: pointer;
   padding: 2px;
   display: flex;
   align-items: center;
-  &:hover { color: white; }
-  &:disabled { opacity: 0.3; }
+  &:hover { color: var(--text); }
+  &:disabled { color: var(--text-faint); }
   svg, :deep(svg) { width: 14px; height: 14px; }
 }
 </style>

@@ -36,24 +36,15 @@ ShowInstDetails show
 !insertmacro MUI_PAGE_FINISH
 
 !insertmacro MUI_LANGUAGE "English"
-!insertmacro MUI_LANGUAGE "SimpChinese"
 
 LangString WelcomeTitle ${LANG_ENGLISH} "Sunshine GUI component update"
-LangString WelcomeTitle ${LANG_SIMPCHINESE} "Sunshine GUI 组件更新"
 LangString WelcomeText ${LANG_ENGLISH} "This installer updates the GUI in the existing Sunshine installation.$\r$\n$\r$\nIt does not install a second copy of Sunshine or change your autostart preference."
-LangString WelcomeText ${LANG_SIMPCHINESE} "此安装器会更新现有 Sunshine 安装中的 GUI。$\r$\n$\r$\n它不会安装第二套 Sunshine，也不会更改你的开机启动偏好。"
 LangString InstallButton ${LANG_ENGLISH} "Update"
-LangString InstallButton ${LANG_SIMPCHINESE} "更新"
 LangString SunshineNotFound ${LANG_ENGLISH} "No valid Sunshine installation was found. Install or repair Sunshine first."
-LangString SunshineNotFound ${LANG_SIMPCHINESE} "未检测到有效的 Sunshine 安装，请先安装或修复 Sunshine。"
 LangString CoreIncompatible ${LANG_ENGLISH} "The installed Sunshine core is not running or does not support this GUI. Start Sunshine or update the complete Sunshine installation first. No files were changed."
-LangString CoreIncompatible ${LANG_SIMPCHINESE} "现有 Sunshine Core 未运行或不支持此 GUI。请先启动 Sunshine，或更新完整 Sunshine 安装。当前文件未发生更改。"
 LangString BackupFailed ${LANG_ENGLISH} "The current GUI could not be prepared for replacement. Sunshine was not changed."
-LangString BackupFailed ${LANG_SIMPCHINESE} "无法准备替换当前 GUI，Sunshine 未被修改。"
 LangString InstallFailed ${LANG_ENGLISH} "The new GUI could not be installed. The previous GUI has been restored."
-LangString InstallFailed ${LANG_SIMPCHINESE} "无法安装新 GUI，旧 GUI 已恢复。"
 LangString InstallingGui ${LANG_ENGLISH} "Updating Sunshine GUI in $GuiDir"
-LangString InstallingGui ${LANG_SIMPCHINESE} "正在更新 $GuiDir 中的 Sunshine GUI"
 
 Var SunshineDir
 Var GuiDir
