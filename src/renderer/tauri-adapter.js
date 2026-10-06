@@ -187,8 +187,6 @@ export const sunshine = {
   waitForProxyReady: () => wrapResult('wait_for_proxy_ready'),
   refreshTarget: () => wrapDefault('refresh_sunshine_target', null),
   getActiveSessions: () => wrapDefault('get_active_sessions', []),
-  getLocale: () => wrapDefault('get_sunshine_locale', 'en'),
-  setLocale: (locale) => invoke('set_sunshine_locale', { locale }),
   changeBitrate: (clientName, bitrate) => invoke('change_bitrate', { clientName, bitrate }),
   stopAllSessions: () => invoke('stop_all_sessions'),
 }

@@ -5,7 +5,7 @@
       <ToggleSwitch :modelValue="active" @update:modelValue="toggleMonitoring" />
     </template>
 
-    <!-- 指标选择 -->
+    <!-- Metric selection -->
     <div class="metric-groups">
       <div v-for="group in metricGroups" :key="group.id" class="metric-group">
         <div class="metric-group-label">{{ group.label }}</div>
@@ -23,14 +23,14 @@
       </div>
     </div>
 
-    <!-- 样式配置 -->
+    <!-- Style configuration -->
     <div class="monitor-style">
       <div class="style-row">
         <label>{{ t.rtssTool.headerText }}</label>
-        <input v-model="config.header_text" class="style-input" placeholder="☀ Foundation Sunshine" />
+        <input v-model="config.header_text" class="style-input" placeholder="Foundation Sunshine" />
       </div>
       <div class="style-row cjk-hint">
-        <small>{{ t.rtssTool.cjkHint || '中文/CJK 需在 RTSS Setup 中启用“Vector 3D”并选择中文字体（如 Microsoft YaHei）' }}</small>
+        <small>{{ t.rtssTool.cjkHint || 'CJK text requires "Vector 3D" to be enabled in RTSS Setup together with a CJK font such as Microsoft YaHei' }}</small>
       </div>
       <div class="style-row">
         <label>{{ t.rtssTool.updateInterval }}</label>
@@ -57,7 +57,7 @@
       </div>
     </div>
 
-    <!-- OSD 预览 -->
+    <!-- OSD preview -->
     <div v-if="active && snapshot.osd_text" class="osd-preview">
       <div class="osd-preview-label">{{ t.rtssTool.osdPreview }}</div>
       <pre class="osd-preview-text">{{ snapshot.osd_text }}</pre>
@@ -73,7 +73,7 @@ import { useI18n } from '../../../desktop/i18n/index.js'
 import SectionPanel from '../../components/SectionPanel.vue'
 import ToggleSwitch from '../../components/ToggleSwitch.vue'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const emit = defineEmits(['message'])
 
 const STORAGE_KEY = 'rtss-monitoring-config'
@@ -85,7 +85,7 @@ const DEFAULT_CONFIG = {
   label_color: 'AAAAAA',
   value_color: '00FF00',
   font_size: 0,
-  header_text: '☀ Foundation Sunshine',
+  header_text: 'Foundation Sunshine',
 }
 
 function loadPersistedConfig() {
@@ -106,26 +106,25 @@ const config = reactive(loadPersistedConfig())
 const availableMetrics = ref([])
 let pollTimer = null
 
-// 持久化 config 到 localStorage
+// Persist the config to localStorage.
 watch(config, (v) => {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(v)) } catch {}
 }, { deep: true })
 
 const metricGroups = computed(() => {
-  const isZh = locale.value === 'zh'
   const groups = [
-    { id: 'session', label: isZh ? '串流会话' : 'Streaming', metrics: [] },
-    { id: 'host_perf', label: isZh ? '主机性能' : 'Host Performance', metrics: [] },
-    { id: 'process', label: isZh ? '进程性能' : 'Process', metrics: [] },
+    { id: 'session', label: 'Streaming', metrics: [] },
+    { id: 'host_perf', label: 'Host Performance', metrics: [] },
+    { id: 'process', label: 'Process', metrics: [] },
   ]
   for (const m of availableMetrics.value) {
     const grp = groups.find(g => g.id === m.group)
-    if (grp) grp.metrics.push({ id: m.id, label: isZh ? m.label_zh : m.label_en })
+    if (grp) grp.metrics.push({ id: m.id, label: m.label_en })
   }
   return groups.filter(g => g.metrics.length > 0)
 })
 
-// ─── 方法 ───
+// ─── Methods ───
 function toggleMetric(id) {
   const idx = config.metrics.indexOf(id)
   if (idx >= 0) config.metrics.splice(idx, 1)

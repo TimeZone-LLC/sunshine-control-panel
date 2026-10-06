@@ -382,22 +382,9 @@ const setupWindowStateMonitor = async (currentWindow) => {
   return visibilityHandler
 }
 
-// Reload the iframe when the locale changes so the new language applies.
-const handleLocaleChanged = () => {
-  if (sunshineUrl.value && sunshineUrl.value !== 'about:blank') {
-    beginLoading()
-    // Remember the current path and reload through about:blank, which avoids
-    // the cross-origin restriction.
-    const targetUrl = proxyBase ? proxyBase + currentPath.value : sunshineUrl.value
-    sunshineUrl.value = 'about:blank'
-    setTimeout(() => { sunshineUrl.value = targetUrl }, 50)
-  }
-}
-
 // Lifecycle
 onUnmounted(() => {
   window.removeEventListener('navigate-frame', handleNavigateFrame)
-  window.removeEventListener('locale-changed', handleLocaleChanged)
   if (messageHandler) window.removeEventListener('message', messageHandler)
   if (visibilityHandlerRef) document.removeEventListener('visibilitychange', visibilityHandlerRef)
   if (pollTimer) clearInterval(pollTimer)
@@ -407,7 +394,6 @@ onUnmounted(() => {
 
 onMounted(async () => {
   window.addEventListener('navigate-frame', handleNavigateFrame)
-  window.addEventListener('locale-changed', handleLocaleChanged)
 
   try {
     await invoke('wait_for_proxy_ready')

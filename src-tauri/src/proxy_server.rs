@@ -1477,17 +1477,10 @@ mod tests {
     async fn spawn_one_shot_http_server(body: &'static str) -> String {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
+        let app = Router::new().fallback(move || async move { body });
 
         tokio::spawn(async move {
-            let (mut stream, _) = listener.accept().await.unwrap();
-            let mut request_buf = [0_u8; 1024];
-            let _ = stream.read(&mut request_buf).await;
-            let response = format!(
-                "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-                body.len(),
-                body
-            );
-            stream.write_all(response.as_bytes()).await.unwrap();
+            axum::serve(listener, app).await.unwrap();
         });
 
         format!("http://{}", addr)
