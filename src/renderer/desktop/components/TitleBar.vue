@@ -26,7 +26,7 @@ import WindowControls from './WindowControls.vue'
 const props = defineProps({
   title: {
     type: String,
-    default: 'FOUNDATION DESKTOP'
+    default: 'Foundation desktop'
   },
   icon: {
     type: String,

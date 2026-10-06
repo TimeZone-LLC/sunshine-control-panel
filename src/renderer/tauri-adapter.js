@@ -222,8 +222,6 @@ export const moonlightWeb = {
   start: () => invoke('moonlight_web_start'),
   stop: () => invoke('moonlight_web_stop'),
   saveConfig: (config) => invoke('moonlight_web_save_config', { config }),
-  checkRelease: () => invoke('moonlight_web_check_release'),
-  download: (url, version) => invoke('moonlight_web_download', { url, version: version || '' }),
   getInstallPath: () => invoke('moonlight_web_get_install_path'),
   generateCert: () => invoke('moonlight_web_generate_cert'),
 }
@@ -233,8 +231,6 @@ export const moonlightWeb = {
 export const controllerMeta = {
   getStatus: () => wrapDefault('controllermeta_get_status',
     { installed: false, running: false, install_path: '', binary_path: '', version: '' }),
-  checkRelease: () => invoke('controllermeta_check_release'),
-  download: (url, version) => invoke('controllermeta_download', { url, version: version || '' }),
   launch: () => invoke('controllermeta_launch'),
   getInstallPath: () => invoke('controllermeta_get_install_path'),
   uninstall: () => invoke('controllermeta_uninstall'),

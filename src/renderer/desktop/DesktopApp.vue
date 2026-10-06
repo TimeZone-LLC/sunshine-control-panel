@@ -71,10 +71,6 @@
     </svg>
   </div>
 
-  <SplashScreen
-    :visible="showSplash"
-    @done="showSplash = false"
-  />
 </template>
 
 <script setup>
@@ -84,7 +80,6 @@ import { defineAsyncComponent, ref, computed, nextTick, onMounted, onUnmounted, 
 import DesktopWindow from './components/DesktopWindow.vue'
 import DesktopSidebar from './components/DesktopSidebar.vue'
 import ThemeEditor from './components/ThemeEditor.vue'
-import SplashScreen from './components/SplashScreen.vue'
 import OnScreenKeyboard from './components/OnScreenKeyboard.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import LaunchOverlay from './components/LaunchOverlay.vue'
@@ -168,12 +163,11 @@ import sunshineIcon from '../../assets/sunshine.ico'
 const { t } = useI18n()
 
 // Application configuration
-const appTitle = 'FOUNDATION DESKTOP'
+const appTitle = 'Foundation desktop'
 
 // Theme
 const { themeVars, activePreset, presets, setVar, applyPreset, exportTheme, importTheme } = useTheme()
 const themeEditorOpen = ref(false)
-const showSplash = ref(true)
 const { helperPanelOpen } = useLaunchHelpers(t)
 
 function handleThemeExport() {
