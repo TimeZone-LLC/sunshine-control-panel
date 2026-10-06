@@ -59,7 +59,7 @@ fn check_device_installed() -> (bool, bool, String) {
         Ok(out) => {
             let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
             if stdout.is_empty() || stdout == "null" {
-                return (false, false, "未安装".to_string());
+                return (false, false, "Not installed".to_string());
             }
 
             // 尝试解析 JSON
@@ -112,34 +112,40 @@ fn check_device_installed() -> (bool, bool, String) {
                 let running = root_ok && hid_present;
                 let status_text = if running {
                     if instance_id.is_empty() {
-                        format!("{} - 正常运行", friendly)
+                        format!("{} - running normally", friendly)
                     } else {
-                        format!("{} - 正常运行 ({})", friendly, instance_id)
+                        format!("{} - running normally ({})", friendly, instance_id)
                     }
                 } else if problem == 21 {
-                    format!("{} - 需要重启", friendly)
+                    format!("{} - restart required", friendly)
                 } else if root_ok {
-                    format!("{} - 已安装，但 HID 接口未枚举/驱动未运行", friendly)
+                    format!(
+                        "{} - installed, but the HID interface is not enumerated or the driver is not running",
+                        friendly
+                    )
                 } else {
-                    format!("{} - 状态: {} (问题码: {})", friendly, status, problem)
+                    format!(
+                        "{} - status: {} (problem code: {})",
+                        friendly, status, problem
+                    )
                 };
 
                 (true, running, status_text)
             } else {
                 // JSON 解析失败但有输出，说明设备存在
-                (true, false, format!("已安装（状态未知）"))
+                (true, false, format!("Installed (status unknown)"))
             }
         }
         Err(e) => {
-            warn!("检测 vmouse 设备失败: {}", e);
-            (false, false, "检测失败".to_string())
+            warn!("Failed to detect the virtual mouse device: {}", e);
+            (false, false, "Detection failed".to_string())
         }
     }
 }
 
 #[cfg(not(target_os = "windows"))]
 fn check_device_installed() -> (bool, bool, String) {
-    (false, false, "仅支持 Windows".to_string())
+    (false, false, "Available only on Windows".to_string())
 }
 
 /// 读取 sunshine.conf 中的 virtual_mouse 配置
@@ -198,24 +204,24 @@ pub async fn install_vmouse_driver() -> Result<String, String> {
 
         if !install_bat.exists() {
             return Err(format!(
-                "安装脚本不存在: {}。请确认 Sunshine 安装完整。",
+                "Installation script not found: {}. Verify the Sunshine installation.",
                 install_bat.display()
             ));
         }
 
-        info!("调用 install-vmouse.bat 安装虚拟鼠标驱动...");
+        info!("Running install-vmouse.bat to install the virtual mouse driver...");
         bat_runner::run_elevated(&install_bat, "vmouse", &[])?;
 
         // 等待驱动加载
         tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
 
-        info!("✅ vmouse 驱动安装完成");
-        Ok("虚拟鼠标驱动安装完成".to_string())
+        info!("Virtual mouse driver installed");
+        Ok("Virtual mouse driver installed".to_string())
     }
 
     #[cfg(not(target_os = "windows"))]
     {
-        Err("此功能仅支持 Windows".to_string())
+        Err("This feature is available only on Windows".to_string())
     }
 }
 
@@ -229,23 +235,23 @@ pub async fn uninstall_vmouse_driver() -> Result<String, String> {
 
         if !uninstall_bat.exists() {
             return Err(format!(
-                "卸载脚本不存在: {}。请确认 Sunshine 安装完整。",
+                "Uninstallation script not found: {}. Verify the Sunshine installation.",
                 uninstall_bat.display()
             ));
         }
 
-        info!("调用 uninstall-vmouse.bat 卸载虚拟鼠标驱动...");
+        info!("Running uninstall-vmouse.bat to uninstall the virtual mouse driver...");
         bat_runner::run_elevated(&uninstall_bat, "vmouse", &[])?;
 
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
-        info!("✅ vmouse 驱动卸载完成");
-        Ok("虚拟鼠标驱动已卸载".to_string())
+        info!("Virtual mouse driver uninstalled");
+        Ok("Virtual mouse driver uninstalled".to_string())
     }
 
     #[cfg(not(target_os = "windows"))]
     {
-        Err("此功能仅支持 Windows".to_string())
+        Err("This feature is available only on Windows".to_string())
     }
 }
 
@@ -261,13 +267,13 @@ pub async fn set_vmouse_config(enabled: bool) -> Result<String, String> {
     let value_str = if enabled { "enabled" } else { "disabled" };
     config_map.insert("virtual_mouse".to_string(), serde_json::json!(value_str));
 
-    debug!("📝 更新 virtual_mouse = {}", value_str);
+    debug!("Updating virtual_mouse = {}", value_str);
 
     // 通过 Sunshine API 保存
     sunshine::post_sunshine_config(&config_map).await?;
-    info!("✅ virtual_mouse 配置已更新: {}", value_str);
+    info!("virtual_mouse configuration updated: {}", value_str);
     Ok(format!(
-        "虚拟鼠标已{}",
-        if enabled { "启用" } else { "禁用" }
+        "Virtual mouse {}",
+        if enabled { "enabled" } else { "disabled" }
     ))
 }

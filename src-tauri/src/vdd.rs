@@ -97,7 +97,10 @@ fn probe_vdd_status() -> VddStatus {
     if !install_script.exists() {
         return VddStatus {
             state: "payload_missing".to_string(),
-            status_text: format!("VDD 安装脚本不存在: {}", install_script.display()),
+            status_text: format!(
+                "VDD installation script not found: {}",
+                install_script.display()
+            ),
             ..Default::default()
         };
     }
@@ -107,7 +110,7 @@ fn probe_vdd_status() -> VddStatus {
         Err(error) => {
             return VddStatus {
                 state: "unknown".to_string(),
-                status_text: format!("无法启动 VDD 状态检测: {}", error),
+                status_text: format!("Failed to start the VDD status check: {}", error),
                 ..Default::default()
             };
         }
@@ -127,9 +130,9 @@ fn probe_vdd_status() -> VddStatus {
             }
             .to_string(),
             status_text: if payload_missing {
-                "Sunshine 安装目录中缺少 VDD 驱动文件，请修复或重新安装 Sunshine".to_string()
+                "The Sunshine installation is missing VDD driver files. Repair or reinstall Sunshine".to_string()
             } else {
-                "无法读取 VDD 驱动状态".to_string()
+                "Failed to read VDD driver status".to_string()
             },
             ..Default::default()
         };
@@ -157,17 +160,20 @@ fn probe_vdd_status() -> VddStatus {
         problem_code,
     );
     let (state, status_text) = if classified_state == "not_installed" {
-        ("not_installed", "尚未安装虚拟显示器驱动".to_string())
+        (
+            "not_installed",
+            "The virtual display driver is not installed".to_string(),
+        )
     } else if classified_state == "reboot_required" {
         (
             "reboot_required",
-            "虚拟显示器驱动需要重启 Windows 后才能使用".to_string(),
+            "Restart Windows before using the virtual display driver".to_string(),
         )
     } else if classified_state == "unhealthy" {
         (
             "unhealthy",
             format!(
-                "虚拟显示器驱动状态异常（状态: {}, 问题码: {}）",
+                "Virtual display driver status is abnormal (status: {}, problem code: {})",
                 pnp_status, problem_code
             ),
         )
@@ -176,15 +182,16 @@ fn probe_vdd_status() -> VddStatus {
             "degraded",
             if !version_match {
                 format!(
-                    "已安装版本 {} 与 Sunshine 随包版本 {} 不一致",
+                    "Installed version {} does not match the version bundled with Sunshine ({})",
                     installed_version, bundled_version
                 )
             } else {
-                "驱动已安装，但现代控制接口不可用".to_string()
+                "The driver is installed, but the modern control interface is unavailable"
+                    .to_string()
             },
         )
     } else {
-        ("ready", "虚拟显示器驱动已就绪".to_string())
+        ("ready", "The virtual display driver is ready".to_string())
     };
 
     VddStatus {
@@ -204,7 +211,7 @@ fn probe_vdd_status() -> VddStatus {
 fn probe_vdd_status() -> VddStatus {
     VddStatus {
         state: "unsupported".to_string(),
-        status_text: "虚拟显示器驱动仅支持 Windows".to_string(),
+        status_text: "The virtual display driver is available only on Windows".to_string(),
         ..Default::default()
     }
 }
@@ -213,7 +220,9 @@ fn probe_vdd_status() -> VddStatus {
 pub async fn get_vdd_status() -> Result<VddStatus, String> {
     let mut status = tokio::task::spawn_blocking(probe_vdd_status)
         .await
-        .map_err(|error| format!("虚拟显示器驱动状态检测失败，请重试: {error}"))?;
+        .map_err(|error| {
+            format!("Virtual display driver status check failed. Try again: {error}")
+        })?;
     if let Ok(tray_state) = sunshine::get_tray_state().await {
         status.monitor_active = tray_state.vdd.active;
     }
@@ -222,13 +231,15 @@ pub async fn get_vdd_status() -> Result<VddStatus, String> {
 
 async fn set_vdd_tray_option(action: &str, enabled: bool) -> Result<String, String> {
     if enabled && !get_vdd_status().await?.is_usable() {
-        return Err("虚拟显示器驱动尚未就绪，请先安装或修复驱动".to_string());
+        return Err(
+            "The virtual display driver is not ready. Install or repair it first".to_string(),
+        );
     }
 
     let response = sunshine::post_tray_action(action, Some(enabled)).await?;
     if !response.status {
         return Err(if response.error.is_empty() {
-            "Sunshine 拒绝了 VDD 设置变更".to_string()
+            "Sunshine rejected the VDD setting change".to_string()
         } else {
             response.error
         });
@@ -248,19 +259,24 @@ pub async fn set_vdd_headless_create_enabled(enabled: bool) -> Result<String, St
 
 async fn ensure_vdd_driver_uninstall_is_safe() -> Result<(), String> {
     let sessions = sunshine::get_active_sessions().await.map_err(|error| {
-        warn!("检查 Sunshine 串流状态失败: {error}");
-        "无法确认 Sunshine 串流状态，请重试后再卸载虚拟显示器驱动".to_string()
+        warn!("Failed to check Sunshine streaming status: {error}");
+        "Sunshine streaming status could not be confirmed. Try again before uninstalling the virtual display driver".to_string()
     })?;
     if !sessions.is_empty() {
-        return Err("串流进行中，停止所有串流后才能卸载虚拟显示器驱动".to_string());
+        return Err(
+            "Streaming is active. Stop all streams before uninstalling the virtual display driver"
+                .to_string(),
+        );
     }
 
     let tray_state = sunshine::get_tray_state().await.map_err(|error| {
-        warn!("检查 Sunshine 托盘状态失败: {error}");
-        "无法确认 Sunshine 虚拟显示器状态，请重试后再卸载驱动".to_string()
+        warn!("Failed to check Sunshine tray status: {error}");
+        "Sunshine virtual-display status could not be confirmed. Try again before uninstalling the driver".to_string()
     })?;
     if tray_state.vdd.active {
-        return Err("虚拟显示器当前仍处于活动状态，请先从托盘关闭它".to_string());
+        return Err(
+            "The virtual display is still active. Disable it from the tray first".to_string(),
+        );
     }
     Ok(())
 }
@@ -272,27 +288,30 @@ pub async fn install_vdd_driver() -> Result<String, String> {
         let install_script = get_sunshine_path().join("scripts").join("install-vdd.bat");
         if !install_script.exists() {
             return Err(format!(
-                "VDD 安装脚本不存在: {}。请修复或重新安装 Sunshine。",
+                "VDD installation script not found: {}. Repair or reinstall Sunshine.",
                 install_script.display()
             ));
         }
 
-        info!("调用 install-vdd.bat 安装或修复虚拟显示器驱动...");
+        info!("Running install-vdd.bat to install or repair the virtual display driver...");
         tokio::task::spawn_blocking(move || bat_runner::run_elevated(&install_script, "vdd", &[]))
             .await
-            .map_err(|error| format!("VDD 安装任务执行失败: {error}"))??;
+            .map_err(|error| format!("VDD installation task failed: {error}"))??;
         tokio::time::sleep(tokio::time::Duration::from_millis(750)).await;
 
         let status = get_vdd_status().await?;
         if !status.installed || !status.running {
-            return Err(format!("VDD 安装后验证失败: {}", status.status_text));
+            return Err(format!(
+                "VDD post-installation verification failed: {}",
+                status.status_text
+            ));
         }
-        Ok("虚拟显示器驱动已安装并通过验证".to_string())
+        Ok("Virtual display driver installed and verified".to_string())
     }
 
     #[cfg(not(target_os = "windows"))]
     {
-        Err("此功能仅支持 Windows".to_string())
+        Err("This feature is available only on Windows".to_string())
     }
 }
 
@@ -303,37 +322,37 @@ async fn update_vdd_xml_extra_fields(settings: &VddSettings) -> Result<(), Strin
 
     // 读取现有 XML（如果存在）
     let mut vdd_settings = if vdd_xml_path.exists() {
-        let content =
-            fs::read_to_string(&vdd_xml_path).map_err(|e| format!("读取 VDD XML 失败: {}", e))?;
+        let content = fs::read_to_string(&vdd_xml_path)
+            .map_err(|e| format!("Failed to read VDD XML: {}", e))?;
 
-        from_str::<VddSettings>(&content).map_err(|e| format!("解析 VDD XML 失败: {}", e))?
+        from_str::<VddSettings>(&content).map_err(|e| format!("Failed to parse VDD XML: {}", e))?
     } else {
         // 如果文件不存在，使用默认配置
-        debug!("  📄 VDD 配置文件不存在，使用默认配置");
+        debug!("VDD configuration file does not exist; using defaults");
         get_default_settings()
     };
 
     // 只更新 colour、cursor 和 edid 字段（其他字段会被 C++ 更新）
     if let Some(ref colour) = settings.colour {
         vdd_settings.colour = Some(colour.clone());
-        debug!("  ✓ 更新 colour 配置");
+        debug!("Updating colour configuration");
     }
 
     if let Some(ref cursor) = settings.cursor {
         vdd_settings.cursor = Some(cursor.clone());
         debug!(
-            "  ✓ 更新 cursor 配置: HardwareCursor={}",
+            "Updating cursor configuration: HardwareCursor={}",
             cursor.hardware_cursor
         );
     } else if vdd_settings.cursor.is_none() {
         vdd_settings.cursor = default_cursor();
-        debug!("  ✓ 补齐默认 cursor 配置");
+        debug!("Adding the default cursor configuration");
     }
 
     if let Some(ref edid) = settings.edid {
         vdd_settings.edid = Some(edid.clone());
         debug!(
-            "  ✓ 更新 edid 配置: CustomEdid={}, PreventSpoof={}, CeaOverride={}, Vrr={}",
+            "Updating EDID configuration: CustomEdid={}, PreventSpoof={}, CeaOverride={}, Vrr={}",
             edid.custom_edid, edid.prevent_spoof, edid.edid_cea_override, edid.vrr
         );
     }
@@ -356,11 +375,11 @@ async fn update_vdd_xml_extra_fields(settings: &VddSettings) -> Result<(), Strin
 fn serialize_vdd_settings(settings: &VddSettings) -> Result<String, String> {
     let mut xml = String::new();
     let mut ser = quick_xml::se::Serializer::with_root(&mut xml, Some("vdd_settings"))
-        .map_err(|e| format!("创建 VDD XML 序列化器失败: {}", e))?;
+        .map_err(|e| format!("Failed to create the VDD XML serializer: {}", e))?;
     ser.indent(' ', 2);
     settings
         .serialize(ser)
-        .map_err(|e| format!("序列化 VDD XML 失败: {}", e))?;
+        .map_err(|e| format!("Failed to serialize VDD XML: {}", e))?;
     Ok(xml)
 }
 
@@ -385,7 +404,7 @@ fn normalize_hardware_cursor_for_persistence(settings: &mut VddSettings) {
 
 fn prepare_hardware_cursor_migration(content: &str) -> Result<Option<String>, String> {
     let mut settings: VddSettings =
-        from_str(content).map_err(|e| format!("解析 VDD XML 失败: {}", e))?;
+        from_str(content).map_err(|e| format!("Failed to parse VDD XML: {}", e))?;
     if !normalize_hardware_cursor(&mut settings) {
         return Ok(None);
     }
@@ -398,19 +417,19 @@ fn prepare_hardware_cursor_migration(content: &str) -> Result<Option<String>, St
     let cursor_start = content
         .find(CURSOR_OPEN_TAG)
         .map(|index| index + CURSOR_OPEN_TAG.len())
-        .ok_or_else(|| "VDD XML 缺少 cursor 起始标签".to_string())?;
+        .ok_or_else(|| "VDD XML is missing the cursor opening tag".to_string())?;
     let cursor_end = content[cursor_start..]
         .find(CURSOR_CLOSE_TAG)
         .map(|index| cursor_start + index)
-        .ok_or_else(|| "VDD XML 缺少 cursor 结束标签".to_string())?;
+        .ok_or_else(|| "VDD XML is missing the cursor closing tag".to_string())?;
     let value_start = content[cursor_start..cursor_end]
         .find(OPEN_TAG)
         .map(|index| cursor_start + index + OPEN_TAG.len())
-        .ok_or_else(|| "VDD XML 缺少 HardwareCursor 起始标签".to_string())?;
+        .ok_or_else(|| "VDD XML is missing the HardwareCursor opening tag".to_string())?;
     let value_end = content[value_start..cursor_end]
         .find(CLOSE_TAG)
         .map(|index| value_start + index)
-        .ok_or_else(|| "VDD XML 缺少 HardwareCursor 结束标签".to_string())?;
+        .ok_or_else(|| "VDD XML is missing the HardwareCursor closing tag".to_string())?;
     let raw_value = &content[value_start..value_end];
     let leading_whitespace = raw_value.len() - raw_value.trim_start().len();
     let trailing_whitespace = raw_value.len() - raw_value.trim_end().len();
@@ -430,7 +449,12 @@ async fn migrate_hardware_cursor_setting() -> Result<bool, String> {
     let content = match tokio::fs::read_to_string(&path).await {
         Ok(content) => content,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
-        Err(error) => return Err(format!("读取 VDD 配置文件失败: {}", error)),
+        Err(error) => {
+            return Err(format!(
+                "Failed to read the VDD configuration file: {}",
+                error
+            ));
+        }
     };
     let Some(full_xml) = prepare_hardware_cursor_migration(&content)? else {
         return Ok(false);
@@ -438,7 +462,7 @@ async fn migrate_hardware_cursor_setting() -> Result<bool, String> {
 
     write_vdd_xml(&path, &full_xml).await?;
     verify_vdd_xml(&path).await?;
-    info!("✅ 已在启动时将旧版 HardwareCursor=false 配置迁移为 true");
+    info!("Migrated the legacy HardwareCursor=false setting to true at startup");
     Ok(true)
 }
 
@@ -446,7 +470,9 @@ async fn migrate_hardware_cursor_setting() -> Result<bool, String> {
 pub fn start_hardware_cursor_migration() {
     tauri::async_runtime::spawn(async {
         if let Err(error) = migrate_hardware_cursor_setting().await {
-            warn!("VDD HardwareCursor 配置迁移失败，将在下次启动时重试: {error}");
+            warn!(
+                "Failed to migrate the VDD HardwareCursor setting; it will be retried at the next startup: {error}"
+            );
         }
     });
 }
@@ -456,12 +482,12 @@ pub fn start_hardware_cursor_migration() {
 async fn write_vdd_xml(vdd_xml_path: &PathBuf, content: &str) -> Result<(), String> {
     // 写入临时文件
     let temp_path = std::env::temp_dir().join(format!("vdd_extra_{}.xml", std::process::id()));
-    debug!("  📝 写入临时文件: {:?}", temp_path);
+    debug!("Writing temporary file: {:?}", temp_path);
     tokio::fs::write(&temp_path, content)
         .await
-        .map_err(|e| format!("写入临时文件失败: {}", e))?;
+        .map_err(|e| format!("Failed to write the temporary file: {}", e))?;
 
-    debug!("  📝 目标文件: {:?}", vdd_xml_path);
+    debug!("Target file: {:?}", vdd_xml_path);
 
     // 提权复制（run_cmd_elevated 内部等待完成并核对退出码），再读回校验内容
     let mut elevated_success = false;
@@ -540,14 +566,14 @@ async fn write_vdd_xml(vdd_xml_path: &PathBuf, content: &str) -> Result<(), Stri
     if let Some(parent) = vdd_xml_path.parent() {
         tokio::fs::create_dir_all(parent)
             .await
-            .map_err(|e| format!("创建目录失败: {}", e))?;
+            .map_err(|e| format!("Failed to create the directory: {}", e))?;
     }
 
     tokio::fs::write(vdd_xml_path, content)
         .await
-        .map_err(|e| format!("写入 VDD XML 失败: {}", e))?;
+        .map_err(|e| format!("Failed to write VDD XML: {}", e))?;
 
-    debug!("  ✓ 已写入 VDD XML 扩展字段");
+    debug!("Wrote VDD XML extension fields");
 
     Ok(())
 }
@@ -557,18 +583,18 @@ async fn verify_vdd_xml(vdd_xml_path: &PathBuf) -> Result<(), String> {
     let verify_content = match tokio::fs::read_to_string(vdd_xml_path).await {
         Ok(content) => content,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            return Err("验证失败: 文件不存在".to_string());
+            return Err("Verification failed: file does not exist".to_string());
         }
-        Err(error) => return Err(format!("验证文件失败: {}", error)),
+        Err(error) => return Err(format!("Failed to verify the file: {}", error)),
     };
 
     if verify_content.contains("<colour>")
         || verify_content.contains("<cursor>")
         || verify_content.contains("<edid>")
     {
-        debug!("  ✅ 验证: VDD XML 扩展字段已写入");
+        debug!("Verified that VDD XML extension fields were written");
     } else {
-        warn!("  ⚠️  警告: 未在文件中找到 VDD XML 扩展字段");
+        warn!("VDD XML extension fields were not found in the file");
     }
 
     Ok(())
@@ -584,12 +610,12 @@ pub async fn read_full_sunshine_config()
     let mut config_map = serde_json::Map::new();
 
     if !config_path.exists() {
-        warn!("⚠️  配置文件不存在: {:?}", config_path);
+        warn!("Configuration file does not exist: {:?}", config_path);
         return Ok(config_map);
     }
 
-    let content =
-        fs::read_to_string(&config_path).map_err(|e| format!("读取 sunshine.conf 失败: {}", e))?;
+    let content = fs::read_to_string(&config_path)
+        .map_err(|e| format!("Failed to read sunshine.conf: {}", e))?;
 
     let lines: Vec<&str> = content.lines().collect();
     let mut i = 0;
@@ -630,7 +656,7 @@ pub async fn read_full_sunshine_config()
         i += 1;
     }
 
-    debug!("📄 读取到 {} 个配置项", config_map.len());
+    debug!("Read {} configuration entries", config_map.len());
     Ok(config_map)
 }
 
@@ -641,7 +667,7 @@ async fn sync_vdd_config_to_sunshine(settings: &VddSettings) -> Result<(), Strin
     // 这样可以避免丢失其他配置
     let mut config_data = read_full_sunshine_config().await?;
 
-    debug!("🔄 合并 VDD 配置到现有配置中");
+    debug!("Merging VDD settings into the existing configuration");
 
     // 更新分辨率配置 - 格式: [1920x1080,2560x1440] (不带引号)
     if !settings.resolutions.resolution.is_empty() {
@@ -662,7 +688,7 @@ async fn sync_vdd_config_to_sunshine(settings: &VddSettings) -> Result<(), Strin
             "resolutions".to_string(),
             serde_json::json!(resolutions_json),
         );
-        debug!("  ✓ 分辨率: {}", resolutions_json);
+        debug!("Resolutions: {}", resolutions_json);
     }
 
     // 更新刷新率配置（作为 fps） - 格式: [60,120,240]
@@ -673,7 +699,7 @@ async fn sync_vdd_config_to_sunshine(settings: &VddSettings) -> Result<(), Strin
 
         // 更新或插入到配置中
         config_data.insert("fps".to_string(), serde_json::json!(fps_json));
-        debug!("  ✓ 刷新率: {}", fps_json);
+        debug!("Refresh rates: {}", fps_json);
     }
 
     // 更新 GPU 名称 - 格式: 普通字符串
@@ -688,20 +714,20 @@ async fn sync_vdd_config_to_sunshine(settings: &VddSettings) -> Result<(), Strin
         && !trimmed.eq_ignore_ascii_case("auto")
     {
         config_data.insert("adapter_name".to_string(), serde_json::json!(trimmed));
-        debug!("  ✓ GPU: {}", trimmed);
+        debug!("GPU: {}", trimmed);
     } else if !trimmed.is_empty() {
         debug!(
-            "  ⚠ 忽略 VDD 哨兵 friendlyname={:?}，让 Sunshine 自动选卡",
+            "Ignoring VDD sentinel friendlyname={:?} so Sunshine can select the adapter automatically",
             trimmed
         );
     }
 
     // 调用 Sunshine Config API
-    debug!("📡 调用 Sunshine Config API");
-    debug!("📝 配置数据: {:?}", config_data);
+    debug!("Calling the Sunshine Config API");
+    debug!("Configuration data: {:?}", config_data);
 
     sunshine::post_sunshine_config(&config_data).await?;
-    info!("✅ VDD 配置已通过 Sunshine API 保存");
+    info!("VDD configuration saved through the Sunshine API");
     Ok(())
 }
 
@@ -834,11 +860,11 @@ fn get_vdd_base_path() -> Result<PathBuf, String> {
     let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
     let vdd_key = hklm
         .open_subkey(r"SOFTWARE\ZakoTech\ZakoDisplayAdapter")
-        .map_err(|e| format!("无法打开注册表项: {}", e))?;
+        .map_err(|e| format!("Failed to open the registry key: {}", e))?;
 
     let vdd_path: String = vdd_key
         .get_value("VDDPATH")
-        .map_err(|e| format!("无法读取 VDDPATH: {}", e))?;
+        .map_err(|e| format!("Failed to read VDDPATH: {}", e))?;
 
     Ok(PathBuf::from(vdd_path))
 }
@@ -846,7 +872,7 @@ fn get_vdd_base_path() -> Result<PathBuf, String> {
 /// 从注册表读取 VDD 设置目录路径（非 Windows 平台回退）
 #[cfg(not(target_os = "windows"))]
 fn get_vdd_base_path() -> Result<PathBuf, String> {
-    Err("VDD 仅支持 Windows 平台".to_string())
+    Err("VDD is available only on Windows".to_string())
 }
 
 /// 获取 VDD 设置文件路径
@@ -995,28 +1021,29 @@ pub async fn load_vdd_settings() -> Result<VddSettings, String> {
         return Ok(get_default_settings());
     }
 
-    let content = fs::read_to_string(&path).map_err(|e| format!("读取配置文件失败: {}", e))?;
+    let content = fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read the configuration file: {}", e))?;
 
-    debug!("📄 读取到的 XML 内容:\n{}", content);
+    debug!("XML content read from disk:\n{}", content);
 
     // 解析 XML
     let mut settings: VddSettings = from_str(&content).map_err(|e| {
-        error!("❌ XML 解析失败: {}", e);
-        error!("📄 XML 内容:\n{}", content);
-        format!("XML 解析失败: {}", e)
+        error!("Failed to parse XML: {}", e);
+        error!("XML content:\n{}", content);
+        format!("Failed to parse XML: {}", e)
     })?;
 
     normalize_hardware_cursor(&mut settings);
 
-    info!("✅ XML 解析成功！");
-    debug!("🔍 解析后的 VDD 设置: {:?}", settings);
-    debug!("🔍 解析后的 GPU 名称: {}", settings.gpu.friendlyname);
+    info!("XML parsed successfully");
+    debug!("Parsed VDD settings: {:?}", settings);
+    debug!("Parsed GPU name: {}", settings.gpu.friendlyname);
     debug!(
-        "🔍 解析后的分辨率数量: {}",
+        "Parsed resolution count: {}",
         settings.resolutions.resolution.len()
     );
     debug!(
-        "🔍 解析后的全局刷新率: {:?}",
+        "Parsed global refresh rates: {:?}",
         settings.global.g_refresh_rate
     );
 
@@ -1025,7 +1052,7 @@ pub async fn load_vdd_settings() -> Result<VddSettings, String> {
 
 #[tauri::command]
 pub async fn save_vdd_settings(mut settings: VddSettings) -> Result<String, String> {
-    info!("💾 开始保存 VDD 配置...");
+    info!("Saving VDD configuration...");
     normalize_hardware_cursor_for_persistence(&mut settings);
     let _operation_guard = VDD_SETTINGS_OPERATION_LOCK.lock().await;
 
@@ -1034,23 +1061,23 @@ pub async fn save_vdd_settings(mut settings: VddSettings) -> Result<String, Stri
     sync_vdd_config_to_sunshine(&settings).await?;
 
     // 步骤2: 等待 C++ 完成文件写入
-    debug!("⏳ 等待 Sunshine API 完成文件写入...");
+    debug!("Waiting for the Sunshine API to finish writing the file...");
     tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
 
     // 步骤3: 写入 colour、cursor 和 edid 到 XML
     // 读取 C++ 刚写入的 XML，添加 colour、cursor 和 edid，然后写回
-    debug!("📝 写入 colour、cursor 和 edid 字段...");
+    debug!("Writing colour, cursor, and EDID fields...");
     update_vdd_xml_extra_fields(&settings).await?;
 
     // 步骤4: 通知 VDD 驱动重新加载配置
     #[cfg(target_os = "windows")]
     {
-        debug!("🔄 通知 VDD 驱动重新加载...");
+        debug!("Notifying the VDD driver to reload...");
         let _ = exec_vdd_cmd("RELOAD_DRIVER".to_string()).await;
     }
 
-    info!("✅ VDD 配置保存完成");
-    Ok("保存成功".to_string())
+    info!("VDD configuration saved");
+    Ok("Saved successfully".to_string())
 }
 
 #[cfg(target_os = "windows")]
@@ -1101,8 +1128,8 @@ pub async fn exec_vdd_cmd(command: String) -> Result<bool, String> {
     #[cfg(target_os = "windows")]
     {
         if !is_allowed_elevated_vdd_command(&command) {
-            warn!("拒绝非白名单 VDD 控制命令");
-            return Err("不允许的 VDD 控制命令".to_string());
+            warn!("Rejected a VDD control command that is not allowed");
+            return Err("VDD control command is not allowed".to_string());
         }
 
         use crate::vdd_ioctl;
@@ -1130,7 +1157,9 @@ pub async fn exec_vdd_cmd(command: String) -> Result<bool, String> {
         match in_process {
             Ok(v) => Ok(v),
             Err((true, msg)) => {
-                warn!("  ⚠️ VDD 命令在普通权限下被拒 ({msg})，回退到提权执行");
+                warn!(
+                    "VDD command was rejected with standard privileges ({msg}); retrying with administrator privileges"
+                );
                 run_elevated_ioctl_command(&command).await?;
                 Ok(true)
             }
@@ -1149,17 +1178,18 @@ pub async fn exec_vdd_cmd(command: String) -> Result<bool, String> {
 #[cfg(target_os = "windows")]
 async fn run_elevated_ioctl_command(command: &str) -> Result<(), String> {
     if !is_allowed_elevated_vdd_command(command) {
-        return Err("不允许的 VDD 提权命令".to_string());
+        return Err("Elevated VDD command is not allowed".to_string());
     }
 
-    let executable = std::env::current_exe().map_err(|e| format!("无法定位控制面板程序: {e}"))?;
+    let executable = std::env::current_exe()
+        .map_err(|e| format!("Failed to locate the control-panel executable: {e}"))?;
     let executable = executable.to_string_lossy().replace('\'', "''");
     let encoded = URL_SAFE_NO_PAD.encode(command.as_bytes());
     let inner = format!(
         "$p = Start-Process -FilePath '{}' -ArgumentList '{}','{}' -Verb RunAs -WindowStyle Hidden -Wait -PassThru; exit $p.ExitCode",
         executable, ELEVATED_VDD_IOCTL_ARG, encoded
     );
-    run_elevated_powershell(&inner, "提权执行 VDD IOCTL").await
+    run_elevated_powershell(&inner, "Run the VDD IOCTL with administrator privileges").await
 }
 
 /// 验证 EDID 文件格式和 checksum
@@ -1167,7 +1197,7 @@ fn validate_edid(data: &[u8]) -> Result<(), String> {
     // EDID 必须是 128 或 256 字节
     if data.len() != 128 && data.len() != 256 {
         return Err(format!(
-            "EDID 文件大小无效: {} 字节（必须是 128 或 256 字节）",
+            "Invalid EDID file size: {} bytes (must be 128 or 256 bytes)",
             data.len()
         ));
     }
@@ -1175,7 +1205,7 @@ fn validate_edid(data: &[u8]) -> Result<(), String> {
     // 验证 EDID 头部 (前8字节应该是: 00 FF FF FF FF FF FF 00)
     let expected_header: [u8; 8] = [0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00];
     if data.len() >= 8 && &data[0..8] != &expected_header {
-        return Err("EDID 头部格式无效".to_string());
+        return Err("Invalid EDID header".to_string());
     }
 
     // 每个 128 字节块都必须有独立的 checksum
@@ -1189,7 +1219,7 @@ fn validate_edid(data: &[u8]) -> Result<(), String> {
         let expected_checksum = if sum != 0 { (256 - sum) as u8 } else { 0 };
         if block[127] != expected_checksum {
             return Err(format!(
-                "EDID 第 {} 个数据块 checksum 无效: 期望 0x{:02X}，实际 0x{:02X}",
+                "Invalid checksum in EDID block {}: expected 0x{:02X}, actual 0x{:02X}",
                 block_index + 1,
                 expected_checksum,
                 block[127]
@@ -1203,11 +1233,11 @@ fn validate_edid(data: &[u8]) -> Result<(), String> {
 /// 上传并保存 EDID 文件
 #[tauri::command]
 pub async fn upload_edid_file(file_data: Vec<u8>) -> Result<String, String> {
-    info!("📤 开始上传 EDID 文件（{} 字节）", file_data.len());
+    info!("Uploading an EDID file ({} bytes)", file_data.len());
 
     // 验证 EDID 数据
     validate_edid(&file_data)?;
-    info!("✅ EDID 验证通过");
+    info!("EDID validation passed");
 
     let edid_path = get_vdd_edid_path();
 
@@ -1220,21 +1250,26 @@ pub async fn upload_edid_file(file_data: Vec<u8>) -> Result<String, String> {
                     "New-Item -ItemType Directory -Force -Path '{}' | Out-Null",
                     parent.display()
                 );
-                run_elevated_powershell(&inner_command, "创建 EDID 目录").await?;
+                run_elevated_powershell(&inner_command, "Create the EDID directory").await?;
 
                 if !parent.exists() {
-                    return Err(format!("创建目录失败: {}", parent.display()));
+                    return Err(format!(
+                        "Failed to create the directory: {}",
+                        parent.display()
+                    ));
                 }
             }
 
             #[cfg(not(target_os = "windows"))]
-            fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create the directory: {}", e))?;
         }
     }
 
     // 写入临时文件
     let temp_path = std::env::temp_dir().join(format!("user_edid_{}.bin", std::process::id()));
-    fs::write(&temp_path, &file_data).map_err(|e| format!("写入临时文件失败: {}", e))?;
+    fs::write(&temp_path, &file_data)
+        .map_err(|e| format!("Failed to write the temporary file: {}", e))?;
 
     // 使用管理员权限复制文件
     #[cfg(target_os = "windows")]
@@ -1245,7 +1280,7 @@ pub async fn upload_edid_file(file_data: Vec<u8>) -> Result<String, String> {
             edid_path.display()
         );
 
-        if let Err(error) = run_elevated_powershell(&inner_command, "复制 EDID 文件").await {
+        if let Err(error) = run_elevated_powershell(&inner_command, "Copy the EDID file").await {
             let _ = fs::remove_file(&temp_path);
             return Err(error);
         }
@@ -1253,7 +1288,8 @@ pub async fn upload_edid_file(file_data: Vec<u8>) -> Result<String, String> {
 
     #[cfg(not(target_os = "windows"))]
     {
-        fs::copy(&temp_path, &edid_path).map_err(|e| format!("复制 EDID 文件失败: {}", e))?;
+        fs::copy(&temp_path, &edid_path)
+            .map_err(|e| format!("Failed to copy the EDID file: {}", e))?;
     }
 
     // 清理临时文件
@@ -1261,16 +1297,17 @@ pub async fn upload_edid_file(file_data: Vec<u8>) -> Result<String, String> {
 
     // 验证文件是否成功写入
     if !edid_path.exists() {
-        return Err("EDID 文件写入失败".to_string());
+        return Err("Failed to write the EDID file".to_string());
     }
 
-    let saved_data = fs::read(&edid_path).map_err(|e| format!("验证 EDID 文件失败: {}", e))?;
+    let saved_data =
+        fs::read(&edid_path).map_err(|e| format!("Failed to verify the EDID file: {}", e))?;
     if saved_data != file_data {
-        return Err("EDID 文件写入校验失败，目标内容与上传内容不一致".to_string());
+        return Err("EDID write verification failed because the saved content differs from the uploaded content".to_string());
     }
 
-    info!("✅ EDID 文件已保存到: {:?}", edid_path);
-    Ok(format!("EDID 文件已保存: {}", edid_path.display()))
+    info!("EDID file saved to: {:?}", edid_path);
+    Ok(format!("EDID file saved: {}", edid_path.display()))
 }
 
 /// 读取当前的 EDID 文件
@@ -1279,10 +1316,10 @@ pub fn read_edid_file() -> Result<Vec<u8>, String> {
     let edid_path = get_vdd_edid_path();
 
     if !edid_path.exists() {
-        return Err("EDID 文件不存在".to_string());
+        return Err("EDID file does not exist".to_string());
     }
 
-    let data = fs::read(&edid_path).map_err(|e| format!("读取 EDID 文件失败: {}", e))?;
+    let data = fs::read(&edid_path).map_err(|e| format!("Failed to read the EDID file: {}", e))?;
 
     // 验证读取的数据
     validate_edid(&data)?;
@@ -1296,26 +1333,27 @@ pub async fn delete_edid_file() -> Result<String, String> {
     let edid_path = get_vdd_edid_path();
 
     if !edid_path.exists() {
-        return Ok("EDID 文件不存在".to_string());
+        return Ok("EDID file does not exist".to_string());
     }
 
     #[cfg(target_os = "windows")]
     {
         let inner_command = format!("Remove-Item -Path '{}' -Force", edid_path.display());
-        run_elevated_powershell(&inner_command, "删除 EDID 文件").await?;
+        run_elevated_powershell(&inner_command, "Delete the EDID file").await?;
     }
 
     #[cfg(not(target_os = "windows"))]
     {
-        fs::remove_file(&edid_path).map_err(|e| format!("删除 EDID 文件失败: {}", e))?;
+        fs::remove_file(&edid_path)
+            .map_err(|e| format!("Failed to delete the EDID file: {}", e))?;
     }
 
     if edid_path.exists() {
-        return Err("EDID 文件删除校验失败，目标文件仍然存在".to_string());
+        return Err("EDID deletion verification failed because the file still exists".to_string());
     }
 
-    info!("✅ EDID 文件已删除");
-    Ok("EDID 文件已删除".to_string())
+    info!("EDID file deleted");
+    Ok("EDID file deleted".to_string())
 }
 
 #[tauri::command]
@@ -1345,7 +1383,7 @@ pub async fn start_vdd_trace() -> Result<VddTraceStatus, String> {
             quote_powershell_path(&trace_file)
         );
 
-        run_elevated_powershell(&command, "启动 VDD ETW 采集").await?;
+        run_elevated_powershell(&command, "Start VDD ETW capture").await?;
         Ok(build_vdd_trace_status())
     }
 
@@ -1367,7 +1405,7 @@ pub async fn stop_vdd_trace() -> Result<VddTraceStatus, String> {
             "logman stop {} -ets",
             quote_powershell(VDD_TRACE_SESSION_NAME)
         );
-        run_elevated_powershell(&command, "停止 VDD ETW 采集").await?;
+        run_elevated_powershell(&command, "Stop VDD ETW capture").await?;
         Ok(build_vdd_trace_status())
     }
 
@@ -1415,28 +1453,31 @@ pub async fn uninstall_vdd_driver() -> Result<String, String> {
             .join("uninstall-vdd.bat");
         if !uninstall_script.exists() {
             return Err(format!(
-                "VDD 卸载脚本不存在: {}。请修复或重新安装 Sunshine。",
+                "VDD uninstallation script not found: {}. Repair or reinstall Sunshine.",
                 uninstall_script.display()
             ));
         }
 
-        info!("调用 uninstall-vdd.bat 卸载虚拟显示器驱动...");
+        info!("Running uninstall-vdd.bat to uninstall the virtual display driver...");
         tokio::task::spawn_blocking(move || {
             bat_runner::run_elevated(&uninstall_script, "vdd", &[])
         })
         .await
-        .map_err(|error| format!("VDD 卸载任务执行失败: {error}"))??;
+        .map_err(|error| format!("VDD uninstallation task failed: {error}"))??;
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
         let status = get_vdd_status().await?;
         if status.installed {
-            return Err(format!("VDD 卸载后验证失败: {}", status.status_text));
+            return Err(format!(
+                "VDD post-uninstallation verification failed: {}",
+                status.status_text
+            ));
         }
-        Ok("虚拟显示器驱动已卸载".to_string())
+        Ok("Virtual display driver uninstalled".to_string())
     }
 
     #[cfg(not(target_os = "windows"))]
     {
-        Err("此功能仅支持 Windows".to_string())
+        Err("This feature is available only on Windows".to_string())
     }
 }
 

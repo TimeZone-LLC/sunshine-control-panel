@@ -11,9 +11,9 @@ pub fn install_file_transfer_menu() -> Result<(), String> {
         .create_subkey(r"Software\Classes\*\shell\Sunshine.SendToClient")
         .map_err(|e| format!("create context menu key failed: {e}"))?;
 
-    verb.set_value("", &"发送到 Sunshine 客户端")
+    verb.set_value("", &"Send to a Sunshine client")
         .map_err(|e| format!("set context menu title failed: {e}"))?;
-    verb.set_value("MUIVerb", &"发送到 Sunshine 客户端")
+    verb.set_value("MUIVerb", &"Send to a Sunshine client")
         .map_err(|e| format!("set context menu verb failed: {e}"))?;
     verb.set_value("Icon", &exe)
         .map_err(|e| format!("set context menu icon failed: {e}"))?;
@@ -84,9 +84,9 @@ fn install_file_mapping_menu_key(
         .create_subkey(key_path)
         .map_err(|e| format!("create file mapping context menu key failed: {e}"))?;
 
-    verb.set_value("", &"通过 Sunshine 共享")
+    verb.set_value("", &"Share through Sunshine")
         .map_err(|e| format!("set file mapping context menu title failed: {e}"))?;
-    verb.set_value("MUIVerb", &"通过 Sunshine 共享")
+    verb.set_value("MUIVerb", &"Share through Sunshine")
         .map_err(|e| format!("set file mapping context menu verb failed: {e}"))?;
     verb.set_value("Icon", &exe)
         .map_err(|e| format!("set file mapping context menu icon failed: {e}"))?;

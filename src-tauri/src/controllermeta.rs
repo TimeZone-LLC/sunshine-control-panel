@@ -167,7 +167,7 @@ pub async fn controllermeta_check_release() -> Result<ControllerMetaRelease, Str
         .connect_timeout(std::time::Duration::from_secs(3))
         .user_agent("sunshine-control-panel")
         .build()
-        .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))?;
+        .map_err(|e| format!("Failed to create the HTTP client: {}", e))?;
 
     // 依次试探：直连 → 代理 1 → 代理 2……
     let mut urls = vec![GITHUB_API_LATEST.to_string()];
@@ -175,9 +175,9 @@ pub async fn controllermeta_check_release() -> Result<ControllerMetaRelease, Str
         urls.push(format!("{}{}", proxy, GITHUB_API_LATEST));
     }
 
-    let mut last_err = String::from("未尝试");
+    let mut last_err = String::from("not attempted");
     for url in &urls {
-        debug!("📦 查询 ControllerMeta 最新版本: {}", url);
+        debug!("Checking the latest ControllerMeta release: {}", url);
         let result = client
             .get(url)
             .header("Accept", "application/vnd.github.v3+json")
@@ -188,12 +188,12 @@ pub async fn controllermeta_check_release() -> Result<ControllerMetaRelease, Str
             Ok(r) if r.status().is_success() => r,
             Ok(r) => {
                 last_err = format!("HTTP {}", r.status());
-                warn!("⚠️ 请求失败 ({}): {}", url, last_err);
+                warn!("Request failed ({}): {}", url, last_err);
                 continue;
             }
             Err(e) => {
                 last_err = e.to_string();
-                warn!("⚠️ 请求失败 ({}): {}", url, last_err);
+                warn!("Request failed ({}): {}", url, last_err);
                 continue;
             }
         };
@@ -230,14 +230,14 @@ pub async fn controllermeta_check_release() -> Result<ControllerMetaRelease, Str
                 });
             }
             Err(e) => {
-                last_err = format!("解析失败: {}", e);
-                warn!("⚠️ {}", last_err);
+                last_err = format!("Failed to parse the response: {}", e);
+                warn!("{}", last_err);
             }
         }
     }
 
     Err(format!(
-        "查询 GitHub Release 失败（已尝试 {} 个地址）: {}",
+        "Failed to query the GitHub release after trying {} endpoints: {}",
         urls.len(),
         last_err
     ))
@@ -256,14 +256,14 @@ pub async fn controllermeta_download(
     use futures_util::StreamExt;
     use tauri::Emitter;
 
-    info!("📥 开始下载 ControllerMeta: {}", url);
+    info!("Downloading ControllerMeta: {}", url);
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(600))
         .connect_timeout(std::time::Duration::from_secs(10))
         .user_agent("sunshine-control-panel")
         .build()
-        .map_err(|e| format!("创建客户端失败: {}", e))?;
+        .map_err(|e| format!("Failed to create the client: {}", e))?;
 
     // 构造下载 URL 列表：代理优先（国内直连 GitHub Releases 常常超时），最后直连
     let mut urls: Vec<String> = DOWNLOAD_PROXY_PREFIXES
@@ -272,10 +272,10 @@ pub async fn controllermeta_download(
         .collect();
     urls.push(url.clone());
 
-    let mut last_err = String::from("未尝试");
+    let mut last_err = String::from("not attempted");
     let mut response_opt = None;
     for try_url in &urls {
-        debug!("🔗 尝试下载: {}", try_url);
+        debug!("Trying download URL: {}", try_url);
         match client
             .get(try_url)
             .header("Accept", "application/octet-stream")
@@ -283,26 +283,28 @@ pub async fn controllermeta_download(
             .await
         {
             Ok(r) if r.status().is_success() => {
-                info!("✅ 连接成功: {}", try_url);
+                info!("Connected successfully: {}", try_url);
                 response_opt = Some(r);
                 break;
             }
             Ok(r) => {
                 last_err = format!("HTTP {}", r.status());
-                warn!("⚠️ {} → {}", try_url, last_err);
+                warn!("{} -> {}", try_url, last_err);
             }
             Err(e) => {
                 last_err = e.to_string();
-                warn!("⚠️ {} → {}", try_url, last_err);
+                warn!("{} -> {}", try_url, last_err);
             }
         }
     }
 
-    let response = response_opt.ok_or_else(|| format!("所有下载源均失败: {}", last_err))?;
+    let response =
+        response_opt.ok_or_else(|| format!("All download sources failed: {}", last_err))?;
 
     let total_size = response.content_length().unwrap_or(0);
     let install_dir = get_install_dir();
-    std::fs::create_dir_all(&install_dir).map_err(|e| format!("创建安装目录失败: {}", e))?;
+    std::fs::create_dir_all(&install_dir)
+        .map_err(|e| format!("Failed to create the installation directory: {}", e))?;
 
     // 下载到临时文件，完成后再原子重命名到目标位置（避免覆盖运行中的 exe）
     let final_path = get_binary_path();
@@ -312,16 +314,17 @@ pub async fn controllermeta_download(
         let _ = std::fs::remove_file(&temp_path);
     }
 
-    let mut file =
-        std::fs::File::create(&temp_path).map_err(|e| format!("创建临时文件失败: {}", e))?;
+    let mut file = std::fs::File::create(&temp_path)
+        .map_err(|e| format!("Failed to create the temporary file: {}", e))?;
 
     let mut stream = response.bytes_stream();
     let mut downloaded: u64 = 0;
     let window = app_handle.get_webview_window("main");
 
     while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|e| format!("下载数据失败: {}", e))?;
-        std::io::Write::write_all(&mut file, &chunk).map_err(|e| format!("写入文件失败: {}", e))?;
+        let chunk = chunk.map_err(|e| format!("Failed to download data: {}", e))?;
+        std::io::Write::write_all(&mut file, &chunk)
+            .map_err(|e| format!("Failed to write the file: {}", e))?;
         downloaded += chunk.len() as u64;
 
         if let Some(ref w) = window {
@@ -342,14 +345,14 @@ pub async fn controllermeta_download(
     }
     drop(file);
 
-    info!("✅ 下载完成 ({} bytes)", downloaded);
+    info!("Download complete ({} bytes)", downloaded);
 
     // 如果目标文件正在运行，重命名会失败；返回友好提示
     if final_path.exists() {
         if let Err(e) = std::fs::remove_file(&final_path) {
             let _ = std::fs::remove_file(&temp_path);
             return Err(format!(
-                "无法覆盖已有版本，请先关闭 ControllerMeta 后重试: {}",
+                "The existing version could not be replaced. Close ControllerMeta and try again: {}",
                 e
             ));
         }
@@ -357,7 +360,7 @@ pub async fn controllermeta_download(
 
     std::fs::rename(&temp_path, &final_path).map_err(|e| {
         let _ = std::fs::remove_file(&temp_path);
-        format!("落盘失败: {}", e)
+        format!("Failed to finalize the installation: {}", e)
     })?;
 
     // 记录版本号
@@ -366,7 +369,7 @@ pub async fn controllermeta_download(
         let _ = std::fs::write(get_version_file(), clean);
     }
 
-    info!("✅ ControllerMeta 安装完成: {:?}", final_path);
+    info!("ControllerMeta installed: {:?}", final_path);
     Ok(final_path.to_string_lossy().to_string())
 }
 
@@ -375,17 +378,17 @@ pub async fn controllermeta_download(
 pub async fn controllermeta_launch() -> Result<String, String> {
     let binary_path = get_binary_path();
     if !binary_path.exists() {
-        return Err("ControllerMeta 未安装".to_string());
+        return Err("ControllerMeta is not installed".to_string());
     }
 
     // 如果已在运行，不再重复启动
     if is_process_running() {
-        info!("ℹ️ ControllerMeta 已在运行");
+        info!("ControllerMeta is already running");
         return Ok("already-running".to_string());
     }
 
     let install_dir = get_install_dir();
-    info!("🎮 启动 ControllerMeta: {:?}", binary_path);
+    info!("Starting ControllerMeta: {:?}", binary_path);
 
     // 下载的 exe 会被 Windows 打上 Zone.Identifier（MOTW）标记，
     // 某些场景下会导致运行时 UAC 拦截或被 SmartScreen 阻断，先清理掉
@@ -405,14 +408,14 @@ pub async fn controllermeta_launch() -> Result<String, String> {
             .current_dir(&install_dir)
             .creation_flags(0x00000008)
             .spawn()
-            .map_err(|e| format!("启动 ControllerMeta 失败: {}", e))?
+            .map_err(|e| format!("Failed to start ControllerMeta: {}", e))?
     };
 
     #[cfg(not(target_os = "windows"))]
     let child = std::process::Command::new(&binary_path)
         .current_dir(&install_dir)
         .spawn()
-        .map_err(|e| format!("启动 ControllerMeta 失败: {}", e))?;
+        .map_err(|e| format!("Failed to start ControllerMeta: {}", e))?;
 
     let pid = child.id();
     *CHILD_PROCESS.lock().unwrap() = Some(child);
@@ -428,13 +431,14 @@ pub fn controllermeta_get_install_path() -> String {
 #[tauri::command]
 pub async fn controllermeta_uninstall() -> Result<String, String> {
     if is_process_running() {
-        return Err("ControllerMeta 正在运行，请先关闭后再卸载".to_string());
+        return Err("ControllerMeta is running. Close it before uninstalling".to_string());
     }
     let install_dir = get_install_dir();
     if !install_dir.exists() {
         return Ok("not-installed".to_string());
     }
-    std::fs::remove_dir_all(&install_dir).map_err(|e| format!("删除安装目录失败: {}", e))?;
-    info!("🗑️ ControllerMeta 已卸载: {:?}", install_dir);
+    std::fs::remove_dir_all(&install_dir)
+        .map_err(|e| format!("Failed to remove the installation directory: {}", e))?;
+    info!("ControllerMeta uninstalled: {:?}", install_dir);
     Ok("uninstalled".to_string())
 }

@@ -10,7 +10,7 @@ pub fn handle_tray_menu_event<R: Runtime + 'static>(app: &AppHandle<R>, menu_id:
         "open_sunshine" => open_sunshine_web_ui(app),
         "tray_notification_action" => handle_tray_notification_action(app),
         "open_desktop" => {
-            info!("🖥️ 托盘菜单：打开桌面 UI");
+            info!("Tray menu: opening the desktop UI");
             open_desktop_gui_from_tray(app, "menu");
         }
         #[cfg(target_os = "windows")]
@@ -50,13 +50,13 @@ pub fn handle_tray_menu_event<R: Runtime + 'static>(app: &AppHandle<R>, menu_id:
         "restart_user_mode" => toggle_sunshine_mode(app),
         "show_toolbar" => toggle_toolbar(app),
         "rtss_control" => {
-            info!("🎯 托盘菜单：打开 RTSS 控制");
+            info!("Tray menu: opening RTSS controls");
             if let Err(e) = toolbar::create_tool_window_internal(app, "rtss") {
                 error!("Failed to create the RTSS tool window: {}", e);
             }
         }
         "host_performance" => {
-            info!("📊 托盘菜单：打开主机性能监控");
+            info!("Tray menu: opening host performance monitoring");
             if let Err(e) = toolbar::create_tool_window_internal(app, "performance") {
                 error!("Failed to create the host performance window: {}", e);
             }
@@ -67,12 +67,12 @@ pub fn handle_tray_menu_event<R: Runtime + 'static>(app: &AppHandle<R>, menu_id:
         "prevent_sleep" => toggle_prevent_sleep(app),
         #[cfg(debug_assertions)]
         "debug_page" => {
-            info!("🐛 托盘菜单：打开调试页面");
+            info!("Tray menu: opening the debug page");
             windows::open_debug_page(app);
         }
         "check_update" => check_for_updates(app),
         "about" => {
-            info!("ℹ️ 托盘菜单：显示关于对话框");
+            info!("Tray menu: showing the About dialog");
             let _ = windows::open_about_window(app);
         }
         "shutdown" => shutdown_sunshine(app),
@@ -80,7 +80,7 @@ pub fn handle_tray_menu_event<R: Runtime + 'static>(app: &AppHandle<R>, menu_id:
         "lang_en" => switch_tray_locale(app, "en"),
         "lang_ja" => switch_tray_locale(app, "ja"),
         "restart" => restart_sunshine(app),
-        _ => warn!("⚠️ 未知的托盘菜单事件: {}", menu_id),
+        _ => warn!("Unknown tray-menu event: {}", menu_id),
     }
 }
 
@@ -476,7 +476,7 @@ async fn update_sunshine_mode_state<R: Runtime + 'static>(app: &AppHandle<R>, ch
             .unwrap_or(false);
     *SUNSHINE_USER_MODE_STATE.lock().unwrap() = is_user_mode;
     info!(
-        "✅ Sunshine 用户模式状态已更新({}): {}",
+        "Sunshine user-mode status updated ({}): {}",
         check_label, is_user_mode
     );
     let rebuild_handle = app.clone();
@@ -488,14 +488,14 @@ async fn update_sunshine_mode_state<R: Runtime + 'static>(app: &AppHandle<R>, ch
 /// 切换 Sunshine 运行模式
 #[cfg(target_os = "windows")]
 fn toggle_sunshine_mode<R: Runtime>(app: &AppHandle<R>) {
-    info!("🔄 托盘菜单：切换 Sunshine 模式");
+    info!("Tray menu: switching Sunshine mode");
     refresh_menu(app);
     let app_handle = app.clone();
 
     tauri::async_runtime::spawn(async move {
         match crate::sunshine::toggle_sunshine_mode().await {
             Ok(msg) => {
-                info!("✅ {}", msg);
+                info!("{}", msg);
                 emit_message(&app_handle, "success", &msg);
 
                 // 切换由 UAC 提升的 PowerShell 在后台执行，需预留 UAC + stop + start
@@ -507,7 +507,7 @@ fn toggle_sunshine_mode<R: Runtime>(app: &AppHandle<R>) {
                 update_sunshine_mode_state(&app_handle, "二次").await;
             }
             Err(e) => {
-                error!("❌ 切换 Sunshine 模式失败: {}", e);
+                error!("Failed to switch Sunshine mode: {}", e);
                 emit_message(&app_handle, "error", &format!("切换失败: {}", e));
             }
         }
@@ -516,12 +516,12 @@ fn toggle_sunshine_mode<R: Runtime>(app: &AppHandle<R>) {
 
 /// 切换工具栏显示/隐藏
 fn toggle_toolbar<R: Runtime>(app: &AppHandle<R>) {
-    info!("🔧 托盘菜单：切换工具栏显示/隐藏");
+    info!("Tray menu: toggling the toolbar");
 
     if let Some(toolbar_window) = app.get_webview_window("toolbar") {
         let _ = toolbar_window.close();
     } else if let Err(e) = toolbar::create_toolbar_window_internal(app) {
-        error!("❌ 创建工具栏失败: {}", e);
+        error!("Failed to create the toolbar: {}", e);
     }
 }
 
@@ -612,16 +612,16 @@ fn toggle_prevent_sleep<R: Runtime>(app: &AppHandle<R>) {
     let new_state = !*state;
 
     let result = if new_state {
-        info!("🌙 托盘菜单：启用防止睡眠");
+        info!("Tray menu: enabling sleep prevention");
         power::enable_prevent_sleep()
     } else {
-        info!("💤 托盘菜单：禁用防止睡眠");
+        info!("Tray menu: disabling sleep prevention");
         power::disable_prevent_sleep()
     };
 
     match result {
         Ok(()) => *state = new_state,
-        Err(e) => error!("❌ 切换防止睡眠失败: {}", e),
+        Err(e) => error!("Failed to toggle sleep prevention: {}", e),
     }
     drop(state);
     rebuild_tray_menu(app);
@@ -632,8 +632,8 @@ fn toggle_prevent_sleep<R: Runtime>(app: &AppHandle<R>) {
 pub fn cleanup_prevent_sleep() {
     if *PREVENT_SLEEP_STATE.lock().unwrap() {
         match power::disable_prevent_sleep() {
-            Ok(()) => info!("✅ 已清理防止睡眠状态"),
-            Err(e) => error!("❌ 清理防止睡眠状态失败: {}", e),
+            Ok(()) => info!("Cleared sleep-prevention state"),
+            Err(e) => error!("Failed to clear sleep-prevention state: {}", e),
         }
     }
 }

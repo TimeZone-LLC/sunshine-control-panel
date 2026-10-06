@@ -70,17 +70,17 @@ pub fn dispatch_cli_quick_share(paths: Vec<String>) {
     tauri::async_runtime::spawn(async move {
         match quick_share_folder_internal(paths).await {
             Ok(mapping) => {
-                let message = format!("已共享文件夹：{}\n{}", mapping.name, mapping.path);
+                let message = format!("Shared folder: {}\n{}", mapping.name, mapping.path);
                 info!(
                     "file mapping quick share created: {} ({})",
                     mapping.name, mapping.path
                 );
-                show_quick_share_message("Sunshine 文件夹共享", &message, false);
+                show_quick_share_message("Sunshine folder sharing", &message, false);
             }
             Err(e) => {
-                let message = format!("共享文件夹失败：\n{e}");
+                let message = format!("Failed to share the folder:\n{e}");
                 warn!("file mapping quick share failed: {e}");
-                show_quick_share_message("Sunshine 文件夹共享", &message, true);
+                show_quick_share_message("Sunshine folder sharing", &message, true);
             }
         }
     });

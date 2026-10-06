@@ -29,7 +29,7 @@ static HTTPS_CLIENT: Lazy<Result<reqwest::Client, String>> = Lazy::new(|| {
         .redirect(reqwest::redirect::Policy::none())
         .timeout(std::time::Duration::from_secs(10))
         .build()
-        .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))
+        .map_err(|e| format!("Failed to create the HTTP client: {}", e))
 });
 const MAX_CONFIG_SAVE_RESPONSE_BYTES: usize = 64 * 1024;
 static SSE_HTTPS_CLIENT: Lazy<Result<reqwest::Client, String>> = Lazy::new(|| {
@@ -132,7 +132,10 @@ fn get_sunshine_path_internal() -> PathBuf {
                     if let Ok(path) = sunshine_key.get_value::<String, _>(key_name) {
                         let install_path = PathBuf::from(path);
                         if install_path.exists() {
-                            info!("✅ 从注册表读取到 Sunshine 路径: {:?}", install_path);
+                            info!(
+                                "Read the Sunshine path from the registry: {:?}",
+                                install_path
+                            );
                             return install_path;
                         }
                     }
@@ -148,12 +151,12 @@ fn get_sunshine_path_internal() -> PathBuf {
 
         for path in &default_paths {
             if path.exists() {
-                info!("✅ 使用默认 Sunshine 路径: {:?}", path);
+                info!("Using the default Sunshine path: {:?}", path);
                 return path.clone();
             }
         }
 
-        warn!("⚠️  无法找到 Sunshine 安装路径，使用默认路径");
+        warn!("Sunshine installation path was not found; using the default path");
         PathBuf::from(r"C:\Program Files\Sunshine")
     }
 
@@ -255,7 +258,7 @@ pub async fn get_sunshine_version() -> Result<String, String> {
             && let Some(version) = cap.get(1)
         {
             let version_str = version.as_str().to_string();
-            debug!("✅ 解析到版本号: {}", version_str);
+            debug!("Parsed version: {}", version_str);
             return Ok(version_str);
         }
     }
@@ -980,7 +983,7 @@ async fn post_sunshine_config_to(
         .json(config_data)
         .send()
         .await
-        .map_err(|e| format!("调用 Sunshine Config API 失败: {}", e))?;
+        .map_err(|e| format!("Sunshine Config API request failed: {}", e))?;
 
     let status = response.status();
     if response
@@ -998,7 +1001,7 @@ async fn post_sunshine_config_to(
     while let Some(chunk) = response
         .chunk()
         .await
-        .map_err(|error| format!("无法读取 Sunshine Config API 响应: {error}"))?
+        .map_err(|error| format!("Failed to read the Sunshine Config API response: {error}"))?
     {
         if response_bytes.len().saturating_add(chunk.len()) > MAX_CONFIG_SAVE_RESPONSE_BYTES {
             return Err("Sunshine Config API response exceeds 64 KiB".to_string());
@@ -1006,10 +1009,10 @@ async fn post_sunshine_config_to(
         response_bytes.extend_from_slice(&chunk);
     }
     let response_body = String::from_utf8(response_bytes)
-        .map_err(|error| format!("Sunshine Config API 响应不是有效 UTF-8: {error}"))?;
+        .map_err(|error| format!("Sunshine Config API response is not valid UTF-8: {error}"))?;
     if !status.is_success() {
         return Err(format!(
-            "Sunshine Config API 返回错误 (状态: {}): {}",
+            "Sunshine Config API returned an error (status: {}): {}",
             status, response_body
         ));
     }
@@ -1025,7 +1028,7 @@ pub async fn get_active_sessions() -> Result<Vec<SessionInfo>, String> {
         sunshine_url.trim_end_matches('/')
     );
 
-    debug!("📡 获取活动会话: {}", sessions_url);
+    debug!("Requesting active sessions: {}", sessions_url);
 
     let client = create_https_client()?;
 
@@ -1033,11 +1036,11 @@ pub async fn get_active_sessions() -> Result<Vec<SessionInfo>, String> {
         .get(&sessions_url)
         .send()
         .await
-        .map_err(|e| format!("请求会话信息失败: {}", e))?;
+        .map_err(|e| format!("Failed to request session information: {}", e))?;
 
     let status = response.status();
 
-    debug!("📡 获取 sessions 响应状态码: {}", status);
+    debug!("Sessions response status: {}", status);
 
     // 检查 Content-Type
     let content_type = response
@@ -1050,41 +1053,45 @@ pub async fn get_active_sessions() -> Result<Vec<SessionInfo>, String> {
     let response_text = response
         .text()
         .await
-        .map_err(|e| format!("读取响应失败: {}", e))?;
+        .map_err(|e| format!("Failed to read the response: {}", e))?;
 
-    debug!("📡 获取 sessions 响应内容: {}", response_text);
+    debug!("Sessions response body: {}", response_text);
 
     // 如果是 404 或 XML 响应，返回空数组（没有会话是正常情况）
     if status == 404
         || content_type.contains("xml")
         || response_text.trim_start().starts_with("<?xml")
     {
-        debug!("⚠️ 没有活动会话 (404 或 XML 响应)");
+        debug!("No active sessions (404 or XML response)");
         return Ok(Vec::new());
     }
 
     // 如果状态码不是成功，但也不是 404，返回错误
     if !status.is_success() {
-        error!("❌ 错误响应: {}", response_text);
+        error!("Error response: {}", response_text);
         return Err(format!(
-            "获取会话信息失败 (状态: {}): {}",
+            "Failed to get session information (status: {}): {}",
             status, response_text
         ));
     }
 
     // 尝试解析 JSON
-    let json: serde_json::Value = serde_json::from_str(&response_text)
-        .map_err(|e| format!("解析 JSON 失败: {}，响应内容: {}", e, response_text))?;
+    let json: serde_json::Value = serde_json::from_str(&response_text).map_err(|e| {
+        format!(
+            "Failed to parse JSON: {}; response body: {}",
+            e, response_text
+        )
+    })?;
 
-    debug!("📡 解析后的 JSON: {:#}", json);
+    debug!("Parsed JSON: {:#}", json);
 
     // 检查 API 响应状态
     if json.get("success").and_then(|v| v.as_bool()) == Some(false) {
         let error_msg = json
             .get("status_message")
             .and_then(|v| v.as_str())
-            .unwrap_or("未知错误");
-        return Err(format!("API 返回错误: {}", error_msg));
+            .unwrap_or("Unknown error");
+        return Err(format!("API returned an error: {}", error_msg));
     }
 
     // 解析会话列表
@@ -1092,19 +1099,19 @@ pub async fn get_active_sessions() -> Result<Vec<SessionInfo>, String> {
         .get("sessions")
         .and_then(|v| v.as_array())
         .map(|sessions_array| {
-            debug!("📡 找到 {} 个会话", sessions_array.len());
+            debug!("Found {} sessions", sessions_array.len());
             sessions_array
                 .iter()
                 .map(SessionInfo::from_json)
                 .collect::<Vec<_>>()
         })
         .unwrap_or_else(|| {
-            warn!("⚠️ 响应中没有 'sessions' 字段或不是数组");
-            debug!("📡 JSON 结构: {:#}", json);
+            warn!("The response has no 'sessions' field or it is not an array");
+            debug!("JSON structure: {:#}", json);
             Vec::new()
         });
 
-    info!("✅ 获取到 {} 个活动会话", sessions.len());
+    info!("Retrieved {} active sessions", sessions.len());
     Ok(sessions)
 }
 
@@ -1148,25 +1155,25 @@ pub async fn stop_all_sessions() -> Result<String, String> {
 pub async fn change_bitrate(client_name: String, bitrate: u32) -> Result<String, String> {
     // 验证码率范围
     if !(1..=800000).contains(&bitrate) {
-        return Err("码率值必须在 1-800000 Kbps 之间".to_string());
+        return Err("Bitrate must be between 1 and 800000 Kbps".to_string());
     }
 
     // 构建请求 URL
     let sunshine_url = get_sunshine_url().await?;
-    let base_url =
-        Url::parse(&sunshine_url).map_err(|e| format!("解析 Sunshine URL 失败: {}", e))?;
+    let base_url = Url::parse(&sunshine_url)
+        .map_err(|e| format!("Failed to parse the Sunshine URL: {}", e))?;
 
     let mut change_bitrate_url = base_url
         .join("api/runtime/bitrate")
-        .map_err(|e| format!("构建 URL 失败: {}", e))?;
+        .map_err(|e| format!("Failed to build the URL: {}", e))?;
 
     change_bitrate_url
         .query_pairs_mut()
         .append_pair("bitrate", &bitrate.to_string())
         .append_pair("clientname", &client_name);
 
-    info!("📡 调整码率: {} -> {} Kbps", client_name, bitrate);
-    debug!("📡 请求 URL: {}", change_bitrate_url);
+    info!("Adjusting bitrate for {} to {} Kbps", client_name, bitrate);
+    debug!("Request URL: {}", change_bitrate_url);
 
     // 发送请求
     let client = create_https_client()?;
@@ -1174,65 +1181,72 @@ pub async fn change_bitrate(client_name: String, bitrate: u32) -> Result<String,
         .get(change_bitrate_url.as_str())
         .send()
         .await
-        .map_err(|e| format!("请求调整码率失败: {}", e))?;
+        .map_err(|e| format!("Bitrate-adjustment request failed: {}", e))?;
 
     let status = response.status();
-    debug!("📡 HTTP 状态码: {}", status);
+    debug!("HTTP status: {}", status);
 
     // 读取响应内容
     let response_text = response
         .text()
         .await
-        .map_err(|e| format!("读取响应失败: {}", e))?;
+        .map_err(|e| format!("Failed to read the response: {}", e))?;
 
     // 检查 HTTP 状态码
     if !status.is_success() {
         return Err(match status.as_u16() {
-            401 => "身份验证失败，请检查 Sunshine 配置".to_string(),
-            403 => "访问被拒绝，仅允许 localhost 访问".to_string(),
-            _ => format!("HTTP 错误 (状态码: {}): {}", status, response_text),
+            401 => "Authentication failed. Check the Sunshine configuration".to_string(),
+            403 => "Access denied. Only localhost access is allowed".to_string(),
+            _ => format!("HTTP error (status: {}): {}", status, response_text),
         });
     }
 
     // 解析 JSON 响应
-    let json: serde_json::Value = serde_json::from_str(&response_text)
-        .map_err(|e| format!("解析 JSON 失败: {}，响应内容: {}", e, response_text))?;
+    let json: serde_json::Value = serde_json::from_str(&response_text).map_err(|e| {
+        format!(
+            "Failed to parse JSON: {}; response body: {}",
+            e, response_text
+        )
+    })?;
 
-    debug!("📡 解析后的 JSON: {:#}", json);
+    debug!("Parsed JSON: {:#}", json);
 
     // 检查响应状态
     match json.get("success").and_then(|v| v.as_bool()) {
         Some(true) => {
-            info!("✅ 码率调整成功");
-            Ok(format!("码率已调整为 {} Kbps", bitrate))
+            info!("Bitrate adjusted successfully");
+            Ok(format!("Bitrate adjusted to {} Kbps", bitrate))
         }
         Some(false) => {
             let error_msg = json
                 .get("status_message")
                 .and_then(|v| v.as_str())
-                .unwrap_or("未知错误");
+                .unwrap_or("Unknown error");
             let status_code = json
                 .get("status_code")
                 .and_then(|v| v.as_u64())
                 .unwrap_or(0);
 
-            error!("❌ 码率调整失败: {} (状态码: {})", error_msg, status_code);
+            error!(
+                "Failed to adjust bitrate: {} (status: {})",
+                error_msg, status_code
+            );
 
             // 根据状态码提供详细提示
             let error_message = if status_code == 404 {
                 format!(
-                    "码率调整失败: {}\n\n提示：请确认客户端名称是否正确，或会话是否处于 RUNNING 状态",
+                    "Failed to adjust bitrate: {}\n\nVerify that the client name is correct and the session is in the RUNNING state",
                     error_msg
                 )
             } else {
-                format!("码率调整失败: {}", error_msg)
+                format!("Failed to adjust bitrate: {}", error_msg)
             };
 
             Err(error_message)
         }
         None => {
-            warn!("⚠️ 响应格式无效，无法解析 success 字段");
-            Err("无效的响应格式".to_string())
+            warn!("Invalid response format; the success field could not be parsed");
+            Err("Invalid response format".to_string())
         }
     }
 }
@@ -1327,33 +1341,42 @@ pub async fn toggle_sunshine_mode() -> Result<String, String> {
         let sunshine_exe = sunshine_path.join("sunshine.exe");
 
         if !sunshine_exe.exists() {
-            return Err(format!("找不到 sunshine.exe: {}", sunshine_exe.display()));
+            return Err(format!(
+                "sunshine.exe was not found: {}",
+                sunshine_exe.display()
+            ));
         }
 
         let stop_cmd = build_stop_sunshine_command();
 
         let (mode_name, command) = if is_user_mode {
-            info!("🔄 切换 Sunshine 模式：用户模式 → 服务模式");
+            info!("Switching Sunshine from user mode to service mode");
             let start_cmd = build_start_service_command(&sunshine_path);
-            ("服务模式", format!("{}; {}", stop_cmd, start_cmd))
+            ("service mode", format!("{}; {}", stop_cmd, start_cmd))
         } else {
-            info!("🔄 切换 Sunshine 模式：服务模式 → 用户模式");
+            info!("Switching Sunshine from service mode to user mode");
             let start_cmd = format!(
                 "Set-Location '{}'; Start-Process -FilePath '.\\sunshine.exe' -Verb RunAs -WindowStyle Hidden",
                 sunshine_path.display()
             );
-            ("用户模式", format!("{}; {}", stop_cmd, start_cmd))
+            ("user mode", format!("{}; {}", stop_cmd, start_cmd))
         };
 
-        crate::utils::execute_powershell_command(&command, &format!("切换到{}失败", mode_name))?;
+        crate::utils::execute_powershell_command(
+            &command,
+            &format!("Failed to switch to {}", mode_name),
+        )?;
 
-        info!("✅ 切换到{}命令已启动，正在后台执行...", mode_name);
-        Ok(format!("正在切换到{}", mode_name))
+        info!(
+            "The command to switch to {} started in the background",
+            mode_name
+        );
+        Ok(format!("Switching to {}", mode_name))
     }
 
     #[cfg(not(target_os = "windows"))]
     {
-        Err("此功能仅支持 Windows".to_string())
+        Err("This feature is available only on Windows".to_string())
     }
 }
 
@@ -1361,22 +1384,22 @@ pub async fn toggle_sunshine_mode() -> Result<String, String> {
 pub async fn restart_sunshine_service() -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
-        info!("🔄 开始重启 Sunshine 服务...");
+        info!("Restarting the Sunshine service...");
 
         let sunshine_path = get_sunshine_path();
         let stop_cmd = build_stop_sunshine_command();
         let start_cmd = build_start_service_command(&sunshine_path);
         let command = format!("{}; {}", stop_cmd, start_cmd);
 
-        crate::utils::execute_powershell_command(&command, "启动重启命令失败")?;
+        crate::utils::execute_powershell_command(&command, "Failed to start the restart command")?;
 
-        info!("✅ 重启命令已启动，正在后台执行...");
+        info!("The restart command started in the background");
         Ok("success".to_string())
     }
 
     #[cfg(not(target_os = "windows"))]
     {
-        Err("此功能仅支持 Windows".to_string())
+        Err("This feature is available only on Windows".to_string())
     }
 }
 

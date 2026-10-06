@@ -48,11 +48,11 @@ pub fn run_elevated(bat_path: &Path, log_prefix: &str, extra_args: &[&str]) -> R
         std::env::temp_dir().join(format!("sunshine-{log_prefix}-{stem}-{operation_id}.log"));
     let log_str = log_path.to_string_lossy().into_owned();
     writeln!(
-        File::create(&log_path).map_err(|e| format!("创建驱动日志失败: {e}"))?,
+        File::create(&log_path).map_err(|e| format!("Failed to create the driver log: {e}"))?,
         "Sunshine elevated task: {}",
         bat_path.display()
     )
-    .map_err(|e| format!("初始化驱动日志失败: {e}"))?;
+    .map_err(|e| format!("Failed to initialize the driver log: {e}"))?;
 
     // 把额外参数拼成 cmd-safe 的字符串：每个参数用双引号包裹
     let args_cmd: String = extra_args.iter().map(|arg| format!(" \"{arg}\"")).collect();
@@ -66,12 +66,12 @@ pub fn run_elevated(bat_path: &Path, log_prefix: &str, extra_args: &[&str]) -> R
             .raw_arg(&cmd_line)
             .creation_flags(CREATE_NO_WINDOW)
             .output()
-            .map_err(|e| format!("启动脚本失败: {e}，日志: {log_str}"))?;
+            .map_err(|e| format!("Failed to start the script: {e}; log: {log_str}"))?;
 
         append_process_output(&log_path, &output.stdout, &output.stderr);
         if !output.status.success() {
             let code = output.status.code().unwrap_or(-1);
-            return Err(format!("脚本执行失败 (exit {code})，日志: {log_str}"));
+            return Err(format!("Script failed (exit {code}); log: {log_str}"));
         }
     } else {
         // 写一份唯一 wrapper，避免连续操作互相覆盖。
@@ -80,7 +80,7 @@ pub fn run_elevated(bat_path: &Path, log_prefix: &str, extra_args: &[&str]) -> R
         ));
         {
             let mut wrapper = File::create(&wrapper_path)
-                .map_err(|e| format!("创建 wrapper 失败: {e}，日志: {log_str}"))?;
+                .map_err(|e| format!("Failed to create the wrapper: {e}; log: {log_str}"))?;
             writeln!(wrapper, "@echo off")
                 .and_then(|_| writeln!(wrapper, "chcp 65001 >nul"))
                 .and_then(|_| {
@@ -93,7 +93,7 @@ pub fn run_elevated(bat_path: &Path, log_prefix: &str, extra_args: &[&str]) -> R
                     )
                 })
                 .and_then(|_| writeln!(wrapper, "exit /b %ERRORLEVEL%"))
-                .map_err(|e| format!("写入 wrapper 失败: {e}，日志: {log_str}"))?;
+                .map_err(|e| format!("Failed to write the wrapper: {e}; log: {log_str}"))?;
         }
 
         // 经共享 run_cmd_elevated（裸 switch + 外层引号对）执行 wrapper：

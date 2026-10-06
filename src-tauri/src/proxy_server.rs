@@ -179,21 +179,21 @@ pub fn ensure_started() {
 
     tauri::async_runtime::spawn(async {
         if let Ok(dev_target) = std::env::var("WEBUI_DEV_TARGET") {
-            info!("🛠️ [开发模式] 检测到 WEBUI_DEV_TARGET 环境变量");
-            info!("🎯 代理目标: {}", dev_target);
+            info!("Detected WEBUI_DEV_TARGET in development mode");
+            info!("Proxy target: {}", dev_target);
             set_sunshine_target(dev_target);
         } else {
             match crate::sunshine::get_sunshine_url().await {
                 Ok(url) => {
-                    info!("🎯 Sunshine URL: {}", url);
+                    info!("Sunshine URL: {}", url);
                     set_sunshine_target(url.trim_end_matches('/').to_string());
                 }
-                Err(e) => warn!("⚠️ 无法获取 Sunshine URL，使用默认: {}", e),
+                Err(e) => warn!("Failed to get the Sunshine URL; using the default: {}", e),
             }
         }
 
         if let Err(e) = start_proxy_server().await {
-            error!("❌ 代理服务器启动失败: {}", e);
+            error!("Failed to start the proxy server: {}", e);
         }
         PROXY_START_REQUESTED.store(false, Ordering::Release);
     });
@@ -202,7 +202,7 @@ pub fn ensure_started() {
 /// 设置 Sunshine 目标 URL
 pub fn set_sunshine_target(url: String) {
     if let Ok(mut target) = SUNSHINE_TARGET.write() {
-        info!("🎯 代理目标已更新: {}", url);
+        info!("Proxy target updated: {}", url);
         *target = url;
     }
 }
@@ -461,16 +461,16 @@ pub async fn start_proxy_server() -> Result<(), Box<dyn std::error::Error + Send
         let addr = SocketAddr::from(([127, 0, 0, 1], port));
         match tokio::net::TcpListener::bind(addr).await {
             Ok(l) => {
-                info!("✅ 代理服务器成功绑定到 http://{}", addr);
+                info!("Proxy server bound to http://{}", addr);
                 bound_port = port;
                 listener = Some(l);
                 break;
             }
             Err(e) => {
                 if port == PROXY_PORT_START {
-                    warn!("⚠️  端口 {} 被占用，尝试其他端口...", port);
+                    warn!("Port {} is in use; trying another port...", port);
                 }
-                debug!("   端口 {} 不可用: {}", port, e);
+                debug!("Port {} is unavailable: {}", port, e);
             }
         }
     }
@@ -479,10 +479,14 @@ pub async fn start_proxy_server() -> Result<(), Box<dyn std::error::Error + Send
         Some(l) => l,
         None => {
             error!(
-                "❌ 代理服务器绑定端口失败: 端口 {}-{} 均被占用",
+                "The proxy server could not bind because ports {}-{} are all in use",
                 PROXY_PORT_START, PROXY_PORT_END
             );
-            return Err(format!("无法绑定端口 {}-{}", PROXY_PORT_START, PROXY_PORT_END).into());
+            return Err(format!(
+                "Failed to bind to a port in the range {}-{}",
+                PROXY_PORT_START, PROXY_PORT_END
+            )
+            .into());
         }
     };
 
@@ -491,13 +495,13 @@ pub async fn start_proxy_server() -> Result<(), Box<dyn std::error::Error + Send
     PROXY_READY.store(true, Ordering::Release);
     PROXY_READY_NOTIFY.notify_waiters();
     info!(
-        "🚀 Sunshine 代理服务器已启动: http://127.0.0.1:{}",
+        "Sunshine proxy server started: http://127.0.0.1:{}",
         bound_port
     );
-    info!("   开始监听请求...");
+    info!("Listening for requests...");
 
     let result = axum::serve(listener, app).await.map_err(|e| {
-        error!("❌ 代理服务器运行失败: {}", e);
+        error!("Proxy server failed: {}", e);
         e.into()
     });
     PROXY_READY.store(false, Ordering::Release);
@@ -528,7 +532,10 @@ fn should_fast_fail() -> bool {
 
     if elapsed >= FAST_FAIL_COOLDOWN_SECS {
         // 冷却时间已过，允许重试（重置状态为可用，让请求尝试连接）
-        debug!("⏰ 快速失败冷却时间已过 ({}秒)，允许重试", elapsed);
+        debug!(
+            "Fast-failure cooldown elapsed after {} seconds; retrying is allowed",
+            elapsed
+        );
         mark_available();
         false
     } else {
@@ -580,15 +587,15 @@ fn is_timeout_error(error: &str) -> bool {
 
 fn proxy_error_kind(error: &str) -> &'static str {
     if error.contains("Connection refused") || error.contains("connection refused") {
-        "连接被拒绝（后端未启动？）"
+        "Connection refused (is the backend running?)"
     } else if is_timeout_error(error) {
-        "连接超时"
+        "Connection timed out"
     } else if error.contains("certificate") || error.contains("ssl") || error.contains("tls") {
-        "TLS/证书错误"
+        "TLS or certificate error"
     } else if is_connection_error(error) {
-        "连接失败"
+        "Connection failed"
     } else {
-        "请求失败"
+        "Request failed"
     }
 }
 
@@ -730,9 +737,9 @@ fn ai_proxy_error_response(error_kind: &str, error: &str) -> Response {
         axum::http::StatusCode::BAD_GATEWAY
     };
     let message = if is_timeout {
-        "AI 请求超时，请稍后重试或减少日志上下文".to_string()
+        "The AI request timed out. Try again later or reduce the log context".to_string()
     } else {
-        format!("AI 请求代理失败：{}", error_kind)
+        format!("AI request proxy failed: {}", error_kind)
     };
 
     proxy_error_response(true, status, message, Some(error))
@@ -930,7 +937,7 @@ async fn proxy_handler(req: Request) -> Response {
 
     #[cfg(debug_assertions)]
     if path == "/" || path.ends_with(".html") || path.starts_with("/api/") {
-        debug!("📡 代理请求: {} {}", method, path);
+        debug!("Proxy request: {} {}", method, path);
     }
 
     // 快速失败检查：在冷却时间内直接返回错误，避免大量无效请求。
@@ -960,14 +967,18 @@ async fn proxy_handler(req: Request) -> Response {
             }
             let status = response.status();
             if status.is_client_error() || status.is_server_error() {
-                warn!("⚠️ 代理响应异常 [{}]: HTTP {}", path, status.as_u16());
+                warn!(
+                    "Unexpected proxy response [{}]: HTTP {}",
+                    path,
+                    status.as_u16()
+                );
             }
             response
         }
         Err(e) => {
             let error_str = e.to_string();
             let error_kind = proxy_error_kind(&error_str);
-            error!("❌ 代理错误 [{}] ({}): {}", path, error_kind, error_str);
+            error!("Proxy error [{}] ({}): {}", path, error_kind, error_str);
 
             if is_connection_error(&error_str) {
                 match refresh_sunshine_target_internal().await {
@@ -1014,7 +1025,7 @@ async fn proxy_handler(req: Request) -> Response {
                 proxy_error_response(
                     is_api,
                     axum::http::StatusCode::BAD_GATEWAY,
-                    format!("代理错误：{}", error_kind),
+                    format!("Proxy error: {}", error_kind),
                     Some(&error_str),
                 )
             }
@@ -1060,14 +1071,14 @@ async fn handle_steam_api(
             .into_response();
     };
 
-    debug!("🎮 Steam API 代理请求: {} -> {}", path, target_url);
+    debug!("Steam API proxy request: {} -> {}", path, target_url);
 
     // 发送请求并构建响应
     let client = get_http_client();
     match send_request(client, &target_url, method, headers, &body).await {
         Ok(response) => build_filtered_proxy_response(response).await,
         Err(e) => {
-            error!("❌ Steam API 请求失败: {}", e);
+            error!("Steam API request failed: {}", e);
             (
                 axum::http::StatusCode::BAD_GATEWAY,
                 [(
@@ -1091,7 +1102,7 @@ async fn build_filtered_proxy_response(response: reqwest::Response) -> Response 
     let body = match limited_response_body(response, MAX_PROXY_RESPONSE_BODY_BYTES) {
         Ok(body) => body,
         Err(error) => {
-            warn!("拒绝过大的代理响应: {}", error);
+            warn!("Rejected an oversized proxy response: {}", error);
             return proxy_limit_response(
                 axum::http::StatusCode::BAD_GATEWAY,
                 "Proxy response body exceeds 64 MiB",
@@ -1164,7 +1175,10 @@ async fn handle_external_proxy(
         .unwrap_or(false);
 
     if !is_allowed {
-        warn!("⚠️ 外部代理请求被拒绝（域名不在白名单）: {}", target_url);
+        warn!(
+            "Rejected an external proxy request because the domain is not allowed: {}",
+            target_url
+        );
         return (
             axum::http::StatusCode::FORBIDDEN,
             [(
@@ -1176,7 +1190,7 @@ async fn handle_external_proxy(
             .into_response();
     }
 
-    debug!("🌐 外部代理请求: {}", target_url);
+    debug!("External proxy request: {}", target_url);
 
     // 获取请求体
     let body = match read_proxy_request_body(req).await {
@@ -1189,7 +1203,7 @@ async fn handle_external_proxy(
     match send_request(client, &target_url, method, headers, &body).await {
         Ok(response) => build_filtered_proxy_response(response).await,
         Err(e) => {
-            error!("❌ 外部代理请求失败: {}", e);
+            error!("External proxy request failed: {}", e);
             (
                 axum::http::StatusCode::BAD_GATEWAY,
                 [(
@@ -1306,7 +1320,7 @@ async fn fetch_and_proxy(
         Ok(resp) => resp,
         Err(e) if url.starts_with("https://") && !is_connection_error(&e.to_string()) => {
             let http_url = url.replace("https://", "http://");
-            warn!("⚠️  HTTPS 连接失败，尝试 HTTP: {}", http_url);
+            warn!("HTTPS connection failed; trying HTTP: {}", http_url);
             send_request(client, &http_url, method, headers, body).await?
         }
         Err(e) => return Err(e.into()),
@@ -1383,7 +1397,7 @@ fn should_inject_script(url: &str, content_type: &str) -> bool {
 fn inject_if_needed(body: Vec<u8>) -> Vec<u8> {
     match String::from_utf8(body) {
         Ok(html)
-            if !html.contains("主题同步脚本已加载")
+            if !html.contains("id=\"tauri-scrollbar-theme\"")
                 && (html.contains("<html") || html.contains("<!DOCTYPE")) =>
         {
             inject_theme_script(html).into_bytes()
@@ -1411,9 +1425,9 @@ fn inject_theme_script(html: String) -> String {
     let mut result = String::with_capacity(html.len() + inject_size);
 
     result.push_str(&html[..pos]);
-    result.push_str("\n<!-- Tauri 样式优化 -->\n<style id=\"tauri-scrollbar-theme\">\n");
+    result.push_str("\n<!-- Tauri style adjustments -->\n<style id=\"tauri-scrollbar-theme\">\n");
     result.push_str(INJECT_STYLES);
-    result.push_str("\n</style>\n<!-- Tauri 功能脚本 -->\n<script>\n");
+    result.push_str("\n</style>\n<!-- Tauri integration script -->\n<script>\n");
     result.push_str(production_flag);
     result.push_str("\n");
     result.push_str(INJECT_SCRIPT);

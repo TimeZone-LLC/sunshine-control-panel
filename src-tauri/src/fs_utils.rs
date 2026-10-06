@@ -111,7 +111,7 @@ pub async fn get_icc_file_list() -> Result<Vec<String>, String> {
                 files.sort(); // 按字母顺序排序
                 Ok(files)
             }
-            Err(e) => Err(format!("读取目录失败: {}", e)),
+            Err(e) => Err(format!("Failed to read the directory: {}", e)),
         }
     }
 
@@ -137,7 +137,7 @@ pub async fn read_directory(path: String) -> Result<Vec<String>, String> {
             files.sort();
             Ok(files)
         }
-        Err(e) => Err(format!("读取目录失败: {}", e)),
+        Err(e) => Err(format!("Failed to read the directory: {}", e)),
     }
 }
 
@@ -152,19 +152,20 @@ pub async fn copy_image_to_assets(source_path: String) -> Result<String, String>
 
     // 验证源文件存在
     if !source.exists() {
-        return Err(format!("源文件不存在: {}", source_path));
+        return Err(format!("Source file does not exist: {}", source_path));
     }
 
     let assets_dir = sunshine::assets_dir();
 
     // 创建 assets 目录（如果不存在）
-    fs::create_dir_all(&assets_dir).map_err(|e| format!("创建目录失败: {}", e))?;
+    fs::create_dir_all(&assets_dir)
+        .map_err(|e| format!("Failed to create the directory: {}", e))?;
 
     // 获取文件名
     let file_name = source
         .file_name()
         .and_then(|n| n.to_str())
-        .ok_or_else(|| "无效的文件名".to_string())?;
+        .ok_or_else(|| "Invalid file name".to_string())?;
 
     // 生成唯一文件名（避免覆盖）
     let timestamp = std::time::SystemTime::now()
@@ -183,9 +184,9 @@ pub async fn copy_image_to_assets(source_path: String) -> Result<String, String>
     let dest_path = assets_dir.join(&unique_name);
 
     // 复制文件
-    fs::copy(source, &dest_path).map_err(|e| format!("复制文件失败: {}", e))?;
+    fs::copy(source, &dest_path).map_err(|e| format!("Failed to copy the file: {}", e))?;
 
-    info!("✅ 图片已复制到: {:?}", dest_path);
+    info!("Image copied to: {:?}", dest_path);
 
     // 返回相对于 Sunshine Web 根目录的 URL 路径
     let web_url = format!("/boxart/{}", unique_name);
@@ -200,13 +201,13 @@ pub async fn cleanup_unused_covers() -> Result<serde_json::Value, String> {
     use std::collections::HashSet;
     use std::fs;
 
-    info!("🧹 开始清理无用封面...");
+    info!("Cleaning unused cover images...");
 
     let covers_dir = sunshine::covers_dir();
     let apps_json_path = sunshine::config_dir().join("apps.json");
 
-    debug!("📂 使用 covers 目录: {:?}", covers_dir);
-    debug!("📄 使用 apps.json 路径: {:?}", apps_json_path);
+    debug!("Cover directory: {:?}", covers_dir);
+    debug!("apps.json path: {:?}", apps_json_path);
 
     // 读取 apps.json 获取所有正在使用的图片
     let used_images: HashSet<String> = if apps_json_path.exists() {
@@ -215,7 +216,7 @@ pub async fn cleanup_unused_covers() -> Result<serde_json::Value, String> {
                 // 检查文件内容是否为空或只包含空白字符
                 let trimmed_content = content.trim();
                 if trimmed_content.is_empty() {
-                    warn!("⚠️  apps.json 文件为空，跳过解析");
+                    warn!("apps.json is empty; skipping it");
                     HashSet::new()
                 } else {
                     // 尝试解析 JSON
@@ -249,11 +250,11 @@ pub async fn cleanup_unused_covers() -> Result<serde_json::Value, String> {
                                             {
                                                 images.insert(image_path.to_string());
                                                 debug!(
-                                                    "  📌 使用中: {} (完整路径: {})",
+                                                    "In use: {} (full path: {})",
                                                     filename, image_path
                                                 );
                                             } else {
-                                                debug!("  📌 使用中: {}", filename);
+                                                debug!("In use: {}", filename);
                                             }
                                         }
                                     }
@@ -262,23 +263,23 @@ pub async fn cleanup_unused_covers() -> Result<serde_json::Value, String> {
                             images
                         }
                         Err(e) => {
-                            warn!("⚠️  解析 apps.json 失败: {}，跳过解析", e);
+                            warn!("Failed to parse apps.json: {}; skipping it", e);
                             HashSet::new()
                         }
                     }
                 }
             }
             Err(e) => {
-                warn!("⚠️  读取 apps.json 失败: {}，跳过解析", e);
+                warn!("Failed to read apps.json: {}; skipping it", e);
                 HashSet::new()
             }
         }
     } else {
-        debug!("📄 apps.json 不存在，跳过解析");
+        debug!("apps.json does not exist; skipping it");
         HashSet::new()
     };
 
-    debug!("  正在使用的封面数: {}", used_images.len());
+    debug!("Cover images in use: {}", used_images.len());
 
     let mut deleted_count = 0;
     let mut freed_space: u64 = 0;
@@ -286,9 +287,9 @@ pub async fn cleanup_unused_covers() -> Result<serde_json::Value, String> {
 
     // === 1. 清理 covers 目录中未使用的封面 ===
     if covers_dir.exists() {
-        debug!("\n📂 扫描 covers 目录...");
-        let entries =
-            fs::read_dir(&covers_dir).map_err(|e| format!("读取 covers 目录失败: {}", e))?;
+        debug!("\nScanning the cover directory...");
+        let entries = fs::read_dir(&covers_dir)
+            .map_err(|e| format!("Failed to read the cover directory: {}", e))?;
 
         for entry in entries {
             if let Ok(entry) = entry {
@@ -315,18 +316,19 @@ pub async fn cleanup_unused_covers() -> Result<serde_json::Value, String> {
                             // 删除文件
                             match fs::remove_file(&path) {
                                 Ok(_) => {
-                                    debug!("  🗑️  [封面] {}", filename);
+                                    debug!("Removed cover: {}", filename);
                                     deleted_count += 1;
                                     freed_space += size;
                                 }
                                 Err(e) => {
-                                    let error_msg = format!("删除封面 {} 失败: {}", filename, e);
-                                    error!("  ❌ {}", error_msg);
+                                    let error_msg =
+                                        format!("Failed to remove cover {}: {}", filename, e);
+                                    error!("{}", error_msg);
                                     errors.push(error_msg);
                                 }
                             }
                         } else {
-                            debug!("  ✅ [保护] {} (正在使用中)", filename);
+                            debug!("Keeping cover {} because it is in use", filename);
                         }
                     }
                 }
@@ -336,7 +338,7 @@ pub async fn cleanup_unused_covers() -> Result<serde_json::Value, String> {
 
     // === 2. 清理 config 目录中的 temp_ 临时文件 ===
     let config_dir = sunshine::config_dir();
-    debug!("\n📂 扫描 config 目录中的临时文件...");
+    debug!("\nScanning temporary files in the configuration directory...");
     if config_dir.exists() {
         match fs::read_dir(&config_dir) {
             Ok(entries) => {
@@ -352,14 +354,16 @@ pub async fn cleanup_unused_covers() -> Result<serde_json::Value, String> {
 
                                     match fs::remove_file(&path) {
                                         Ok(_) => {
-                                            debug!("  🗑️  [临时] {}", filename);
+                                            debug!("Removed temporary file: {}", filename);
                                             deleted_count += 1;
                                             freed_space += size;
                                         }
                                         Err(e) => {
-                                            let error_msg =
-                                                format!("删除临时文件 {} 失败: {}", filename, e);
-                                            error!("  ❌ {}", error_msg);
+                                            let error_msg = format!(
+                                                "Failed to remove temporary file {}: {}",
+                                                filename, e
+                                            );
+                                            error!("{}", error_msg);
                                             errors.push(error_msg);
                                         }
                                     }
@@ -370,8 +374,8 @@ pub async fn cleanup_unused_covers() -> Result<serde_json::Value, String> {
                 }
             }
             Err(e) => {
-                let error_msg = format!("读取 config 目录失败: {}", e);
-                warn!("  ⚠️  {}", error_msg);
+                let error_msg = format!("Failed to read the configuration directory: {}", e);
+                warn!("{}", error_msg);
                 // 不返回错误，继续执行
             }
         }
@@ -379,15 +383,15 @@ pub async fn cleanup_unused_covers() -> Result<serde_json::Value, String> {
 
     let message = if deleted_count > 0 {
         format!(
-            "成功删除 {} 个无用文件，释放 {:.2} KB",
+            "Removed {} unused files and freed {:.2} KB",
             deleted_count,
             freed_space as f64 / 1024.0
         )
     } else {
-        "没有发现需要清理的文件".to_string()
+        "No files need cleanup".to_string()
     };
 
-    info!("\n✅ 清理完成: {}", message);
+    info!("\nCleanup complete: {}", message);
 
     Ok(json!({
         "success": true,
@@ -408,7 +412,7 @@ pub async fn resolve_lnk_target(lnk_path: String) -> Result<LnkInfo, String> {
 
     #[cfg(not(target_os = "windows"))]
     {
-        Err("快捷方式解析仅支持 Windows 系统".to_string())
+        Err("Shortcut parsing is available only on Windows".to_string())
     }
 }
 
@@ -422,7 +426,7 @@ fn resolve_lnk_windows(lnk_path: &str) -> Result<LnkInfo, String> {
     use windows::Win32::UI::Shell::{IShellLinkW, ShellLink};
     use windows::core::Interface;
 
-    info!("🔗 解析快捷方式: {}", lnk_path);
+    info!("Parsing shortcut: {}", lnk_path);
 
     // 初始化 COM
     unsafe {
@@ -433,13 +437,13 @@ fn resolve_lnk_windows(lnk_path: &str) -> Result<LnkInfo, String> {
         // 创建 ShellLink 对象
         let shell_link: IShellLinkW = unsafe {
             CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER)
-                .map_err(|e| format!("创建 ShellLink 失败: {:?}", e))?
+                .map_err(|e| format!("Failed to create ShellLink: {:?}", e))?
         };
 
         // 获取 IPersistFile 接口
         let persist_file: IPersistFile = shell_link
             .cast()
-            .map_err(|e| format!("获取 IPersistFile 失败: {:?}", e))?;
+            .map_err(|e| format!("Failed to get IPersistFile: {:?}", e))?;
 
         // 加载 .lnk 文件
         let wide_path: Vec<u16> = OsStr::new(lnk_path)
@@ -450,7 +454,7 @@ fn resolve_lnk_windows(lnk_path: &str) -> Result<LnkInfo, String> {
         unsafe {
             persist_file
                 .Load(windows::core::PCWSTR(wide_path.as_ptr()), STGM_READ)
-                .map_err(|e| format!("加载 .lnk 文件失败: {:?}", e))?;
+                .map_err(|e| format!("Failed to load the .lnk file: {:?}", e))?;
         }
 
         // 获取目标路径
@@ -465,7 +469,7 @@ fn resolve_lnk_windows(lnk_path: &str) -> Result<LnkInfo, String> {
                     &mut find_data,
                     windows::Win32::UI::Shell::SLGP_RAWPATH.0 as u32,
                 )
-                .map_err(|e| format!("获取目标路径失败: {:?}", e))?;
+                .map_err(|e| format!("Failed to get the target path: {:?}", e))?;
         }
 
         let target_path = String::from_utf16_lossy(
@@ -509,11 +513,11 @@ fn resolve_lnk_windows(lnk_path: &str) -> Result<LnkInfo, String> {
             .unwrap_or("Unknown")
             .to_string();
 
-        debug!("✅ 快捷方式解析成功:");
-        debug!("   名称: {}", name);
-        debug!("   目标: {}", target_path);
-        debug!("   工作目录: {}", working_dir);
-        debug!("   参数: {}", arguments);
+        debug!("Shortcut parsed successfully:");
+        debug!("Name: {}", name);
+        debug!("Target: {}", target_path);
+        debug!("Working directory: {}", working_dir);
+        debug!("Arguments: {}", arguments);
 
         Ok(LnkInfo {
             name,
@@ -537,15 +541,15 @@ fn resolve_lnk_windows(lnk_path: &str) -> Result<LnkInfo, String> {
 pub async fn scan_directory_for_apps(directory: String) -> Result<Vec<ScannedApp>, String> {
     use std::path::Path;
 
-    info!("📂 开始扫描目录: {}", directory);
+    info!("Scanning directory: {}", directory);
 
     let dir_path = Path::new(&directory);
     if !dir_path.exists() {
-        return Err(format!("目录不存在: {}", directory));
+        return Err(format!("Directory does not exist: {}", directory));
     }
 
     if !dir_path.is_dir() {
-        return Err(format!("路径不是目录: {}", directory));
+        return Err(format!("Path is not a directory: {}", directory));
     }
 
     let mut apps: Vec<ScannedApp> = Vec::new();
@@ -556,7 +560,7 @@ pub async fn scan_directory_for_apps(directory: String) -> Result<Vec<ScannedApp
     // 递归扫描目录
     scan_directory_recursive(dir_path, &supported_extensions, &mut apps)?;
 
-    info!("✅ 扫描完成，找到 {} 个应用", apps.len());
+    info!("Scan complete; found {} applications", apps.len());
     Ok(apps)
 }
 
@@ -753,7 +757,8 @@ fn scan_directory_recursive(
     use std::fs;
 
     // 读取目录内容
-    let entries = fs::read_dir(dir_path).map_err(|e| format!("读取目录失败: {}", e))?;
+    let entries =
+        fs::read_dir(dir_path).map_err(|e| format!("Failed to read the directory: {}", e))?;
 
     for entry in entries {
         let entry = match entry {
@@ -801,7 +806,7 @@ fn scan_directory_recursive(
         }
 
         let file_path = path.to_string_lossy().to_string();
-        debug!("📄 找到文件: {}", file_path);
+        debug!("Found file: {}", file_path);
 
         // 根据文件类型处理
         let scanned_app = match ext.as_str() {
@@ -938,7 +943,7 @@ pub async fn scan_game_libraries() -> Result<GameLibraryScanResult, String> {
     use std::time::Instant;
 
     let start = Instant::now();
-    info!("🎮 开始扫描游戏平台库...");
+    info!("Scanning game-platform libraries...");
 
     let steam = scan_steam_library();
     let epic = scan_epic_library();
@@ -948,7 +953,7 @@ pub async fn scan_game_libraries() -> Result<GameLibraryScanResult, String> {
     let elapsed = start.elapsed().as_millis() as u64;
 
     info!(
-        "✅ 游戏库扫描完成: Steam={}, Epic={}, GOG={}, 总计={}, 耗时={}ms",
+        "Game-library scan complete: Steam={}, Epic={}, GOG={}, total={}, elapsed={} ms",
         steam.len(),
         epic.len(),
         gog.len(),
@@ -976,16 +981,16 @@ fn scan_steam_library() -> Vec<PlatformGame> {
     let steam_path = match steam_path {
         Some(p) => p,
         None => {
-            info!("Steam 未安装或未找到");
+            info!("Steam is not installed or could not be found");
             return games;
         }
     };
 
-    info!("📂 Steam 路径: {}", steam_path.display());
+    info!("Steam path: {}", steam_path.display());
 
     // 读取 libraryfolders.vdf 获取所有库路径
     let library_folders = get_steam_library_folders(&steam_path);
-    info!("📚 找到 {} 个 Steam 库路径", library_folders.len());
+    info!("Found {} Steam library paths", library_folders.len());
 
     for lib_path in &library_folders {
         let steamapps = lib_path.join("steamapps");
@@ -1079,7 +1084,7 @@ fn parse_library_folders_vdf(path: &PathBuf, folders: &mut Vec<PathBuf>) {
     let content = match std::fs::read_to_string(path) {
         Ok(c) => c,
         Err(e) => {
-            warn!("读取 VDF 失败: {}: {}", path.display(), e);
+            warn!("Failed to read VDF {}: {}", path.display(), e);
             return;
         }
     };
@@ -1283,11 +1288,14 @@ fn scan_epic_library() -> Vec<PlatformGame> {
             });
 
         if !manifests_dir.exists() {
-            info!("Epic Games 清单目录不存在: {}", manifests_dir.display());
+            info!(
+                "Epic Games manifest directory does not exist: {}",
+                manifests_dir.display()
+            );
             return games;
         }
 
-        info!("📂 Epic Games 清单目录: {}", manifests_dir.display());
+        info!("Epic Games manifest directory: {}", manifests_dir.display());
 
         if let Ok(entries) = std::fs::read_dir(&manifests_dir) {
             for entry in entries.flatten() {
@@ -1303,7 +1311,7 @@ fn scan_epic_library() -> Vec<PlatformGame> {
 
     #[cfg(not(target_os = "windows"))]
     {
-        info!("Epic Games 扫描仅支持 Windows");
+        info!("Epic Games scanning is available only on Windows");
     }
 
     games
@@ -1357,7 +1365,7 @@ fn scan_gog_library() -> Vec<PlatformGame> {
 
     #[cfg(not(target_os = "windows"))]
     {
-        info!("GOG 扫描仅支持 Windows");
+        info!("GOG scanning is available only on Windows");
         return Vec::new();
     }
 }
@@ -1375,7 +1383,7 @@ fn scan_gog_from_registry() -> Vec<PlatformGame> {
     {
         Ok(key) => key,
         Err(_) => {
-            info!("GOG 注册表键不存在");
+            info!("GOG registry key does not exist");
             return games;
         }
     };
@@ -1449,7 +1457,7 @@ struct SteamSearchItem {
 #[tauri::command]
 pub async fn search_steam_covers(query: String) -> Result<Vec<SteamCoverCandidate>, String> {
     if query.is_empty() {
-        return Err("搜索关键词不能为空".to_string());
+        return Err("Search query cannot be empty".to_string());
     }
 
     let client = crate::commands::cdn_client();
@@ -1458,25 +1466,25 @@ pub async fn search_steam_covers(query: String) -> Result<Vec<SteamCoverCandidat
         "https://store.steampowered.com/api/storesearch/?term={}&l=english&cc=US",
         url_percent_encode(&query)
     );
-    info!("🔍 搜索 Steam Store: {}", search_url);
+    info!("Searching the Steam Store: {}", search_url);
 
     let resp = client
         .get(&search_url)
         .send()
         .await
-        .map_err(|e| format!("Steam 搜索失败: {}", e))?;
+        .map_err(|e| format!("Steam search failed: {}", e))?;
 
     if !resp.status().is_success() {
-        return Err(format!("Steam 搜索失败, HTTP {}", resp.status()));
+        return Err(format!("Steam search failed: HTTP {}", resp.status()));
     }
 
     let data: SteamSearchResponse = resp
         .json()
         .await
-        .map_err(|e| format!("解析搜索结果失败: {}", e))?;
+        .map_err(|e| format!("Failed to parse search results: {}", e))?;
 
     if data.items.is_empty() {
-        return Err(format!("在 Steam 上未找到 \"{}\"", query));
+        return Err(format!("\"{}\" was not found on Steam", query));
     }
 
     let candidates: Vec<SteamCoverCandidate> = data
@@ -1494,7 +1502,7 @@ pub async fn search_steam_covers(query: String) -> Result<Vec<SteamCoverCandidat
         })
         .collect();
 
-    info!("✅ 找到 {} 个候选封面", candidates.len());
+    info!("Found {} cover candidates", candidates.len());
     Ok(candidates)
 }
 
@@ -1537,7 +1545,10 @@ pub async fn upload_steam_cover(
 
     // 安全检查：仅允许 Steam CDN
     if !header_url.starts_with("https://cdn.akamai.steamstatic.com/") {
-        return Err(format!("不允许从此域名下载: {}", header_url));
+        return Err(format!(
+            "Downloads are not allowed from this domain: {}",
+            header_url
+        ));
     }
 
     let client = crate::commands::cdn_client();
@@ -1547,19 +1558,19 @@ pub async fn upload_steam_cover(
         .get(&header_url)
         .send()
         .await
-        .map_err(|e| format!("下载封面失败: {}", e))?;
+        .map_err(|e| format!("Failed to download the cover: {}", e))?;
 
     if !resp.status().is_success() {
-        return Err(format!("下载失败, HTTP {}", resp.status()));
+        return Err(format!("Download failed: HTTP {}", resp.status()));
     }
 
     let bytes = resp
         .bytes()
         .await
-        .map_err(|e| format!("读取封面失败: {}", e))?;
+        .map_err(|e| format!("Failed to read the cover: {}", e))?;
 
     if bytes.is_empty() {
-        return Err("下载的封面为空".to_string());
+        return Err("Downloaded cover is empty".to_string());
     }
 
     // 2. 转 base64
@@ -1577,12 +1588,12 @@ pub async fn upload_steam_cover(
         .json(&payload)
         .send()
         .await
-        .map_err(|e| format!("上传封面失败: {}", e))?;
+        .map_err(|e| format!("Failed to upload the cover: {}", e))?;
 
     if !upload_resp.status().is_success() {
-        return Err(format!("上传失败, HTTP {}", upload_resp.status()));
+        return Err(format!("Upload failed: HTTP {}", upload_resp.status()));
     }
 
-    info!("✅ 封面已上传: {} ({} bytes)", app_name, bytes.len());
+    info!("Cover uploaded: {} ({} bytes)", app_name, bytes.len());
     Ok(app_name)
 }

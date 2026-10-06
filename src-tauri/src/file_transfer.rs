@@ -63,15 +63,17 @@ pub async fn send_file_to_client(path: String) -> Result<String, String> {
 }
 
 async fn send_paths_to_client(paths: Vec<String>) -> Result<String, String> {
-    let first = paths.first().ok_or_else(|| "没有选择文件".to_string())?;
+    let first = paths
+        .first()
+        .ok_or_else(|| "No file was selected".to_string())?;
 
     if paths.len() > 1 {
-        return Err("当前版本仅支持一次发送一个文件".to_string());
+        return Err("Only one file can be sent at a time".to_string());
     }
 
     let active_sessions = get_active_sessions()
         .await
-        .map_err(|e| format!("无法查询客户端连接状态: {e}"))?;
+        .map_err(|e| format!("Failed to query client connection status: {e}"))?;
 
     let running_sessions = active_sessions
         .iter()
@@ -79,7 +81,7 @@ async fn send_paths_to_client(paths: Vec<String>) -> Result<String, String> {
         .count();
 
     if running_sessions == 0 {
-        return Err("没有正在串流的客户端连接".to_string());
+        return Err("No client is currently streaming".to_string());
     }
 
     let path = canonicalize_file(first)?;
@@ -87,20 +89,24 @@ async fn send_paths_to_client(paths: Vec<String>) -> Result<String, String> {
     let payload = build_client_offer_payload(&offer)?;
     clipboard::post_file_offer_payload(payload)
         .await
-        .map_err(|e| format!("发送文件 offer 失败: {e}"))?;
+        .map_err(|e| format!("Failed to send the file offer: {e}"))?;
 
     Ok(format!(
-        "已发送文件 offer: {} ({} bytes, {} 个客户端)",
+        "Sent file offer: {} ({} bytes, {} clients)",
         offer.name, offer.size, running_sessions
     ))
 }
 
 fn canonicalize_file(path: &str) -> Result<PathBuf, String> {
     let raw = PathBuf::from(path);
-    let canonical = std::fs::canonicalize(&raw)
-        .map_err(|e| format!("文件不存在或无法访问: {} ({e})", raw.display()))?;
+    let canonical = std::fs::canonicalize(&raw).map_err(|e| {
+        format!(
+            "The file does not exist or cannot be accessed: {} ({e})",
+            raw.display()
+        )
+    })?;
     if !canonical.is_file() {
-        return Err("当前版本仅支持发送单个文件".to_string());
+        return Err("Only a single file can be sent".to_string());
     }
     Ok(canonical)
 }
@@ -124,13 +130,15 @@ async fn register_offer(path: &PathBuf) -> Result<FileOffer, String> {
     let status = resp.status();
     let text = resp.text().await.map_err(|e| e.to_string())?;
     if !status.is_success() {
-        return Err(format!("注册文件 offer 失败: HTTP {status} {text}"));
+        return Err(format!(
+            "Failed to register the file offer: HTTP {status} {text}"
+        ));
     }
 
     serde_json::from_str::<FileOffer>(&text)
-        .map_err(|e| format!("解析文件 offer 响应失败: {e}; body={text}"))
+        .map_err(|e| format!("Failed to parse the file-offer response: {e}; body={text}"))
 }
 
 fn build_client_offer_payload(offer: &FileOffer) -> Result<Vec<u8>, String> {
-    serde_json::to_vec(offer).map_err(|e| format!("编码文件 offer 失败: {e}"))
+    serde_json::to_vec(offer).map_err(|e| format!("Failed to encode the file offer: {e}"))
 }

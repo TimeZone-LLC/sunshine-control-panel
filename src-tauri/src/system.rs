@@ -97,7 +97,7 @@ pub async fn get_gpus() -> Result<Vec<String>, String> {
 
     #[cfg(not(target_os = "windows"))]
     {
-        Ok(vec!["未知 GPU".to_string()])
+        Ok(vec!["Unknown GPU".to_string()])
     }
 }
 
@@ -150,7 +150,7 @@ pub async fn get_system_info() -> Result<SystemInfo, String> {
         let (os_version, memory_total, cpu_model) = match get_windows_system_info().await {
             Ok((os_ver, mem, cpu)) => (os_ver, Some(mem), Some(cpu)),
             Err(e) => {
-                error!("获取 Windows 系统信息失败: {}", e);
+                error!("Failed to get Windows system information: {}", e);
                 (format!("Windows {}", env::consts::OS), None, None)
             }
         };
@@ -209,7 +209,9 @@ async fn get_windows_system_info() -> Result<(String, u64, String), String> {
         .raw_query("SELECT Caption, TotalVisibleMemorySize FROM Win32_OperatingSystem")
         .map_err(|e| e.to_string())?;
 
-    let os_info = os_results.first().ok_or("无法获取操作系统信息")?;
+    let os_info = os_results
+        .first()
+        .ok_or("Failed to get operating-system information")?;
 
     let os_version = os_info.caption.clone();
     let memory_bytes = os_info
@@ -253,19 +255,19 @@ pub async fn get_current_dpi() -> Result<u32, String> {
                     // 转换为百分比（96 DPI = 100%）
                     let percentage = (dpi_x as f32 / 96.0 * 100.0).round() as u32;
                     debug!(
-                        "🖥️ 主显示器实时 DPI: {} x {} -> {}%",
+                        "Primary display DPI: {} x {} -> {}%",
                         dpi_x, dpi_y, percentage
                     );
                     Ok(percentage)
                 }
                 Err(e) => {
-                    error!("❌ 获取显示器 DPI 失败: {:?}", e);
+                    error!("Failed to get display DPI: {:?}", e);
 
                     // 回退方案：使用系统 DPI
                     use windows::Win32::UI::HiDpi::GetDpiForSystem;
                     let dpi = GetDpiForSystem();
                     let percentage = (dpi as f32 / 96.0 * 100.0).round() as u32;
-                    debug!("🖥️ 回退：使用系统 DPI: {} ({}%)", dpi, percentage);
+                    debug!("Falling back to system DPI: {} ({}%)", dpi, percentage);
                     Ok(percentage)
                 }
             }
@@ -280,7 +282,7 @@ pub async fn get_current_dpi() -> Result<u32, String> {
 
 #[tauri::command]
 pub async fn set_desktop_dpi(dpi: u32) -> Result<(), String> {
-    info!("🖥️ 设置桌面 DPI: {}%", dpi);
+    info!("Setting desktop DPI to {}%", dpi);
 
     #[cfg(target_os = "windows")]
     {
@@ -292,7 +294,7 @@ pub async fn set_desktop_dpi(dpi: u32) -> Result<(), String> {
         // 从 Sunshine 安装目录获取路径
         let setdpi_path = sunshine::install_dir().join("tools").join("SetDpi.exe");
 
-        debug!("🔍 SetDpi.exe 路径: {:?}", setdpi_path);
+        debug!("SetDpi.exe path: {:?}", setdpi_path);
 
         if setdpi_path.exists() {
             match std::process::Command::new(setdpi_path)
@@ -301,22 +303,22 @@ pub async fn set_desktop_dpi(dpi: u32) -> Result<(), String> {
                 .spawn()
             {
                 Ok(_) => {
-                    info!("✅ DPI 已设置为 {}%", dpi);
+                    info!("DPI set to {}%", dpi);
                     Ok(())
                 }
                 Err(e) => {
-                    error!("❌ 执行 SetDpi.exe 失败: {}", e);
-                    Err(format!("执行失败: {}", e))
+                    error!("Failed to run SetDpi.exe: {}", e);
+                    Err(format!("Execution failed: {}", e))
                 }
             }
         } else {
-            Err(format!("找不到 SetDpi.exe: {:?}", setdpi_path))
+            Err(format!("SetDpi.exe was not found: {:?}", setdpi_path))
         }
     }
 
     #[cfg(not(target_os = "windows"))]
     {
-        Err("DPI 调整功能仅在 Windows 上可用".to_string())
+        Err("DPI adjustment is available only on Windows".to_string())
     }
 }
 
@@ -348,7 +350,7 @@ fn get_process_memory_info_impl() -> Result<MemoryMonitorSnapshot, String> {
             Err(e) => {
                 // WinAPI 失败（权限不足等），尝试 WMI 获取基础内存信息
                 warn!(
-                    "WinAPI 获取进程 {} (PID {}) 内存失败: {}，回退 WMI",
+                    "WinAPI failed to get memory for process {} (PID {}): {}; falling back to WMI",
                     name, pid, e
                 );
                 if let Ok(ws) = get_process_memory_via_wmi(*pid) {
@@ -410,7 +412,11 @@ fn find_sunshine_pids() -> Result<Vec<(u32, String)>, String> {
         .map(|p| (p.process_id, p.name))
         .collect();
 
-    debug!("找到 {} 个 Sunshine 相关进程: {:?}", pids.len(), pids);
+    debug!(
+        "Found {} Sunshine-related processes: {:?}",
+        pids.len(),
+        pids
+    );
     Ok(pids)
 }
 
@@ -436,7 +442,7 @@ fn get_process_memory_via_wmi(pid: u32) -> Result<u64, String> {
     results
         .first()
         .and_then(|p| p.working_set_size)
-        .ok_or_else(|| "WMI 未返回工作集数据".to_string())
+        .ok_or_else(|| "WMI returned no working-set data".to_string())
 }
 
 /// 通过 Windows API 获取单个进程的精确内存信息
@@ -454,7 +460,7 @@ fn get_single_process_memory(pid: u32) -> Result<(u64, u64, u64, u64), String> {
 
     unsafe {
         let handle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, pid)
-            .map_err(|e| format!("OpenProcess 失败: {}", e))?;
+            .map_err(|e| format!("OpenProcess failed: {}", e))?;
 
         let mut counters: PROCESS_MEMORY_COUNTERS_EX = mem::zeroed();
         counters.cb = mem::size_of::<PROCESS_MEMORY_COUNTERS_EX>() as u32;
@@ -475,7 +481,7 @@ fn get_single_process_memory(pid: u32) -> Result<(u64, u64, u64, u64), String> {
                 counters.PagefileUsage as u64,
             ))
         } else {
-            Err("K32GetProcessMemoryInfo 失败".to_string())
+            Err("K32GetProcessMemoryInfo failed".to_string())
         }
     }
 }
@@ -504,7 +510,7 @@ fn get_system_memory_status() -> Result<(u64, u64), String> {
             info.free_physical_memory.unwrap_or(0) * 1024,
         ))
     } else {
-        Err("无法获取系统内存信息".to_string())
+        Err("Failed to get system memory information".to_string())
     }
 }
 
@@ -553,7 +559,7 @@ fn get_sunshine_start_time_impl() -> Result<ProcessStartInfo, String> {
         )
         .map_err(|e| format!("WMI query failed: {}", e))?;
 
-    debug!("WMI 进程查询结果: {:?}", results);
+    debug!("WMI process-query result: {:?}", results);
 
     // 过滤掉 GUI 自身进程，取第一个 Sunshine 主进程
     let proc = results.iter().find(|p| {
@@ -585,7 +591,7 @@ fn get_sunshine_start_time_impl() -> Result<ProcessStartInfo, String> {
         };
 
         info!(
-            "Sunshine 进程 {} (PID {}) 启动时间: {} ms",
+            "Sunshine process {} (PID {}) start time: {} ms",
             proc.name, proc.process_id, start_ms
         );
 
@@ -595,7 +601,7 @@ fn get_sunshine_start_time_impl() -> Result<ProcessStartInfo, String> {
             pid: proc.process_id,
         })
     } else {
-        debug!("未找到 Sunshine 进程");
+        debug!("No Sunshine process was found");
         Ok(ProcessStartInfo {
             start_time_ms: 0,
             process_name: String::new(),

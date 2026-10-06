@@ -145,13 +145,13 @@ pub fn read_hwinfo_shared_memory() -> Result<HwInfoData, String> {
 
     unsafe {
         let handle = OpenFileMappingA(FILE_MAP_READ.0, false, s!("Global\\HWiNFO_SENS_SM2"))
-            .map_err(|e| format!("无法打开 HWiNFO 共享内存: {}。请确保 HWiNFO 正在运行且已启用 Shared Memory Support", e))?;
+            .map_err(|e| format!("Failed to open HWiNFO shared memory: {}. Make sure HWiNFO is running with Shared Memory Support enabled", e))?;
 
         let view = MapViewOfFile(handle, FILE_MAP_READ, 0, 0, 0);
         let ptr = view.Value as *const u8;
         if ptr.is_null() {
             let _ = CloseHandle(handle);
-            return Err("无法映射 HWiNFO 共享内存".to_string());
+            return Err("Failed to map HWiNFO shared memory".to_string());
         }
 
         // 读取头结构
@@ -159,7 +159,10 @@ pub fn read_hwinfo_shared_memory() -> Result<HwInfoData, String> {
         if signature != 0x53695748 {
             let _ = UnmapViewOfFile(view);
             let _ = CloseHandle(handle);
-            return Err(format!("HWiNFO 共享内存签名无效: 0x{:08X}", signature));
+            return Err(format!(
+                "Invalid HWiNFO shared-memory signature: 0x{:08X}",
+                signature
+            ));
         }
 
         let version = read_u32(ptr.add(4));
@@ -235,7 +238,7 @@ pub fn read_hwinfo_shared_memory() -> Result<HwInfoData, String> {
 
 #[cfg(not(target_os = "windows"))]
 pub fn read_hwinfo_shared_memory() -> Result<HwInfoData, String> {
-    Err("HWiNFO 仅支持 Windows".to_string())
+    Err("HWiNFO is available only on Windows".to_string())
 }
 
 // ─── Tauri 命令 ───

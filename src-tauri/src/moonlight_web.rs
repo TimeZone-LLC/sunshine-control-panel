@@ -231,18 +231,18 @@ pub async fn moonlight_web_get_status() -> Result<MoonlightWebStatus, String> {
 pub async fn moonlight_web_start() -> Result<String, String> {
     let binary_path = get_server_binary_path();
     if !binary_path.exists() {
-        return Err("moonlight-web 未安装，请先下载安装".to_string());
+        return Err("moonlight-web is not installed. Install it first".to_string());
     }
 
     // 检查是否已在运行
     if is_process_running() {
-        return Ok("moonlight-web 已在运行".to_string());
+        return Ok("moonlight-web is already running".to_string());
     }
 
     // 确保配置存在
     ensure_config_exists().await?;
 
-    info!("🌐 启动 moonlight-web 服务: {:?}", binary_path);
+    info!("Starting the moonlight-web service: {:?}", binary_path);
 
     let install_dir = get_install_dir();
 
@@ -253,7 +253,7 @@ pub async fn moonlight_web_start() -> Result<String, String> {
             .current_dir(&install_dir)
             .creation_flags(0x08000000) // CREATE_NO_WINDOW
             .spawn()
-            .map_err(|e| format!("启动 moonlight-web 失败: {}", e))?
+            .map_err(|e| format!("Failed to start moonlight-web: {}", e))?
     };
 
     #[cfg(not(target_os = "windows"))]
@@ -261,14 +261,14 @@ pub async fn moonlight_web_start() -> Result<String, String> {
         std::process::Command::new(&binary_path)
             .current_dir(&install_dir)
             .spawn()
-            .map_err(|e| format!("启动 moonlight-web 失败: {}", e))?
+            .map_err(|e| format!("Failed to start moonlight-web: {}", e))?
     };
 
     let pid = child.id();
     *CHILD_PROCESS.lock().unwrap() = Some(child);
 
-    info!("✅ moonlight-web 已启动, PID: {}", pid);
-    Ok(format!("moonlight-web 已启动 (PID: {})", pid))
+    info!("moonlight-web started, PID: {}", pid);
+    Ok(format!("moonlight-web started (PID: {})", pid))
 }
 
 /// 停止 moonlight-web 服务
@@ -278,12 +278,15 @@ pub async fn moonlight_web_stop() -> Result<String, String> {
     {
         let mut guard = CHILD_PROCESS.lock().unwrap();
         if let Some(ref mut child) = *guard {
-            info!("🛑 停止 moonlight-web 子进程 (PID: {})", child.id());
+            info!(
+                "Stopping the moonlight-web child process (PID: {})",
+                child.id()
+            );
             let _ = child.kill();
             let _ = child.wait();
             *guard = None;
-            info!("✅ moonlight-web 子进程已停止");
-            return Ok("moonlight-web 已停止".to_string());
+            info!("moonlight-web child process stopped");
+            return Ok("moonlight-web stopped".to_string());
         }
     }
 
@@ -295,21 +298,21 @@ pub async fn moonlight_web_stop() -> Result<String, String> {
             .args(["/IM", PROCESS_CHECK_NAME, "/F"])
             .creation_flags(0x08000000)
             .output()
-            .map_err(|e| format!("执行 taskkill 失败: {}", e))?;
+            .map_err(|e| format!("Failed to run taskkill: {}", e))?;
 
         if output.status.success() {
-            info!("✅ moonlight-web 进程已终止");
-            Ok("moonlight-web 已停止".to_string())
+            info!("moonlight-web process terminated");
+            Ok("moonlight-web stopped".to_string())
         } else {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            warn!("⚠️ taskkill 输出: {}", stderr);
-            Ok("moonlight-web 可能已经停止".to_string())
+            warn!("taskkill output: {}", stderr);
+            Ok("moonlight-web may already be stopped".to_string())
         }
     }
 
     #[cfg(not(target_os = "windows"))]
     {
-        Err("非 Windows 平台暂不支持".to_string())
+        Err("This operation is currently available only on Windows".to_string())
     }
 }
 
@@ -318,7 +321,7 @@ pub async fn moonlight_web_stop() -> Result<String, String> {
 pub async fn moonlight_web_get_config() -> Result<MoonlightWebConfig, String> {
     let config_path = get_config_path();
     if !config_path.exists() {
-        debug!("配置文件不存在，返回默认配置");
+        debug!("The configuration file does not exist; returning defaults");
         return Ok(MoonlightWebConfig {
             web_server: WebServerConfig::default(),
             webrtc: None,
@@ -327,10 +330,10 @@ pub async fn moonlight_web_get_config() -> Result<MoonlightWebConfig, String> {
         });
     }
 
-    let content =
-        std::fs::read_to_string(&config_path).map_err(|e| format!("读取配置失败: {}", e))?;
+    let content = std::fs::read_to_string(&config_path)
+        .map_err(|e| format!("Failed to read the configuration: {}", e))?;
 
-    serde_json::from_str(&content).map_err(|e| format!("解析配置失败: {}", e))
+    serde_json::from_str(&content).map_err(|e| format!("Failed to parse the configuration: {}", e))
 }
 
 /// 保存 moonlight-web 配置
@@ -345,7 +348,8 @@ pub async fn moonlight_web_save_config(mut config: MoonlightWebConfig) -> Result
 
     // 确保目录存在
     if let Some(parent) = config_path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| format!("创建配置目录失败: {}", e))?;
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create the configuration directory: {}", e))?;
     }
 
     // 更新本地端口缓存
@@ -353,13 +357,14 @@ pub async fn moonlight_web_save_config(mut config: MoonlightWebConfig) -> Result
         *BIND_PORT.lock().unwrap() = port;
     }
 
-    let json =
-        serde_json::to_string_pretty(&config).map_err(|e| format!("序列化配置失败: {}", e))?;
+    let json = serde_json::to_string_pretty(&config)
+        .map_err(|e| format!("Failed to serialize the configuration: {}", e))?;
 
-    std::fs::write(&config_path, json).map_err(|e| format!("写入配置失败: {}", e))?;
+    std::fs::write(&config_path, json)
+        .map_err(|e| format!("Failed to write the configuration: {}", e))?;
 
-    info!("✅ moonlight-web 配置已保存: {:?}", config_path);
-    Ok("配置已保存".to_string())
+    info!("moonlight-web configuration saved: {:?}", config_path);
+    Ok("Configuration saved".to_string())
 }
 
 /// 检查可用更新
@@ -369,26 +374,29 @@ pub async fn moonlight_web_check_release() -> Result<MoonlightWebRelease, String
         .timeout(std::time::Duration::from_secs(10))
         .user_agent("sunshine-control-panel")
         .build()
-        .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))?;
+        .map_err(|e| format!("Failed to create the HTTP client: {}", e))?;
 
     let url = format!("{}/latest", GITHUB_API_RELEASES);
-    debug!("📦 检查 moonlight-web 最新版本: {}", url);
+    debug!("Checking the latest moonlight-web release: {}", url);
 
     let response = client
         .get(&url)
         .header("Accept", "application/vnd.github.v3+json")
         .send()
         .await
-        .map_err(|e| format!("请求 GitHub API 失败: {}", e))?;
+        .map_err(|e| format!("GitHub API request failed: {}", e))?;
 
     if !response.status().is_success() {
-        return Err(format!("GitHub API 返回错误: {}", response.status()));
+        return Err(format!(
+            "GitHub API returned an error: {}",
+            response.status()
+        ));
     }
 
     let release: GitHubRelease = response
         .json()
         .await
-        .map_err(|e| format!("解析 Release 数据失败: {}", e))?;
+        .map_err(|e| format!("Failed to parse release data: {}", e))?;
 
     // 查找 Windows x86_64 的资源
     let asset = release.assets.iter().find(|a| {
@@ -417,23 +425,23 @@ pub async fn moonlight_web_download(
     use futures_util::StreamExt;
     use tauri::Emitter;
 
-    info!("📥 开始下载 moonlight-web: {}", url);
+    info!("Downloading moonlight-web: {}", url);
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(300))
         .user_agent("sunshine-control-panel")
         .build()
-        .map_err(|e| format!("创建客户端失败: {}", e))?;
+        .map_err(|e| format!("Failed to create the client: {}", e))?;
 
     let response = client
         .get(&url)
         .header("Accept", "application/octet-stream")
         .send()
         .await
-        .map_err(|e| format!("下载失败: {}", e))?;
+        .map_err(|e| format!("Download failed: {}", e))?;
 
     if !response.status().is_success() {
-        return Err(format!("下载失败, HTTP {}", response.status()));
+        return Err(format!("Download failed: HTTP {}", response.status()));
     }
 
     let total_size = response.content_length().unwrap_or(0);
@@ -448,15 +456,16 @@ pub async fn moonlight_web_download(
             ".zip"
         };
     let temp_path = temp_dir.join(format!("moonlight-web_download{}", temp_ext));
-    let mut file =
-        std::fs::File::create(&temp_path).map_err(|e| format!("创建临时文件失败: {}", e))?;
+    let mut file = std::fs::File::create(&temp_path)
+        .map_err(|e| format!("Failed to create the temporary file: {}", e))?;
 
     let mut stream = response.bytes_stream();
     let mut downloaded: u64 = 0;
 
     while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|e| format!("下载数据失败: {}", e))?;
-        std::io::Write::write_all(&mut file, &chunk).map_err(|e| format!("写入文件失败: {}", e))?;
+        let chunk = chunk.map_err(|e| format!("Failed to download data: {}", e))?;
+        std::io::Write::write_all(&mut file, &chunk)
+            .map_err(|e| format!("Failed to write the file: {}", e))?;
         downloaded += chunk.len() as u64;
 
         // 发送进度事件
@@ -478,14 +487,15 @@ pub async fn moonlight_web_download(
     }
     drop(file);
 
-    info!("✅ 下载完成 ({} bytes), 开始解压...", downloaded);
+    info!("Download complete ({} bytes); extracting...", downloaded);
 
     // 解压到临时目录，避免直接在安装目录操作导致权限问题
     let extract_dir = temp_dir.join("moonlight-web-extract");
     if extract_dir.exists() {
         let _ = std::fs::remove_dir_all(&extract_dir);
     }
-    std::fs::create_dir_all(&extract_dir).map_err(|e| format!("创建解压临时目录失败: {}", e))?;
+    std::fs::create_dir_all(&extract_dir)
+        .map_err(|e| format!("Failed to create the temporary extraction directory: {}", e))?;
 
     extract_archive(&temp_path, &extract_dir)?;
 
@@ -500,7 +510,8 @@ pub async fn moonlight_web_download(
     };
 
     // 确保安装目录存在
-    std::fs::create_dir_all(&install_dir).map_err(|e| format!("创建安装目录失败: {}", e))?;
+    std::fs::create_dir_all(&install_dir)
+        .map_err(|e| format!("Failed to create the installation directory: {}", e))?;
 
     // 使用 robocopy 将文件复制到安装目录（更可靠，处理权限和覆盖）
     copy_dir_contents(&source_dir, &install_dir)?;
@@ -514,7 +525,7 @@ pub async fn moonlight_web_download(
         let _ = std::fs::write(install_dir.join("version.txt"), version_clean);
     }
 
-    info!("✅ moonlight-web 安装完成: {:?}", install_dir);
+    info!("moonlight-web installed: {:?}", install_dir);
     Ok(install_dir.to_string_lossy().to_string())
 }
 
@@ -529,23 +540,24 @@ pub fn moonlight_web_get_install_path() -> String {
 pub async fn moonlight_web_generate_cert() -> Result<CertificateConfig, String> {
     let install_dir = get_install_dir();
     let server_dir = install_dir.join("server");
-    std::fs::create_dir_all(&server_dir).map_err(|e| format!("创建目录失败: {}", e))?;
+    std::fs::create_dir_all(&server_dir)
+        .map_err(|e| format!("Failed to create the directory: {}", e))?;
 
     let key_path = server_dir.join("key.pem");
     let cert_path = server_dir.join("cert.pem");
 
-    info!("🔐 正在生成自签名 HTTPS 证书...");
+    info!("Generating a self-signed HTTPS certificate...");
 
     // 使用 rcgen 生成自签名证书
     let mut params = rcgen::CertificateParams::new(vec!["localhost".to_string()])
-        .map_err(|e| format!("证书参数创建失败: {}", e))?;
+        .map_err(|e| format!("Failed to create certificate parameters: {}", e))?;
 
     // 添加 SAN（Subject Alternative Names）
     params.subject_alt_names = vec![
         rcgen::SanType::DnsName(
             "localhost"
                 .try_into()
-                .map_err(|e| format!("DNS name 无效: {}", e))?,
+                .map_err(|e| format!("Invalid DNS name: {}", e))?,
         ),
         rcgen::SanType::IpAddress(std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1))),
         rcgen::SanType::IpAddress(std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0))),
@@ -564,17 +576,22 @@ pub async fn moonlight_web_generate_cert() -> Result<CertificateConfig, String> 
         .distinguished_name
         .push(rcgen::DnType::OrganizationName, "Sunshine Control Panel");
 
-    let key_pair = rcgen::KeyPair::generate().map_err(|e| format!("密钥生成失败: {}", e))?;
+    let key_pair =
+        rcgen::KeyPair::generate().map_err(|e| format!("Failed to generate a key: {}", e))?;
     let cert = params
         .self_signed(&key_pair)
-        .map_err(|e| format!("证书签名失败: {}", e))?;
+        .map_err(|e| format!("Failed to sign the certificate: {}", e))?;
 
     // 写入文件
     std::fs::write(&key_path, key_pair.serialize_pem())
-        .map_err(|e| format!("写入私钥失败: {}", e))?;
-    std::fs::write(&cert_path, cert.pem()).map_err(|e| format!("写入证书失败: {}", e))?;
+        .map_err(|e| format!("Failed to write the private key: {}", e))?;
+    std::fs::write(&cert_path, cert.pem())
+        .map_err(|e| format!("Failed to write the certificate: {}", e))?;
 
-    info!("✅ 自签名证书已生成: {:?}, {:?}", cert_path, key_path);
+    info!(
+        "Self-signed certificate generated: {:?}, {:?}",
+        cert_path, key_path
+    );
 
     // 返回相对于 moonlight-web 安装目录的路径（web-server 工作目录）
     Ok(CertificateConfig {
@@ -698,7 +715,7 @@ async fn ensure_config_exists() -> Result<(), String> {
                 if fixed {
                     if let Ok(json) = serde_json::to_string_pretty(&raw) {
                         let _ = std::fs::write(&config_path, json);
-                        info!("🔧 已自动修复 config.json 中的无效字段");
+                        info!("Repaired invalid fields in config.json");
                     }
                 }
             }
@@ -717,7 +734,7 @@ async fn ensure_config_exists() -> Result<(), String> {
         return Ok(());
     }
 
-    info!("🔧 生成 moonlight-web 默认配置...");
+    info!("Generating the default moonlight-web configuration...");
 
     let config = MoonlightWebConfig {
         web_server: WebServerConfig {
@@ -747,15 +764,17 @@ async fn ensure_config_exists() -> Result<(), String> {
 
     // 确保目录存在
     if let Some(parent) = config_path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| format!("创建配置目录失败: {}", e))?;
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create the configuration directory: {}", e))?;
     }
 
-    let json =
-        serde_json::to_string_pretty(&config).map_err(|e| format!("序列化配置失败: {}", e))?;
+    let json = serde_json::to_string_pretty(&config)
+        .map_err(|e| format!("Failed to serialize the configuration: {}", e))?;
 
-    std::fs::write(&config_path, json).map_err(|e| format!("写入配置失败: {}", e))?;
+    std::fs::write(&config_path, json)
+        .map_err(|e| format!("Failed to write the configuration: {}", e))?;
 
-    info!("✅ 默认配置已生成: {:?}", config_path);
+    info!("Default configuration generated: {:?}", config_path);
     Ok(())
 }
 
@@ -796,12 +815,12 @@ fn copy_dir_contents(src: &PathBuf, dest: &PathBuf) -> Result<(), String> {
             ])
             .creation_flags(0x08000000)
             .output()
-            .map_err(|e| format!("执行 robocopy 失败: {}", e))?;
+            .map_err(|e| format!("Failed to run robocopy: {}", e))?;
 
         let exit_code = output.status.code().unwrap_or(-1);
         if exit_code >= 8 {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("robocopy 失败 (exit {}): {}", exit_code, stderr));
+            return Err(format!("robocopy failed (exit {}): {}", exit_code, stderr));
         }
         Ok(())
     }
@@ -812,11 +831,11 @@ fn copy_dir_contents(src: &PathBuf, dest: &PathBuf) -> Result<(), String> {
         let output = std::process::Command::new("cp")
             .args(["-a", "-T", &src.to_string_lossy(), &dest.to_string_lossy()])
             .output()
-            .map_err(|e| format!("执行 cp 失败: {}", e))?;
+            .map_err(|e| format!("Failed to run cp: {}", e))?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("cp 失败: {}", stderr));
+            return Err(format!("cp failed: {}", stderr));
         }
         Ok(())
     }
@@ -848,7 +867,7 @@ fn extract_archive(archive_path: &PathBuf, target_dir: &PathBuf) -> Result<(), S
     } else if name.ends_with(".tar.gz") || name.ends_with(".tgz") {
         extract_tar_gz(archive_path, target_dir)
     } else {
-        Err(format!("不支持的压缩格式: {}", name))
+        Err(format!("Unsupported archive format: {}", name))
     }
 }
 
@@ -874,11 +893,11 @@ fn extract_zip(zip_path: &PathBuf, target_dir: &PathBuf) -> Result<(), String> {
             ])
             .creation_flags(0x08000000)
             .output()
-            .map_err(|e| format!("执行解压命令失败: {}", e))?;
+            .map_err(|e| format!("Failed to run the extraction command: {}", e))?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("解压失败: {}", stderr));
+            return Err(format!("Extraction failed: {}", stderr));
         }
 
         Ok(())
@@ -886,7 +905,7 @@ fn extract_zip(zip_path: &PathBuf, target_dir: &PathBuf) -> Result<(), String> {
 
     #[cfg(not(target_os = "windows"))]
     {
-        Err("非 Windows 平台暂不支持".to_string())
+        Err("This operation is currently available only on Windows".to_string())
     }
 }
 
@@ -904,11 +923,11 @@ fn extract_tar_gz(archive_path: &PathBuf, target_dir: &PathBuf) -> Result<(), St
             ])
             .creation_flags(0x08000000)
             .output()
-            .map_err(|e| format!("执行 tar 解压失败: {}", e))?;
+            .map_err(|e| format!("Failed to run tar: {}", e))?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("tar 解压失败: {}", stderr));
+            return Err(format!("tar extraction failed: {}", stderr));
         }
 
         Ok(())
@@ -916,7 +935,7 @@ fn extract_tar_gz(archive_path: &PathBuf, target_dir: &PathBuf) -> Result<(), St
 
     #[cfg(not(target_os = "windows"))]
     {
-        Err("非 Windows 平台暂不支持".to_string())
+        Err("This operation is currently available only on Windows".to_string())
     }
 }
 
@@ -924,7 +943,10 @@ fn extract_tar_gz(archive_path: &PathBuf, target_dir: &PathBuf) -> Result<(), St
 pub fn cleanup() {
     let mut guard = CHILD_PROCESS.lock().unwrap();
     if let Some(ref mut child) = *guard {
-        info!("🧹 清理 moonlight-web 子进程 (PID: {})", child.id());
+        info!(
+            "Cleaning up the moonlight-web child process (PID: {})",
+            child.id()
+        );
         let _ = child.kill();
         let _ = child.wait();
         *guard = None;

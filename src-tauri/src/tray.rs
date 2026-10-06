@@ -560,7 +560,7 @@ mod power {
         let flags = ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_AWAYMODE_REQUIRED;
         unsafe {
             if SetThreadExecutionState(flags) == 0 {
-                return Err("SetThreadExecutionState 调用失败");
+                return Err("SetThreadExecutionState failed");
             }
         }
         Ok(())
@@ -569,7 +569,7 @@ mod power {
     pub fn disable_prevent_sleep() -> Result<(), &'static str> {
         unsafe {
             if SetThreadExecutionState(ES_CONTINUOUS) == 0 {
-                return Err("SetThreadExecutionState 调用失败");
+                return Err("SetThreadExecutionState failed");
             }
         }
         Ok(())
@@ -1142,7 +1142,10 @@ fn init_sunshine_user_mode_state<R: Runtime + 'static>(app: &AppHandle<R>) {
                     *state = is_user_mode;
                     changed
                 };
-                debug!("✅ Sunshine 用户模式状态已异步更新: {}", is_user_mode);
+                debug!(
+                    "Sunshine user-mode status updated asynchronously: {}",
+                    is_user_mode
+                );
                 if changed {
                     let rebuild_handle = app_handle.clone();
                     let _ = app_handle.run_on_main_thread(move || {
@@ -1151,10 +1154,10 @@ fn init_sunshine_user_mode_state<R: Runtime + 'static>(app: &AppHandle<R>) {
                 }
             }
             Ok(Err(e)) => {
-                debug!("⚠️ 检查 Sunshine 用户模式状态失败: {}", e);
+                debug!("Failed to check Sunshine user-mode status: {}", e);
             }
             Err(e) => {
-                debug!("⚠️ spawn_blocking 检查用户模式失败: {}", e);
+                debug!("spawn_blocking failed while checking user mode: {}", e);
             }
         }
     });
@@ -1220,7 +1223,7 @@ fn rebuild_tray_menu<R: Runtime>(app: &AppHandle<R>) {
         match build_tray_menu(app) {
             Ok(menu) => {
                 if let Err(e) = tray.set_menu(Some(menu)) {
-                    error!("❌ 重建托盘菜单失败: {}", e);
+                    error!("Failed to rebuild the tray menu: {}", e);
                 }
                 // 更新 tooltip
                 let tooltip = {
@@ -1237,7 +1240,7 @@ fn rebuild_tray_menu<R: Runtime>(app: &AppHandle<R>) {
                 };
                 let _ = tray.set_tooltip(Some(tooltip));
             }
-            Err(e) => error!("❌ 构建托盘菜单失败: {}", e),
+            Err(e) => error!("Failed to build the tray menu: {}", e),
         }
     }
 }
