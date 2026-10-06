@@ -197,7 +197,6 @@ fn main() {
             game_session::get_game_stats,
             game_session::focus_running_game,
             toolbar::create_toolbar_window,
-            commands::fetch_remote_bytes,
             desktop_settings::get_desktop_settings,
             desktop_settings::save_desktop_settings,
             desktop_settings::load_toolbar_shortcut_status,
