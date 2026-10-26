@@ -2,7 +2,6 @@ use log::{debug, error, info, warn};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::{Mutex, RwLock};
 use url::Url;
 
@@ -201,64 +200,9 @@ pub fn config_dir() -> PathBuf {
     get_sunshine_path().join("config")
 }
 
-/// 获取 covers 目录（config/covers）
-pub fn covers_dir() -> PathBuf {
-    config_dir().join("covers")
-}
-
 /// 获取 assets 目录（install_dir/assets）
 pub fn assets_dir() -> PathBuf {
     get_sunshine_path().join("assets")
-}
-
-#[tauri::command]
-pub async fn get_sunshine_version() -> Result<String, String> {
-    let sunshine_exe = get_sunshine_path().join("sunshine.exe");
-
-    if !sunshine_exe.exists() {
-        return Ok("Unknown".to_string());
-    }
-
-    #[cfg(target_os = "windows")]
-    let output = {
-        use std::os::windows::process::CommandExt;
-        Command::new(sunshine_exe)
-            .arg("--version")
-            .creation_flags(0x08000000) // CREATE_NO_WINDOW
-            .output()
-            .map_err(|e| e.to_string())?
-    };
-
-    #[cfg(not(target_os = "windows"))]
-    let output = Command::new(sunshine_exe)
-        .arg("--version")
-        .output()
-        .map_err(|e| e.to_string())?;
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let combined = format!("{}{}", stdout, stderr);
-
-    // Match the most specific version forms first.
-    let patterns = [
-        r"Sunshine\s+v?(\d+\.\d+\.\d+(?:\.\d+)?)",
-        r"version\s*:?\s*v?(\d+\.\d+\.\d+(?:\.\d+)?)",
-        r"v?(\d+\.\d+\.\d+(?:\.\d+)?)",
-        r"(\d+\.\d+)",
-    ];
-
-    for pattern_str in &patterns {
-        if let Ok(pattern) = regex::Regex::new(pattern_str)
-            && let Some(cap) = pattern.captures(&combined)
-            && let Some(version) = cap.get(1)
-        {
-            let version_str = version.as_str().to_string();
-            debug!("Parsed version: {}", version_str);
-            return Ok(version_str);
-        }
-    }
-
-    Ok("Unknown".to_string())
 }
 
 fn parse_sunshine_config_content(content: &str) -> SunshineConfig {
@@ -973,7 +917,6 @@ async fn post_sunshine_config_to(
     validate_config_save_response(&response_body)
 }
 
-
 #[tauri::command]
 pub async fn get_active_sessions() -> Result<Vec<SessionInfo>, String> {
     let sunshine_url = get_sunshine_url().await?;
@@ -1077,7 +1020,10 @@ pub async fn stop_all_sessions() -> Result<String, String> {
         sunshine_url.trim_end_matches('/')
     );
 
-    info!("Requesting disconnection of all streaming sessions: {}", stop_url);
+    info!(
+        "Requesting disconnection of all streaming sessions: {}",
+        stop_url
+    );
 
     let client = create_https_client()?;
     let response = client
@@ -1094,7 +1040,10 @@ pub async fn stop_all_sessions() -> Result<String, String> {
         .map_err(|e| format!("Failed to read the session-disconnection response: {}", e))?;
 
     if !status.is_success() {
-        error!("Session disconnection failed (status {}): {}", status, response_text);
+        error!(
+            "Session disconnection failed (status {}): {}",
+            status, response_text
+        );
         return Err(format!(
             "Session disconnection failed (status {}): {}",
             status, response_text

@@ -9,10 +9,6 @@ pub fn handle_tray_menu_event<R: Runtime + 'static>(app: &AppHandle<R>, menu_id:
         "open_main_panel" => open_main_panel_from_tray(app, "menu"),
         "open_sunshine" => open_sunshine_web_ui(app),
         "tray_notification_action" => handle_tray_notification_action(app),
-        "open_desktop" => {
-            info!("Tray menu: opening the desktop UI");
-            open_desktop_gui_from_tray(app, "menu");
-        }
         #[cfg(target_os = "windows")]
         "auto_start" => toggle_auto_start(app),
         #[cfg(target_os = "windows")]
@@ -48,37 +44,23 @@ pub fn handle_tray_menu_event<R: Runtime + 'static>(app: &AppHandle<R>, menu_id:
         ),
         #[cfg(target_os = "windows")]
         "restart_user_mode" => toggle_sunshine_mode(app),
-        "show_toolbar" => toggle_toolbar(app),
         "rtss_control" => {
             info!("Tray menu: opening RTSS controls");
-            if let Err(e) = toolbar::create_tool_window_internal(app, "rtss") {
-                error!("Failed to create the RTSS tool window: {}", e);
-            }
+            open_main_window_view(app, "open-rtss-controls", "RTSS controls");
         }
         "host_performance" => {
             info!("Tray menu: opening host performance monitoring");
-            if let Err(e) = toolbar::create_tool_window_internal(app, "performance") {
-                error!("Failed to create the host performance window: {}", e);
-            }
+            open_main_window_view(app, "open-host-performance", "host performance");
         }
         "log_console" => windows::open_log_console(app),
         "web_stream" => open_web_stream_settings(app),
         #[cfg(target_os = "windows")]
         "prevent_sleep" => toggle_prevent_sleep(app),
-        #[cfg(debug_assertions)]
-        "debug_page" => {
-            info!("Tray menu: opening the debug page");
-            windows::open_debug_page(app);
-        }
-        "check_update" => check_for_updates(app),
         "about" => {
             info!("Tray menu: showing the About dialog");
             let _ = windows::open_about_window(app);
         }
         "shutdown" => shutdown_sunshine(app),
-        "lang_zh" => switch_tray_locale(app, "zh"),
-        "lang_en" => switch_tray_locale(app, "en"),
-        "lang_ja" => switch_tray_locale(app, "ja"),
         "restart" => restart_sunshine(app),
         _ => warn!("Unknown tray-menu event: {}", menu_id),
     }
@@ -501,73 +483,17 @@ fn toggle_sunshine_mode<R: Runtime>(app: &AppHandle<R>) {
                 // 切换由 UAC 提升的 PowerShell 在后台执行，需预留 UAC + stop + start
                 // 两次检查以减少"中间状态"导致的误判
                 tokio::time::sleep(Duration::from_secs(6)).await;
-                update_sunshine_mode_state(&app_handle, "首次").await;
+                update_sunshine_mode_state(&app_handle, "first").await;
 
                 tokio::time::sleep(Duration::from_secs(5)).await;
-                update_sunshine_mode_state(&app_handle, "二次").await;
+                update_sunshine_mode_state(&app_handle, "second").await;
             }
             Err(e) => {
                 error!("Failed to switch Sunshine mode: {}", e);
-                emit_message(&app_handle, "error", &format!("切换失败: {}", e));
-            }
-        }
-    });
-}
-
-/// 切换工具栏显示/隐藏
-fn toggle_toolbar<R: Runtime>(app: &AppHandle<R>) {
-    info!("Tray menu: toggling the toolbar");
-
-    if let Some(toolbar_window) = app.get_webview_window("toolbar") {
-        let _ = toolbar_window.close();
-    } else if let Err(e) = toolbar::create_toolbar_window_internal(app) {
-        error!("Failed to create the toolbar: {}", e);
-    }
-}
-
-/// 检查更新（托盘菜单触发，`manual = true`）
-fn check_for_updates<R: Runtime>(app: &AppHandle<R>) {
-    info!("🔄 托盘菜单：检查更新");
-    if app.get_webview_window("main").is_none()
-        && let Err(e) = windows::create_main_window(app)
-    {
-        error!("Failed to create main window for update check: {}", e);
-        return;
-    }
-    let app_handle = app.clone();
-
-    if let Some(window) = app.get_webview_window("main") {
-        windows::show_and_activate_window(&window);
-    }
-
-    let include_prerelease = update::get_include_prerelease(app);
-    tauri::async_runtime::spawn(async move {
-        match update::check_for_updates_internal(true, include_prerelease).await {
-            Ok(Some(update_info)) => {
-                if update_info.is_latest {
-                    info!("✅ 已是最新版本: {}", update_info.version);
-                } else {
-                    info!("🎉 发现新版本: {}", update_info.version);
-                }
-                update::save_last_check_time(&app_handle);
-                match serde_json::to_value(&update_info) {
-                    Ok(payload) => {
-                        emit_to_main_when_ready(&app_handle, "update-available", payload)
-                    }
-                    Err(e) => error!("Failed to serialize update result: {}", e),
-                }
-            }
-            Ok(None) => {
-                // manual=true 时此分支不会触发
-                debug!("✅ 已是最新版本");
-                update::save_last_check_time(&app_handle);
-            }
-            Err(e) => {
-                error!("❌ 检查更新失败: {}", e);
-                emit_to_main_when_ready(
+                emit_message(
                     &app_handle,
-                    "update-check-result",
-                    serde_json::json!({ "error": e }),
+                    "error",
+                    &format!("Failed to switch Sunshine mode: {}", e),
                 );
             }
         }

@@ -1,13 +1,12 @@
 /**
- * Tauri API 适配层
- * 将 Electron IPC 调用迁移到 Tauri invoke 调用
+ * Tauri API adapter: maps the legacy Electron IPC calls onto Tauri invoke.
  */
 
 import { invoke } from '@tauri-apps/api/core'
 
 // ─── Helpers ────────────────────────────────────────────
 
-/** 调用 command，返回 { success, data, message } */
+/** Invoke a command and return { success, data, message }. */
 async function wrapResult(cmd, args) {
   try {
     const data = await invoke(cmd, args)
@@ -17,7 +16,7 @@ async function wrapResult(cmd, args) {
   }
 }
 
-/** 调用 command，失败时返回 fallback */
+/** Invoke a command, returning the fallback on failure. */
 async function wrapDefault(cmd, fallback, args) {
   try {
     return await invoke(cmd, args)
@@ -27,14 +26,7 @@ async function wrapDefault(cmd, fallback, args) {
   }
 }
 
-// ─── 主题 ────────────────────────────────────────────────
-
-export const darkMode = {
-  toggle: () => invoke('toggle_dark_mode'),
-  system: async () => true,
-}
-
-// ─── 外部 URL ────────────────────────────────────────────
+// ─── External URLs ───────────────────────────────────────
 
 export function isAllowedExternalUrl(url) {
   return /^(https?:\/\/|ms-windows-store:\/\/)/i.test(String(url || '').trim())
@@ -45,12 +37,12 @@ export async function openExternalUrl(url) {
     if (!isAllowedExternalUrl(url)) return false
     return await invoke('open_external_url', { url })
   } catch (error) {
-    console.error('打开外部URL失败:', error)
+    console.error('Failed to open the external URL:', error)
     return false
   }
 }
 
-// ─── VDD 设置 ────────────────────────────────────────────
+// ─── Virtual display settings ────────────────────────────
 
 export const vdd = {
   getStatus: () => wrapResult('get_vdd_status'),
@@ -76,10 +68,10 @@ export const vdd = {
       await invoke('exec_vdd_cmd', { command })
       return true
     } catch (error) {
-      console.error('执行 VDD 命令失败:', error)
+      console.error('Virtual display command failed:', error)
       throw error instanceof Error
         ? error
-        : new Error(typeof error === 'string' && error.trim() ? error : '执行 VDD 命令失败')
+        : new Error(typeof error === 'string' && error.trim() ? error : 'Virtual display command failed')
     }
   },
 }
@@ -101,6 +93,7 @@ export const vigem = {
   uninstall: () => wrapResult('uninstall_vigem_driver'),
 }
 
+// Controller and peripheral management.
 export function controllerHubCommandArgs(patch = {}) {
   return {
     gamepad: patch.gamepad,
@@ -144,8 +137,6 @@ export const dualsense = {
   selfTest: (profile) => wrapResult('dualsense_self_test', { profile }),
 }
 
-// ─── Sunshine 配置 ───────────────────────────────────────
-
 export const usbip = {
   getForwardingConfig: () => wrapResult('usbip_get_forwarding_config'),
   saveForwardingConfig: (enabled, port) => wrapResult('usbip_save_forwarding_config', { enabled, port }),
@@ -156,6 +147,7 @@ export const usbip = {
   attach: (remote, busId, tcpPort = 3240) => wrapResult('usbip_attach', { remote, busId, tcpPort }),
   detach: (port) => wrapResult('usbip_detach', { port }),
 }
+
 export const rtxHdr = {
   recover: () => wrapResult('native_component_recover', { componentId: 'alkaidlab.nvidia_rtx_video' }),
   setEnabled: (enabled) => wrapResult('hdr_enhanced_select_backend', { componentId: 'alkaidlab.nvidia_rtx_video', enabled }),
@@ -178,8 +170,9 @@ export const dlssNr = {
   uninstall: () => wrapResult('native_component_remove', { componentId: 'alkaidlab.nvidia_dlssnr' }),
 }
 
+// ─── Sunshine configuration ──────────────────────────────
+
 export const sunshine = {
-  getVersion: () => wrapDefault('get_sunshine_version', 'Unknown'),
   parseConfig: () => wrapDefault('parse_sunshine_config', {}),
   getUrl: () => wrapDefault('get_sunshine_url', 'https://localhost:47990/'),
   getCommandLineUrl: () => wrapDefault('get_command_line_url', null),
@@ -191,7 +184,7 @@ export const sunshine = {
   stopAllSessions: () => invoke('stop_all_sessions'),
 }
 
-// ─── 系统工具 ────────────────────────────────────────────
+// ─── System tools ────────────────────────────────────────
 
 export const tools = {
   restartGraphicsDriver: () => invoke('restart_graphics_driver'),
@@ -236,16 +229,9 @@ export const controllerMeta = {
   uninstall: () => invoke('controllermeta_uninstall'),
 }
 
-// ─── 文件系统 ────────────────────────────────────────────
-
-export async function readDirectory(path) {
-  return wrapDefault('read_directory', [], { path })
-}
-
-// ─── 导出 ────────────────────────────────────────────────
+// ─── Exports ─────────────────────────────────────────────
 
 export default {
-  darkMode,
   openExternalUrl,
   vdd,
   vmouse,
@@ -261,5 +247,4 @@ export default {
   fileMapping,
   moonlightWeb,
   controllerMeta,
-  readDirectory,
 }

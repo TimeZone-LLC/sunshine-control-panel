@@ -9,27 +9,13 @@
           <div class="page-title-copy">
             <h2>{{ t.vddSettings.title }}</h2>
             <div v-if="!isDriverCheckPending && hasUnsavedChanges" class="page-header-meta">
-              <el-tag size="small" round type="warning" effect="light">
+              <el-tag size="small" type="warning" effect="plain">
                 {{ t.vddSettings.unsavedBadge }}
               </el-tag>
             </div>
           </div>
         </div>
 
-        <div v-if="!isDriverCheckPending && vddReady" class="page-header-actions">
-          <el-button
-            v-for="action in heroActions"
-            :key="action.key"
-            :class="['page-header-action', `is-${action.key}`]"
-            :plain="action.plain"
-            :type="action.type"
-            :loading="action.loading"
-            @click="action.onClick"
-          >
-            <el-icon><component :is="action.icon" /></el-icon>
-            {{ action.label }}
-          </el-button>
-        </div>
       </div>
 
       <div
@@ -81,7 +67,6 @@
         </div>
 
         <div class="detection-lock">
-          <span aria-hidden="true">◇</span>
           {{ t.vddSettings.driverDetectionLocked }}
         </div>
       </section>
@@ -122,33 +107,27 @@
       </section>
 
       <template v-if="!isDriverCheckPending && vddReady">
-      <div class="vdd-section-tabs" role="tablist" :aria-label="t.vddSettings.title">
-        <button
-          v-for="tab in sectionTabs"
-          :key="tab.key"
-          :id="`vdd-tab-${tab.key}`"
-          type="button"
-          role="tab"
-          :aria-controls="`vdd-panel-${tab.key}`"
-          :aria-selected="activeSection === tab.key"
-          :tabindex="activeSection === tab.key ? 0 : -1"
-          :class="['vdd-section-tab', { active: activeSection === tab.key }]"
-          @click="activeSection = tab.key"
-          @keydown.left.prevent="focusAdjacentSection(tab.key, -1)"
-          @keydown.right.prevent="focusAdjacentSection(tab.key, 1)"
-          @keydown.home.prevent="focusSectionByIndex(0)"
-          @keydown.end.prevent="focusSectionByIndex(sectionTabs.length - 1)"
-        >
-          <el-icon><component :is="tab.icon" /></el-icon>
-          {{ tab.label }}
-        </button>
+      <div class="vdd-actions-row">
+        <div class="page-header-actions">
+          <el-button
+            v-for="action in heroActions"
+            :key="action.key"
+            :class="['page-header-action', `is-${action.key}`]"
+            :plain="action.plain"
+            :type="action.type"
+            :loading="action.loading"
+            @click="action.onClick"
+          >
+            <el-icon><component :is="action.icon" /></el-icon>
+            {{ action.label }}
+          </el-button>
+        </div>
       </div>
 
       <section
-        v-show="activeSection === 'overview'"
         id="vdd-panel-overview"
-        role="tabpanel"
-        aria-labelledby="vdd-tab-overview"
+        role="region"
+        aria-label="Display overview"
         class="hero-panel overview-panel"
       >
         <div class="vdd-header">
@@ -179,17 +158,13 @@
             <h3>{{ t.vddSettings.calibrationTitle }}</h3>
             <p>{{ calibrationStatusDescription }}</p>
           </div>
-          <el-button @click="activeSection = 'calibration'">
-            {{ t.vddSettings.calibrationTitle }}
-          </el-button>
         </div>
       </section>
 
       <section
-        v-show="activeSection === 'calibration'"
         id="vdd-panel-calibration"
-        role="tabpanel"
-        aria-labelledby="vdd-tab-calibration"
+        role="region"
+        aria-labelledby="vdd-calibration-title"
         class="section-card calibration-card"
       >
         <div class="section-header calibration-header">
@@ -294,22 +269,16 @@
       </section>
 
       <el-form
-        v-if="activeSection === 'display' || activeSection === 'driver'"
         :model="settings"
         label-position="top"
         size="default"
         class="vdd-form"
       >
-        <div
-          :id="`vdd-panel-${activeSection}`"
-          role="tabpanel"
-          :aria-labelledby="`vdd-tab-${activeSection}`"
-          :class="['form-layout', `is-${activeSection}`]"
-        >
-          <div v-if="activeSection === 'display'" class="form-main">
+        <div class="form-layout is-flat">
+          <div id="vdd-panel-display" class="form-main" role="region" aria-labelledby="vdd-display-title">
             <div class="section-card">
               <div class="section-header">
-                <h3>{{ t.vddSettings.displaySection }}</h3>
+                <h3 id="vdd-display-title">{{ t.vddSettings.displaySection }}</h3>
                 <p>{{ t.vddSettings.displaySectionHint }}</p>
               </div>
 
@@ -505,10 +474,10 @@
             </div>
           </div>
 
-          <div v-if="activeSection === 'driver'" class="form-side">
+          <div id="vdd-panel-driver" class="form-side" role="region" aria-labelledby="vdd-driver-title">
             <div class="section-card utility-card">
               <div class="section-header">
-                <h3>{{ t.vddSettings.driverTools }}</h3>
+                <h3 id="vdd-driver-title">{{ t.vddSettings.driverTools }}</h3>
                 <p>{{ t.vddSettings.driverToolsHint }}</p>
               </div>
 
@@ -521,7 +490,7 @@
 
               <div v-if="edidFileExists" class="danger-zone">
                 <div class="danger-zone-header">
-                  <el-tag type="danger" effect="light" round>{{ t.vddSettings.dangerZone }}</el-tag>
+                  <el-tag type="danger" effect="plain">{{ t.vddSettings.dangerZone }}</el-tag>
                   <span class="danger-zone-desc">{{ t.vddSettings.dangerZoneHint }}</span>
                 </div>
 
@@ -545,7 +514,7 @@
               </div>
 
               <div class="trace-status">
-                <el-tag :type="traceStatus.running ? 'success' : 'info'" effect="light" round>
+                <el-tag :type="traceStatus.running ? 'success' : 'info'" effect="plain">
                   {{ traceStatus.running ? t.vddSettings.vddTraceRunning : t.vddSettings.vddTraceIdle }}
                 </el-tag>
                 <span class="trace-path" :title="traceDisplayPath">{{ traceDisplayPath }}</span>
@@ -616,7 +585,7 @@
                   </el-alert>
 
                   <div class="edid-status">
-                    <el-tag :type="edidFileExists ? 'success' : 'info'" effect="dark">
+                    <el-tag :type="edidFileExists ? 'success' : 'info'" effect="plain">
                       {{ edidFileExists ? t.vddSettings.edidUploaded : t.vddSettings.edidNotUploaded }}
                     </el-tag>
                     <span class="edid-path" v-if="edidFilePath">{{ edidFilePath }}</span>
@@ -668,8 +637,8 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { ElMessage, ElMessageBox } from './ui/compact/feedback.js'
 import {
   Monitor,
   Plus,
@@ -683,16 +652,14 @@ import {
   FolderOpened,
   CircleCheck,
   Warning,
-  DataAnalysis,
   Sunny,
-  Tools,
-} from '@element-plus/icons-vue'
+} from './ui/compact/icons.js'
 import { useEditableOptionField } from '../composables/useEditableOptionField.js'
 import { useVddEdid } from '../composables/useVddEdid.js'
 import { useVddStatusLabel } from '../composables/useVddStatusLabel.js'
 import { installVddWithRecovery } from '../composables/vddInstallRecovery.js'
 import { openExternalUrl, sunshine, vdd } from '../tauri-adapter.js'
-import { useI18n } from '../desktop/i18n/index.js'
+import { useI18n } from '../i18n/index.js'
 
 const { t } = useI18n()
 
@@ -803,7 +770,6 @@ const isOpeningTraceFolder = ref(false)
 const isRefreshingCalibration = ref(false)
 const isLaunchingCalibration = ref(false)
 const isLaunchingPhysicalCalibration = ref(false)
-const activeSection = ref('overview')
 const hasLoadedSnapshot = ref(false)
 const lastSavedSnapshot = ref('')
 const activeHdrClients = ref([])
@@ -958,26 +924,6 @@ const overviewCards = computed(() => [
     value: gpuSummary.value,
   },
 ])
-const sectionTabs = computed(() => [
-  { key: 'overview', label: t.value.vddSettings.tabOverview, icon: DataAnalysis },
-  { key: 'display', label: t.value.vddSettings.tabDisplay, icon: Monitor },
-  { key: 'calibration', label: t.value.vddSettings.tabCalibration, icon: Sunny },
-  { key: 'driver', label: t.value.vddSettings.tabDriver, icon: Tools },
-])
-
-const focusSectionByIndex = async (index) => {
-  const tabs = sectionTabs.value
-  if (!tabs.length) return
-  const normalizedIndex = (index + tabs.length) % tabs.length
-  activeSection.value = tabs[normalizedIndex].key
-  await nextTick()
-  document.getElementById(`vdd-tab-${activeSection.value}`)?.focus()
-}
-
-const focusAdjacentSection = (key, offset) => {
-  const currentIndex = sectionTabs.value.findIndex((tab) => tab.key === key)
-  if (currentIndex >= 0) focusSectionByIndex(currentIndex + offset)
-}
 const heroActions = computed(() => [
   {
     key: 'reload',
@@ -1116,7 +1062,7 @@ const loadCalibrationContext = async ({ silent = false } = {}) => {
 
 const startCalibrationContextPolling = () => {
   stopCalibrationContextPolling()
-  if (activeSection.value !== 'calibration' || !vddReady.value) return
+  if (!vddReady.value) return
   loadCalibrationContext({ silent: true })
   calibrationContextPollTimer = setInterval(() => loadCalibrationContext({ silent: true }), 2500)
 }
@@ -1494,10 +1440,10 @@ const removeEdidFile = async () => {
 
 onMounted(async () => {
   await recheckDriver()
-  if (vddReady.value) await loadCalibrationContext()
+  startCalibrationContextPolling()
 })
 
-watch(activeSection, startCalibrationContextPolling)
+watch(vddReady, startCalibrationContextPolling)
 
 onUnmounted(() => {
   stopCalibrationContextPolling()

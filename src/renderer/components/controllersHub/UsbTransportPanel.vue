@@ -46,7 +46,7 @@
 </template>
 
 <script setup>
-import { useI18n } from '../../desktop/i18n/index.js'
+import { useI18n } from '../../i18n/index.js'
 const { t } = useI18n()
 const { transport } = defineProps({ transport: { type: Object, required: true }, maintenance: Boolean })
 const { status, statusLoading, statusLoaded, statusProbeFailed, installing, cleaning, attachedDevices, needsCleanup, transportBusy, statusClass, statusTitle, friendlyError, refreshStatus, installTransport, cleanupResidual } = transport

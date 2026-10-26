@@ -67,9 +67,9 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
-import { DataAnalysis } from '@element-plus/icons-vue'
+import { DataAnalysis } from '../../../components/ui/compact/icons.js'
 import { invoke } from '@tauri-apps/api/core'
-import { useI18n } from '../../../desktop/i18n/index.js'
+import { useI18n } from '../../../i18n/index.js'
 import SectionPanel from '../../components/SectionPanel.vue'
 import ToggleSwitch from '../../components/ToggleSwitch.vue'
 

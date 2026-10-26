@@ -40,7 +40,7 @@
         </div>
       </template>
 
-      <!-- 消息提示 -->
+      <!-- Messages -->
       <div v-if="message" :class="['message', messageType]">
         {{ message }}
       </div>
@@ -51,7 +51,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { useI18n } from '../../desktop/i18n/index.js'
+import { useI18n } from '../../i18n/index.js'
 
 import RtssStatusBar from './rtss/RtssStatusBar.vue'
 import RtssFpsSection from './rtss/RtssFpsSection.vue'
@@ -85,7 +85,7 @@ async function loadStatus() {
   try {
     status.value = await invoke('get_rtss_status')
   } catch (e) {
-    console.error('获取 RTSS 状态失败:', e)
+    console.error('Failed to read the RTSS status:', e)
     status.value.running = false
   } finally {
     statusLoading.value = false
@@ -106,7 +106,7 @@ onMounted(() => {
 <style lang="less" scoped>
 .tool-container {
   width: 100%;
-  color: white;
+  color: var(--text);
   font-size: 14px;
 
   &.embedded {
@@ -116,49 +116,57 @@ onMounted(() => {
 }
 
 .tool-header {
-  padding: 10px 16px;
-  background: rgba(0, 0, 0, 0.15);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  height: @row-height;
+  padding: 0 @pad-x;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
   position: relative;
 
   h2 {
     margin: 0;
-    font-size: 16px;
-    font-weight: 700;
-    text-align: center;
-    letter-spacing: 0.5px;
+    font-size: @font-size-base;
+    font-weight: @font-weight-medium;
+    text-align: left;
+    letter-spacing: normal;
   }
 }
 
 .close-btn {
   position: absolute;
-  top: 6px;
-  right: 10px;
-  width: 26px;
-  height: 26px;
+  top: 0;
+  right: 0;
+  width: @row-height;
+  height: @row-height;
   border: none;
-  background: rgba(255, 255, 255, 0.15);
-  color: white;
-  font-size: 18px;
+  border-left: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 16px;
   line-height: 1;
-  border-radius: 50%;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
   display: flex;
   align-items: center;
   justify-content: center;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.25);
-    transform: rotate(90deg);
+    background: var(--bg-hover);
+    color: var(--text);
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--border-strong);
+    outline-offset: -1px;
   }
 }
 
 .tool-content {
-  padding: 20px 24px 28px;
+  padding: @spacing-md @pad-x @spacing-lg;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: @spacing-md;
   max-width: 880px;
   margin: 0 auto;
   width: 100%;
@@ -175,28 +183,22 @@ onMounted(() => {
 }
 
 .message {
-  padding: 8px 14px;
-  border-radius: 10px;
-  font-size: 12px;
-  font-weight: 500;
-  text-align: center;
-  animation: fadeIn 0.2s;
+  padding: @pad-y @pad-x;
+  font-size: @font-size-sm;
+  font-weight: @font-weight-normal;
+  text-align: left;
 
   &.success {
-    background: rgba(74, 222, 128, 0.15);
-    border: 1px solid rgba(74, 222, 128, 0.3);
-    color: #4ade80;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    color: var(--text);
   }
 
   &.error {
-    background: rgba(248, 113, 113, 0.15);
-    border: 1px solid rgba(248, 113, 113, 0.3);
-    color: #f87171;
+    background: var(--bg-panel);
+    border: 1px solid var(--error);
+    color: var(--error);
   }
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: none; }
-}
 </style>

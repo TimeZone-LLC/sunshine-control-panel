@@ -5,7 +5,6 @@ mod app;
 mod bat_runner;
 mod client_fingerprint_rules;
 mod clipboard;
-mod commands;
 mod controller_hub;
 mod controller_input;
 mod controllermeta;
@@ -16,8 +15,6 @@ mod dualsense;
 mod elevation;
 mod file_mapping;
 mod file_transfer;
-mod fs_utils;
-mod game_session;
 mod github_download;
 mod hwinfo;
 mod logger;
@@ -28,15 +25,15 @@ mod proxy_server;
 mod rtss;
 use native_components::providers::nvidia_rtx_hdr as rtx_hdr;
 mod hdr_enhanced;
-mod nr_overlay;
 mod native_components;
+mod nr_overlay;
+mod overlay_window;
 #[cfg(target_os = "windows")]
 mod shell_context_menu;
 mod sunshine;
 mod system;
 #[cfg(target_os = "windows")]
 mod text_context;
-mod toolbar;
 mod tray;
 mod tray_config;
 mod usbip;
@@ -116,7 +113,9 @@ fn main() {
     configure_loopback_proxy_bypass();
 
     #[cfg(target_os = "windows")]
-    if let Some(exit_code) = native_components::providers::nvidia_dlssnr::try_handle_elevated_command() {
+    if let Some(exit_code) =
+        native_components::providers::nvidia_dlssnr::try_handle_elevated_command()
+    {
         std::process::exit(exit_code);
     }
     if let Some(exit_code) = rtx_hdr::try_handle_elevated_command() {
@@ -170,7 +169,6 @@ fn main() {
     let application = builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_fs::init())
         .setup(|app| {
             // 初始化日志系统（需要在 setup 中获取 app handle）
             logger::init_logger(app.handle().clone());
@@ -183,24 +181,9 @@ fn main() {
             windows::handle_window_event(window, event);
         })
         .invoke_handler(tauri::generate_handler![
-            commands::toggle_dark_mode,
-            toolbar::handle_toolbar_menu_action,
-            toolbar::save_toolbar_position,
-            toolbar::is_primary_mouse_button_pressed,
             system::get_current_dpi,
             system::set_desktop_dpi,
             native_tools::open_native_tool,
-            commands::open_tool_window,
-            game_session::launch_game,
-            game_session::get_running_game,
-            game_session::stop_running_game,
-            game_session::get_game_stats,
-            game_session::focus_running_game,
-            toolbar::create_toolbar_window,
-            desktop_settings::get_desktop_settings,
-            desktop_settings::save_desktop_settings,
-            desktop_settings::load_toolbar_shortcut_status,
-            desktop_settings::set_toolbar_shortcut_enabled,
             vdd::get_vdd_status,
             vdd::install_vdd_driver,
             vdd::set_vdd_keep_enabled,
@@ -224,7 +207,6 @@ fn main() {
             system::get_process_memory_info,
             system::get_sunshine_start_time,
             sunshine::get_sunshine_install_path,
-            sunshine::get_sunshine_version,
             sunshine::parse_sunshine_config,
             sunshine::get_sunshine_url,
             sunshine::get_command_line_url,
@@ -277,16 +259,6 @@ fn main() {
             usbip::usbip_list_remote,
             usbip::usbip_attach,
             usbip::usbip_detach,
-            fs_utils::get_icc_file_list,
-            fs_utils::read_directory,
-            fs_utils::copy_image_to_assets,
-            fs_utils::cleanup_unused_covers,
-            fs_utils::resolve_lnk_target,
-            fs_utils::scan_directory_for_apps,
-            fs_utils::scan_game_libraries,
-            fs_utils::search_steam_covers,
-            fs_utils::upload_steam_cover,
-            fs_utils::save_text_file,
             logger::get_all_logs,
             logger::clear_logs,
             logger::export_logs,

@@ -95,8 +95,8 @@
 
 <script setup>
 import '../../styles/DualSenseSettings.less'
-import { Refresh } from '@element-plus/icons-vue'
-import { useI18n } from '../../desktop/i18n/index.js'
+import { Refresh } from '../ui/compact/icons.js'
+import { useI18n } from '../../i18n/index.js'
 const { t } = useI18n()
 const { component } = defineProps({
   component: { type: Object, required: true },
@@ -111,4 +111,3 @@ const {
   install, installFromPackage, refresh, uninstall,
 } = component
 </script>
-

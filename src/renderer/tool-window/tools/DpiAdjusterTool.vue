@@ -50,7 +50,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
-import { useI18n } from '../../desktop/i18n/index.js';
+import { useI18n } from '../../i18n/index.js';
 
 const { t } = useI18n();
 
@@ -75,9 +75,9 @@ const loadCurrentDpi = async () => {
   try {
     const currentDpi = await invoke('get_current_dpi');
     dpiValue.value = currentDpi;
-    console.log('当前 DPI:', currentDpi);
+    console.log('Current DPI:', currentDpi);
   } catch (error) {
-    console.error('获取当前 DPI 失败:', error);
+    console.error('Failed to read the current DPI:', error);
   } finally {
     loading.value = false;
   }
@@ -100,7 +100,7 @@ const applyDpi = async () => {
           messageType.value = 'warning';
         }
       } catch (error) {
-        console.error('重新获取 DPI 失败:', error);
+        console.error('Failed to re-read the DPI:', error);
       }
     }, 1000);
     
@@ -122,17 +122,20 @@ onMounted(() => {
 </script>
 
 <style lang="less" scoped>
+// DPI adjuster. Same shape as the bitrate tool: value in monospace, presets as
+// square cells, one plain apply button.
+
 .tool-container {
   width: 100%;
-  color: white;
-  
+  color: var(--text);
+
   &.embedded {
     width: 100%;
-    
+
     .tool-header {
       display: none;
     }
-    
+
     .tool-content {
       padding: 0;
       min-height: 236px;
@@ -142,225 +145,213 @@ onMounted(() => {
 }
 
 .tool-header {
-  padding: 16px 24px;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  height: @row-height;
+  padding: 0 @pad-x;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
   position: relative;
 }
 
 .tool-header h2 {
   margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-  text-align: center;
+  font-size: @font-size-base;
+  font-weight: @font-weight-medium;
+  text-align: left;
 }
 
 .close-btn {
   position: absolute;
-  top: 12px;
-  right: 16px;
-  width: 32px;
-  height: 32px;
+  top: 0;
+  right: 0;
+  width: @row-height;
+  height: @row-height;
   border: none;
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-  font-size: 28px;
+  border-left: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 16px;
   line-height: 1;
-  border-radius: 50%;
   cursor: pointer;
-  transition: all 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .close-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: rotate(90deg);
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.close-btn:focus-visible {
+  outline: 1px solid var(--border-strong);
+  outline-offset: -1px;
 }
 
 .tool-content {
-  padding: 20px 30px;
+  padding: @spacing-md @pad-x;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: @spacing-md;
 }
 
 .dpi-display {
-  text-align: center;
+  padding: @spacing-md;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
 }
 
 .dpi-value {
-  font-size: 46px;
-  font-weight: 700;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
   display: inline-block;
-  animation: pulse 2s ease-in-out infinite;
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: @font-weight-medium;
+  line-height: 1.1;
 }
 
 .dpi-value.loading {
-  font-size: 24px;
-  opacity: 0.8;
-}
-
-@keyframes pulse {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.03);
-  }
+  font-family: var(--font-sans);
+  font-size: @font-size-base;
+  font-weight: @font-weight-normal;
+  color: var(--text-dim);
 }
 
 .slider-container {
-  padding: 0 5px;
+  padding: 0;
 }
 
 .dpi-slider {
   width: 100%;
-  height: 6px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.3);
+  height: 4px;
+  padding: 0;
+  border: 0;
+  background: var(--bg-active);
   outline: none;
   -webkit-appearance: none;
+  appearance: none;
   cursor: pointer;
 }
 
 .dpi-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: white;
+  width: 10px;
+  height: 16px;
+  background: var(--text);
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-  transition: transform 0.2s;
-}
-
-.dpi-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
 }
 
 .dpi-slider::-moz-range-thumb {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: white;
-  cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  width: 10px;
+  height: 16px;
+  background: var(--text);
   border: none;
-  transition: transform 0.2s;
+  cursor: pointer;
 }
 
-.dpi-slider::-moz-range-thumb:hover {
-  transform: scale(1.15);
+.dpi-slider:focus-visible {
+  outline: 1px solid var(--border-strong);
+  outline-offset: 2px;
 }
 
 .presets {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  justify-content: center;
-  max-width: 560px;
-  margin: 0 auto;
+  gap: @spacing-xs;
 }
 
 .preset-btn {
-  padding: 6px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-  border-radius: 15px;
+  height: 22px;
+  padding: 0 @spacing-md;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text);
   cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  transition: all 0.2s;
+  font-family: var(--font-mono);
+  font-size: @font-size-sm;
+  font-weight: @font-weight-normal;
 }
 
 .preset-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.5);
+  background: var(--bg-hover);
 }
 
+.preset-btn:focus-visible {
+  outline: 1px solid var(--border-strong);
+  outline-offset: 0;
+}
+
+// Selected = a filled cell, not a hue.
 .preset-btn.active {
-  background: white;
-  color: #4a9eff;
-  border-color: white;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  background: var(--bg-active);
+  color: var(--text);
+  border-color: var(--border-strong);
 }
 
 .actions {
-  text-align: center;
+  display: flex;
 }
 
 .apply-btn {
-  padding: 10px 32px;
-  background: white;
-  color: #4a9eff;
-  border: none;
-  border-radius: 25px;
-  font-size: 14px;
-  font-weight: 600;
+  height: @row-height;
+  padding: 0 @spacing-lg;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  font-size: @font-size-base;
+  font-weight: @font-weight-normal;
   cursor: pointer;
-  transition: all 0.2s;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
 }
 
 .apply-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  background: var(--bg-hover);
 }
 
 .apply-btn:active:not(:disabled) {
-  transform: translateY(0);
+  background: var(--bg-active);
+}
+
+.apply-btn:focus-visible {
+  outline: 1px solid var(--border-strong);
+  outline-offset: 0;
 }
 
 .apply-btn:disabled {
-  opacity: 0.6;
+  color: var(--text-faint);
+  border-color: var(--border);
   cursor: not-allowed;
 }
 
+// Result line. Success is brightness; warn and error are the only hues.
 .message {
-  text-align: center;
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-size: 12px;
-  animation: slideIn 0.3s ease;
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  padding: @pad-y @pad-x;
+  font-size: @font-size-sm;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
 }
 
 .message.success {
-  background: rgba(76, 175, 80, 0.9);
+  color: var(--text);
 }
 
 .message.warning {
-  background: rgba(255, 152, 0, 0.9);
+  color: var(--warn);
+  border-color: var(--warn);
 }
 
 .message.error {
-  background: rgba(244, 67, 54, 0.9);
+  color: var(--error);
+  border-color: var(--error);
 }
 
 .loading-state {
-  padding: 60px;
+  padding: @spacing-2xl;
   text-align: center;
-  color: white;
+  color: var(--text-dim);
 }
 
 .loading-state p {
-  margin-top: 16px;
-  font-size: 16px;
-  opacity: 0.9;
+  margin-top: @spacing-md;
+  font-size: @font-size-base;
 }
 </style>
-

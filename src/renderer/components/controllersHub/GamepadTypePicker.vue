@@ -118,13 +118,13 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage } from '../ui/compact/feedback.js'
 import { controllerHub, sunshine } from '../../tauri-adapter.js'
 import {
   availableGamepadProfiles,
   reconcileGamepadProfile,
 } from '../../composables/controllerProfiles.js'
-import { useI18n } from '../../desktop/i18n/index.js'
+import { useI18n } from '../../i18n/index.js'
 
 const { t } = useI18n()
 const emit = defineEmits(['ds5-selection-change'])

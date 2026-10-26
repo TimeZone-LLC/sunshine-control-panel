@@ -53,9 +53,9 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage } from '../ui/compact/feedback.js'
 import { controllerHub } from '../../tauri-adapter.js'
-import { useI18n } from '../../desktop/i18n/index.js'
+import { useI18n } from '../../i18n/index.js'
 
 const { t } = useI18n()
 

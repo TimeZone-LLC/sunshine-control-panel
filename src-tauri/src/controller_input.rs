@@ -67,7 +67,7 @@ impl Chord {
 
 #[cfg(target_os = "windows")]
 pub(crate) fn read(index: u32) -> Option<u32> {
-    use windows::Win32::UI::Input::XboxController::{XInputGetState, XINPUT_STATE};
+    use windows::Win32::UI::Input::XboxController::{XINPUT_STATE, XInputGetState};
     let mut state = XINPUT_STATE::default();
     if unsafe { XInputGetState(index, &mut state) } != 0 {
         return None;

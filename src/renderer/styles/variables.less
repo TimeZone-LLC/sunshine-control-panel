@@ -1,81 +1,140 @@
-// Gura 红蓝主题色
-@primary-color: #ff6b6b;  // Gura 红色
-@primary-hover: #ff5252;
-@secondary-color: #4ecdc4;  // Gura 青色
-@secondary-hover: #26a69a;
+// Brutalist LESS variables.
+//
+// Vite injects this file (and mixins.less) into the top of EVERY .less block in
+// the app, including the <style lang="less"> block of every component. That is
+// deliberate: redefining a name here re-skins every call site at once without
+// touching the file that uses it.
+//
+// Every colour resolves to a token declared in app/app.css, so the
+// palette has exactly one home. Nothing here may reintroduce rounding, shadow,
+// gradient, blur or a hue.
 
-@text-primary: #1e293b;
-@text-secondary: #64748b;
-@text-muted: #94a3b8;
+// ---------------------------------------------------------------------------
+// Colour - all greyscale
+// ---------------------------------------------------------------------------
+// "Primary" is not a brand colour any more; it is simply the text colour.
+@primary-color: var(--text);
+@primary-hover: var(--text);
+@secondary-color: var(--text-dim);
+@secondary-hover: var(--text);
 
-@background-primary: #ffffff;
-@background-secondary: #f8fafc;
-@background-dark: #1e293b;
+@text-primary: var(--text);
+@text-secondary: var(--text-dim);
+@text-muted: var(--text-faint);
 
-@border-color: #e2e8f0;
-@border-dark: #334155;
+@background-primary: var(--bg);
+@background-secondary: var(--bg-panel);
+@background-input: var(--bg-input);
+@background-hover: var(--bg-hover);
+@background-active: var(--bg-active);
+// Kept as a literal because one call site passes it through LESS lighten().
+@background-dark: #17171a;
 
-// Gura 主题渐变色
-@gradient-primary: linear-gradient(135deg, #ff6b6b 0%, #4ecdc4 100%);
-@gradient-secondary: linear-gradient(135deg, #4ecdc4 0%, #45b7aa 100%);
-@gradient-accent: linear-gradient(135deg, #ff6b6b 0%, #ff8e8e 50%, #4ecdc4 100%);
+@border-color: var(--border);
+@border-soft: var(--border-soft);
+@border-dark: var(--border-strong);
 
-// 阴影
-@shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
-@shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
-@shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+// Signal colours. Only --error and --warn are hues; "success" and "info" are
+// deliberately greyscale, because status here is brightness, not colour.
+@color-danger: var(--error);
+@color-warning: var(--warn);
+@color-success: var(--on);
+@color-info: var(--text-dim);
 
-// 圆角
-@border-radius-sm: 8px;
-@border-radius-md: 12px;
-@border-radius-lg: 16px;
+// Retained for compatibility with existing call sites: flat fills, never a
+// gradient.
+@gradient-primary: var(--bg-hover);
+@gradient-secondary: var(--bg-hover);
+@gradient-accent: var(--bg-hover);
 
-// 间距
-@spacing-xs: 0.5rem;
-@spacing-sm: 1rem;
-@spacing-md: 1.5rem;
-@spacing-lg: 2rem;
-@spacing-xl: 3rem;
-@spacing-2xl: 4rem;
+// Structure is communicated by hairlines. gloss does allow a subtle NEUTRAL
+// elevation on top of that, but only these three steps, and only where the
+// allow-list in app/app.css grants it: xs on a resting surface at
+// most, sm/md for things that genuinely float.
+@shadow-sm: var(--shadow-xs);
+@shadow-md: var(--shadow-sm);
+@shadow-lg: var(--shadow-md);
 
-// 字体大小
-@font-size-xs: 0.75rem;
-@font-size-sm: 0.875rem;
-@font-size-base: 1rem;
-@font-size-lg: 1.125rem;
-@font-size-xl: 1.25rem;
-@font-size-2xl: 1.5rem;
-@font-size-3xl: 2rem;
-@font-size-4xl: 2.5rem;
-@font-size-5xl: 3rem;
+// Square, everywhere.
+@border-radius-sm: 0;
+@border-radius-md: 0;
+@border-radius-lg: 0;
 
-// 字体权重
+// ---------------------------------------------------------------------------
+// Density - IntelliJ tight. Fixed px, not rem, so the scale does not drift
+// with the root font size.
+// ---------------------------------------------------------------------------
+// The gloss spacing scale is 4 / 8 / 12 / 16 / 20. The @spacing-* names below
+// are the LESS mirror of --space-1 .. --space-5; @spacing-2xl is kept for the
+// handful of call sites that need a page-level gutter.
+@spacing-xs: 4px;
+@spacing-sm: 8px;
+@spacing-md: 12px;
+@spacing-lg: 16px;
+@spacing-xl: 20px;
+@spacing-2xl: 32px;
+
+// Controls (input, button, select) are 32px. Rows of data stay at 28.
+@control-height: 32px;
+@row-height: 28px;
+@pad-x: 10px;
+@pad-y: 6px;
+
+// ---------------------------------------------------------------------------
+// Typography - self-hosted Geist / Geist Mono. The faces are declared once, in
+// app/app.css; these two names are just the LESS handles for them.
+// ---------------------------------------------------------------------------
+@font-family-sans: var(--font-sans);
+@font-family-mono: var(--font-mono);
+
+@font-size-xs: 11px;
+@font-size-sm: 12px;
+@font-size-base: 13px;
+@font-size-lg: 14px;
+@font-size-xl: 15px;
+@font-size-2xl: 16px;
+@font-size-3xl: 18px;
+@font-size-4xl: 20px;
+@font-size-5xl: 24px;
+
+// Geist ships 400 / 500 / 600 / 700 as real faces, so nothing here is ever
+// synthesised. Weight is the only emphasis available - no uppercase, no
+// tracking, no colour.
 @font-weight-normal: 400;
 @font-weight-medium: 500;
 @font-weight-semibold: 600;
 @font-weight-bold: 700;
 
-// 行高
 @line-height-tight: 1.25;
 @line-height-normal: 1.5;
-@line-height-relaxed: 1.75;
+@line-height-relaxed: 1.6;
 
-// 断点
+// ---------------------------------------------------------------------------
+// Layout
+// ---------------------------------------------------------------------------
 @breakpoint-sm: 640px;
 @breakpoint-md: 768px;
 @breakpoint-lg: 1024px;
 @breakpoint-xl: 1280px;
 @breakpoint-2xl: 1536px;
 
-// 容器最大宽度
 @container-max-width: 1200px;
 
-// 过渡动画
-@transition-fast: 0.15s;
-@transition-normal: 0.3s;
-@transition-slow: 0.5s;
+// Rail (sidebar) width - the LESS mirror of --rail-width.
+@rail-width: 240px;
 
+// ---------------------------------------------------------------------------
+// Motion - only background-color/color/border-color animate, 120ms ease.
+// ---------------------------------------------------------------------------
+@transition-fast: 120ms;
+@transition-normal: 120ms;
+@transition-slow: 120ms;
+@transition-ease: ease;
+@transition-props: background-color, color, border-color;
+
+// ---------------------------------------------------------------------------
 // Z-index
+// ---------------------------------------------------------------------------
 @z-dropdown: 1000;
 @z-sticky: 1020;
 @z-fixed: 1030;

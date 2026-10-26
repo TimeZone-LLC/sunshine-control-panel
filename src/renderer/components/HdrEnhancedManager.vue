@@ -26,37 +26,31 @@
       </div>
     </header>
     <div class="quality-surface">
-      <nav class="quality-tabs" role="tablist" :aria-label="text.title">
-        <button
-          v-for="key in ['components', 'session', 'settings']"
-          :id="`quality-tab-${key}`"
-          :key="key"
-          role="tab"
-          :aria-controls="`quality-${key}`"
-          :aria-selected="tab === key"
-          @click="switchTab(key)"
-        >
-          {{ text[key] }}
-        </button>
-      </nav>
       <div class="quality-body">
-        <div
-          v-show="tab === 'components'"
+        <section
           id="quality-components"
-          role="tabpanel"
-          aria-labelledby="quality-tab-components"
+          role="region"
+          class="quality-section"
+          aria-labelledby="quality-components-heading"
         >
-          <p class="category-description">{{ text.componentHint }}</p>
+          <header class="quality-section-heading">
+            <h2 id="quality-components-heading">{{ text.components }}</h2>
+            <p>{{ text.componentHint }}</p>
+          </header>
           <div class="enhancement-stack">
             <EnhancementManager kind="nr" /><EnhancementManager kind="hdr" />
           </div>
-        </div>
-        <div
-          v-show="tab === 'session'"
+        </section>
+        <section
           id="quality-session"
-          role="tabpanel"
-          aria-labelledby="quality-tab-session"
+          role="region"
+          class="quality-section"
+          aria-labelledby="quality-session-heading"
         >
+          <header class="quality-section-heading">
+            <h2 id="quality-session-heading">{{ text.session }}</h2>
+            <p>{{ text.sessionHint }}</p>
+          </header>
           <div v-if="!online" class="quality-note">
             {{ text.disconnected }}
             <button class="quality-link" @click="pollOnce">
@@ -125,21 +119,22 @@
                 :disabled="!pipeline || saving"
                 @click="setVisibility(true)"
               >
-                <Monitor aria-hidden="true" />{{ text.open }}</button
-              ><button class="quality-button" @click="switchTab('settings')">
-                {{ text.settings }}
+                <Monitor aria-hidden="true" />{{ text.open }}
               </button>
             </div>
           </template>
-          <p class="quality-note">{{ text.sessionHint }}</p>
-        </div>
-        <div
-          v-show="tab === 'settings'"
+        </section>
+        <section
           id="quality-settings"
-          role="tabpanel"
-          aria-labelledby="quality-tab-settings"
+          role="region"
+          class="quality-section"
+          aria-labelledby="quality-settings-heading"
           @keydown="captureKey"
         >
+          <header class="quality-section-heading">
+            <h2 id="quality-settings-heading">{{ text.settings }}</h2>
+            <p>{{ text.local }}</p>
+          </header>
           <div class="quality-layout">
             <div>
               <div class="settings-row">
@@ -275,9 +270,9 @@
               <p class="quality-note">{{ text.previewHint }}</p>
             </aside>
           </div>
-        </div>
+        </section>
         <div
-          v-if="error || tab === 'settings'"
+          v-if="error || saved"
           class="quality-feedback"
           :class="{ failure: error }"
           role="status"
@@ -286,9 +281,7 @@
           {{
             error
               ? enhancementError(text, error)
-              : saved
-                ? text.saved
-                : text.local
+              : text.saved
           }}
         </div>
       </div>
@@ -299,11 +292,11 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import { ArrowUp, Monitor, Rank } from '@element-plus/icons-vue'
+import { ArrowUp, Monitor, Rank } from './ui/compact/icons.js'
 import { displayGamepadShortcut, FIXED_GAMEPAD_SHORTCUTS } from '../composables/controllerButtons.js'
 import NrSessionControls from './NrSessionControls.vue'
 import EnhancementManager from './EnhancementManager.vue'
-import { useI18n } from '../desktop/i18n/index.js'
+import { useI18n } from '../i18n/index.js'
 import {
   DEFAULT_NR_SHORTCUT,
   displayShortcut,
@@ -319,12 +312,10 @@ import {
 } from '../composables/nrOverlayState.js'
 import { shortcutCapture } from '../composables/shortcutCapture.js'
 import { nrOverlayText } from '../composables/nrOverlayMessages.js'
-// Element Plus has no keyboard glyph; use its established input icon.
-import { EditPen as Keyboard } from '@element-plus/icons-vue'
+import { EditPen as Keyboard } from './ui/compact/icons.js'
 const { locale } = useI18n()
 const text = computed(() => enhancementControlsText(locale.value)),
   overlayText = computed(() => nrOverlayText(locale.value))
-const tab = ref('components')
 const settings = ref({ nrShortcut: '', overlayShortcut: '', nrGamepad: '', overlayGamepad: '', opacity: 62 }),
   registration = ref({})
 const draftOpacity = ref(62),
@@ -414,10 +405,6 @@ async function clearShortcut(key) {
 async function resetShortcuts() {
   await cancelRecording()
   await save({ nrShortcut: DEFAULT_NR_SHORTCUT, overlayShortcut: '', nrGamepad: '', overlayGamepad: '' })
-}
-function switchTab(key) {
-  void cancelRecording()
-  tab.value = key
 }
 async function setVisibility(value) {
   try {

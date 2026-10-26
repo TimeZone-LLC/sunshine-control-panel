@@ -90,15 +90,18 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from '../ui/compact/feedback.js'
 import { usbip } from '../../tauri-adapter.js'
-import { useI18n } from '../../desktop/i18n/index.js'
+import { useI18n } from '../../i18n/index.js'
 import { useUsbTransport } from '../../composables/useUsbTransport.js'
 import UsbForwardingSettings from './UsbForwardingSettings.vue'
 import UsbTransportPanel from './UsbTransportPanel.vue'
 
 const { t } = useI18n()
-const transport = useUsbTransport()
+const props = defineProps({
+  transport: { type: Object, default: null },
+})
+const transport = props.transport || useUsbTransport()
 const { status, statusLoaded, statusProbeFailed, attachedDevices, refreshStatus, friendlyError, transportBusy } = transport
 const discovering = ref(false)
 const discoveryDone = ref(false)
@@ -168,4 +171,3 @@ watch([remote, tcpPort], () => {
   remoteDevices.value = []
 })
 </script>
-

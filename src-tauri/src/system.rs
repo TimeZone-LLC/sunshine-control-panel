@@ -58,9 +58,6 @@ pub struct SystemInfo {
     pub arch: String,
     pub platform: String,
     pub os_version: String,
-    pub tauri_version: String,
-    pub app_version: String,
-    pub build_time: String,
     pub memory_total: Option<u64>,
     pub cpu_model: Option<String>,
 }
@@ -142,10 +139,6 @@ pub async fn get_system_info() -> Result<SystemInfo, String> {
         // 基础信息
         let arch = env::consts::ARCH.to_string();
         let platform = env::consts::OS.to_string();
-        let tauri_version = tauri::VERSION.to_string();
-        let app_version = env!("CARGO_PKG_VERSION").to_string(); // 从 Cargo.toml 获取真实版本号
-        let build_time = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-
         // 使用 WMI 获取 Windows 系统信息
         let (os_version, memory_total, cpu_model) = match get_windows_system_info().await {
             Ok((os_ver, mem, cpu)) => (os_ver, Some(mem), Some(cpu)),
@@ -159,9 +152,6 @@ pub async fn get_system_info() -> Result<SystemInfo, String> {
             arch,
             platform,
             os_version,
-            tauri_version,
-            app_version,
-            build_time,
             memory_total,
             cpu_model,
         })
@@ -174,9 +164,6 @@ pub async fn get_system_info() -> Result<SystemInfo, String> {
             arch: env::consts::ARCH.to_string(),
             platform: env::consts::OS.to_string(),
             os_version: "Unknown".to_string(),
-            tauri_version: tauri::VERSION.to_string(), // 获取真实的 Tauri 版本
-            app_version: env!("CARGO_PKG_VERSION").to_string(), // 从 Cargo.toml 获取真实版本号
-            build_time: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
             memory_total: None,
             cpu_model: None,
         })

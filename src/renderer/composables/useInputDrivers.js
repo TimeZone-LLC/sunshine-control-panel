@@ -1,5 +1,5 @@
 import { reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage } from '../components/ui/compact/feedback.js'
 import { useVmouse } from './useVmouse.js'
 import { vigem, vmouse } from '../tauri-adapter.js'
 

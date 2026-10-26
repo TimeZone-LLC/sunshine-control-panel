@@ -123,9 +123,9 @@
 <script setup>
 import { useTouchWindowDrag } from '../../composables/useTouchWindowDrag.js'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { ArrowDown, ArrowUp, Close, Monitor, RefreshRight, Warning } from '@element-plus/icons-vue'
+import { ArrowDown, ArrowUp, Close, Monitor, RefreshRight, Warning } from '../../components/ui/compact/icons.js'
 import { sunshine } from '../../tauri-adapter.js'
-import { useI18n } from '../../desktop/i18n/index.js'
+import { useI18n } from '../../i18n/index.js'
 import { useAdaptiveWindowSize } from '../../composables/useAdaptiveWindowSize.js'
 
 const { t } = useI18n()
@@ -426,67 +426,50 @@ onUnmounted(() => {
 </script>
 
 <style lang="less" scoped>
+// Local scale for the performance monitor. Every name resolves to a canonical
+// brutalist token: greyscale throughout, with --warn and --error reserved for
+// the two thresholds a user must not miss.
 .tool-container {
-  --perf-bg: #f7fbff;
-  --perf-surface: #ffffff;
-  --perf-surface-soft: #f1f7fd;
-  --perf-border: #dce9f5;
-  --perf-border-muted: #e8f0f8;
-  --perf-text: #26344d;
-  --perf-text-muted: #78869b;
-  --perf-accent: #55bfd0;
-  --perf-accent-soft: #e4f7fa;
-  --perf-accent-hover: #b8e5ec;
-  --perf-accent-text: #218191;
-  --perf-good: #68c7a2;
-  --perf-warning: #f3bd63;
-  --perf-danger: #f27f90;
-  --perf-danger-soft: #fff0f3;
-  --perf-danger-border: #f6c8d0;
-  --perf-danger-text: #c24c61;
-  --perf-grid: #deebf4;
-  --perf-section: #8c98aa;
+  --perf-bg: var(--bg);
+  --perf-surface: var(--bg-panel);
+  --perf-surface-soft: var(--bg-hover);
+  --perf-border: var(--border);
+  --perf-border-muted: var(--border);
+  --perf-text: var(--text);
+  --perf-text-muted: var(--text-dim);
+  --perf-accent: var(--text);
+  --perf-accent-soft: var(--bg-hover);
+  --perf-accent-hover: var(--bg-hover);
+  --perf-accent-text: var(--text);
+  --perf-good: var(--on);
+  --perf-warning: var(--warn);
+  --perf-danger: var(--error);
+  --perf-danger-soft: var(--bg-hover);
+  --perf-danger-border: var(--error);
+  --perf-danger-text: var(--error);
+  --perf-grid: var(--border);
+  --perf-section: var(--border);
 
   width: 100vw;
-  padding: 12px;
+  padding: @spacing-md;
   box-sizing: border-box;
   color: var(--perf-text);
-  border-radius: var(--fd-card-radius, 12px);
   background: var(--perf-bg);
-  box-shadow: none;
-  transition: width 0.18s ease, background 0.18s ease;
 
   &.expanded {
     width: 100vw;
     overflow: visible;
   }
 
+  // Embedded in another panel: no chrome of its own, just the content.
   &.embedded {
-    --perf-surface: rgba(var(--fd-bg-primary-rgb, 15, 15, 35), 0.22);
-    --perf-border: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
-    --perf-border-muted: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.08);
-    --perf-text: var(--fd-text-primary, #fff);
-    --perf-text-muted: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.58);
-    --perf-accent: var(--fd-accent, #00fff5);
-    --perf-accent-soft: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
-    --perf-accent-hover: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.34);
-    --perf-accent-text: var(--fd-accent, #00fff5);
-    --perf-good: var(--fd-status-success, #34d399);
-    --perf-warning: var(--fd-status-warning, #fbbf24);
-    --perf-danger: var(--fd-status-danger, #f87171);
-    --perf-danger-soft: rgba(var(--fd-status-danger-rgb, 248, 113, 113), 0.18);
-    --perf-danger-border: rgba(var(--fd-status-danger-rgb, 248, 113, 113), 0.34);
-    --perf-danger-text: var(--fd-status-danger, #f87171);
-    --perf-grid: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.1);
-    --perf-section: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.46);
+    --perf-bg: transparent;
 
     width: 100%;
     max-height: none;
     padding: 0;
     border: none;
     background: transparent;
-    box-shadow: none;
-    backdrop-filter: none;
     overflow: visible;
   }
 }
@@ -536,7 +519,6 @@ onUnmounted(() => {
 .status-dot {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
 
   &.good {
     background: var(--perf-good);
@@ -568,7 +550,7 @@ onUnmounted(() => {
 
 .session-title {
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.15;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -596,7 +578,6 @@ onUnmounted(() => {
   height: 28px;
   flex: 0 0 28px;
   border: 1px solid var(--perf-border-muted);
-  border-radius: 8px;
   background: var(--perf-surface);
   color: var(--perf-text);
   display: flex;
@@ -604,7 +585,8 @@ onUnmounted(() => {
   justify-content: center;
   cursor: pointer;
   -webkit-app-region: no-drag;
-  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+  transition: background-color @transition-normal linear, border-color @transition-normal linear,
+    color @transition-normal linear;
 
   svg {
     width: 15px;
@@ -630,14 +612,9 @@ onUnmounted(() => {
 }
 
 .spinning {
-  animation: spin 0.8s linear infinite;
+  animation: brutalist-spin 0.8s linear infinite;
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 
 .compact-state {
   min-height: 72px;
@@ -650,8 +627,7 @@ onUnmounted(() => {
   justify-content: center;
   gap: 8px;
   text-align: center;
-  border: 1px dashed var(--perf-border);
-  border-radius: 10px;
+  border: 1px solid var(--perf-border);
   background: var(--perf-surface);
   color: var(--perf-text-muted);
   font-size: 12px;
@@ -677,8 +653,7 @@ onUnmounted(() => {
 
 .hud-metric {
   min-width: 0;
-  padding: 9px 10px;
-  border-radius: 10px;
+  padding: 8px 12px;
   background: var(--perf-surface);
   border: 1px solid var(--perf-border);
 
@@ -697,7 +672,9 @@ onUnmounted(() => {
 
   strong {
     margin-top: 4px;
-    font-size: 18px;
+    font-family: var(--font-mono);
+    font-size: 16px;
+    font-weight: @font-weight-medium;
     line-height: 1.15;
   }
 }
@@ -706,7 +683,6 @@ onUnmounted(() => {
   margin-top: 10px;
   padding: 10px;
   border: 1px solid var(--perf-border);
-  border-radius: 10px;
   background: var(--perf-surface);
 
   &.compact {
@@ -737,9 +713,9 @@ onUnmounted(() => {
 .sparkline-line {
   fill: none;
   stroke: var(--perf-accent);
-  stroke-width: 2.2;
-  stroke-linejoin: round;
-  stroke-linecap: round;
+  stroke-width: 1.5;
+  stroke-linejoin: miter;
+  stroke-linecap: butt;
 }
 
 .details {
@@ -748,11 +724,11 @@ onUnmounted(() => {
 
 .section-caption {
   margin: 12px 0 7px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--perf-section);
+  font-size: @font-size-xs;
+  font-weight: @font-weight-medium;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--perf-text-muted);
 }
 
 .detail-grid,
@@ -818,7 +794,6 @@ onUnmounted(() => {
 .pipeline-item {
   min-width: 0;
   padding: 8px;
-  border-radius: 8px;
   background: var(--perf-surface);
   border: 1px solid var(--perf-border-muted);
 
@@ -833,7 +808,9 @@ onUnmounted(() => {
 
   strong {
     margin-top: 3px;
-    font-size: 13px;
+    font-family: var(--font-mono);
+    font-size: @font-size-base;
+    font-weight: @font-weight-medium;
   }
 
   small {
@@ -845,8 +822,8 @@ onUnmounted(() => {
 
 .pipeline-item {
   span {
-    font-size: 13px;
-    font-weight: 700;
+    font-size: @font-size-base;
+    font-weight: @font-weight-normal;
   }
 }
 

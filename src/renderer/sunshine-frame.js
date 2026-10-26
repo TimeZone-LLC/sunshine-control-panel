@@ -1,18 +1,11 @@
 import { createApp } from 'vue'
-import SunshineFrame from './components/SunshineFrame.vue'
-import 'element-plus/theme-chalk/el-loading.css'
-import 'element-plus/theme-chalk/el-message.css'
-import 'element-plus/theme-chalk/el-overlay.css'
-import 'element-plus/theme-chalk/el-message-box.css'
-import 'element-plus/theme-chalk/el-notification.css'
-import './styles/dialog.less'  // 导入对话框样式
-// 导入 Tauri polyfill
-import './tauri-polyfill.js'
-import { i18n, getDefaultLocale, setLocale } from '../i18n/index.js'
+import './app/app.css'
+import './components/ui/compact/compact-ui.css'
+import RendererRoot from './app/RendererRoot.vue'
+import { compactUi } from './components/ui/compact/index.js'
 
-// 初始化语言
-setLocale(getDefaultLocale())
+document.documentElement.setAttribute('data-bs-theme', 'dark')
 
-const app = createApp(SunshineFrame)
-app.use(i18n)
+const app = createApp(RendererRoot)
+app.use(compactUi)
 app.mount('#app')

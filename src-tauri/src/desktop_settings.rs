@@ -46,10 +46,8 @@ pub struct DesktopSettings {
     pub file_mapping_menu_enabled: bool,
     pub notifications: bool,
     pub connection_notify: bool,
-    pub update_notify: bool,
     pub dev_mode: bool,
     pub log_level: String,
-    pub toolbar_shortcut_enabled: bool,
 }
 
 impl Default for DesktopSettings {
@@ -61,33 +59,10 @@ impl Default for DesktopSettings {
             file_mapping_menu_enabled: true,
             notifications: true,
             connection_notify: true,
-            update_notify: true,
             dev_mode: false,
             log_level: "info".to_string(),
-            toolbar_shortcut_enabled: true,
         }
     }
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DesktopSettingsStatus {
-    pub auto_start_registered: bool,
-    pub settings_path: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DesktopSettingsResponse {
-    pub settings: DesktopSettings,
-    pub status: DesktopSettingsStatus,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ToolbarShortcutStatus {
-    pub enabled: bool,
-    pub registered: bool,
 }
 
 fn settings_dir() -> Result<PathBuf, String> {
@@ -137,12 +112,11 @@ pub fn set_file_mapping_menu_enabled(enabled: bool) -> Result<(), String> {
 #[cfg(target_os = "windows")]
 fn startup_command(start_minimized: bool) -> Result<String, String> {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-    let mode = if start_minimized {
-        "--hidden"
+    if start_minimized {
+        Ok(format!("\"{}\" --hidden", exe.display()))
     } else {
-        "--desktop"
-    };
-    Ok(format!("\"{}\" {}", exe.display(), mode))
+        Ok(format!("\"{}\"", exe.display()))
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -156,15 +130,29 @@ fn apply_auto_start(settings: &DesktopSettings) -> Result<(), String> {
     let (run_key, _) = hkcu
         .create_subkey(r"Software\Microsoft\Windows\CurrentVersion\Run")
         .map_err(|e| e.to_string())?;
+    let current = run_key.get_value::<String, _>(RUN_VALUE_NAME).ok();
     if register_gui {
         let command = startup_command(settings.start_minimized)?;
-        run_key
-            .set_value(RUN_VALUE_NAME, &command)
-            .map_err(|e| e.to_string())?;
+        // This reconciliation runs on every launch, so only touch the registry
+        // when the stored command actually differs.
+        if current.as_deref() != Some(command.as_str()) {
+            run_key
+                .set_value(RUN_VALUE_NAME, &command)
+                .map_err(|e| e.to_string())?;
+        }
     } else {
-        let _ = run_key.delete_value(RUN_VALUE_NAME);
-        if settings.auto_start && managed_service_mode.is_some() {
-            log::debug!("Sunshine service owns GUI agent startup; removed legacy Run entry");
+        let service_owns_startup = service_starts_at_boot(managed_service_mode);
+        // Only drop the entry when the user turned auto-start off, or when the
+        // service itself starts Sunshine at boot. Removing it in any other state
+        // would delete the last remaining startup hook and undo a manual repair
+        // on every single launch.
+        if current.is_some() && (!settings.auto_start || service_owns_startup) {
+            let _ = run_key.delete_value(RUN_VALUE_NAME);
+            if settings.auto_start {
+                log::debug!(
+                    "Sunshine service starts at boot and owns the GUI agent; removed the redundant Run entry"
+                );
+            }
         }
     }
     Ok(())
@@ -262,12 +250,25 @@ fn managed_service_start_mode() -> Result<Option<ServiceStartMode>, String> {
     }
 }
 
+/// Reports whether the SCM starts the managed service on its own at boot.
+#[cfg(target_os = "windows")]
+fn service_starts_at_boot(managed_service_mode: Option<ServiceStartMode>) -> bool {
+    matches!(
+        managed_service_mode,
+        Some(ServiceStartMode::Auto | ServiceStartMode::DelayedAuto)
+    )
+}
+
 #[cfg(target_os = "windows")]
 fn should_register_gui_auto_start(
     requested: bool,
     managed_service_mode: Option<ServiceStartMode>,
 ) -> bool {
-    requested && managed_service_mode.is_none()
+    // The mere existence of a service does not make it a startup hook: the SCM
+    // never launches a Demand/Disabled service at boot, so the user-session Run
+    // entry has to stay registered in that case. Only an Auto/DelayedAuto
+    // service owns startup and makes the entry redundant.
+    requested && !service_starts_at_boot(managed_service_mode)
 }
 
 #[cfg(target_os = "windows")]
@@ -275,11 +276,9 @@ fn combined_auto_start_ready(
     managed_service_mode: Option<ServiceStartMode>,
     gui_registered: bool,
 ) -> bool {
-    match managed_service_mode {
-        Some(ServiceStartMode::Auto | ServiceStartMode::DelayedAuto) => true,
-        Some(ServiceStartMode::Demand | ServiceStartMode::Disabled) => false,
-        None => gui_registered,
-    }
+    // Mirror of `should_register_gui_auto_start`: whenever the service does not
+    // start itself, the Run entry is the only hook that can bring Sunshine up.
+    service_starts_at_boot(managed_service_mode) || gui_registered
 }
 
 #[cfg(target_os = "windows")]
@@ -312,8 +311,29 @@ fn configure_sunshine_service_start(mode: ServiceStartMode) -> Result<(), String
     result
 }
 
+/// Picks the service start type that satisfies the requested auto-start
+/// preference, or `None` when the current one already does. Returning `None`
+/// keeps a plain settings save from raising a UAC prompt for a no-op change,
+/// and keeps an explicitly disabled service disabled when auto-start is off.
+#[cfg(target_os = "windows")]
+fn desired_service_start_mode(
+    enabled: bool,
+    current: ServiceStartMode,
+) -> Option<ServiceStartMode> {
+    if enabled == service_starts_at_boot(Some(current)) {
+        return None;
+    }
+    Some(if enabled {
+        // Delayed start keeps boot fast and lets the GPU/driver stack settle
+        // before capture starts.
+        ServiceStartMode::DelayedAuto
+    } else {
+        ServiceStartMode::Demand
+    })
+}
+
 pub fn set_combined_auto_start_enabled(enabled: bool) -> Result<(), String> {
-    let mut previous = load_desktop_settings_from_disk();
+    let previous = load_desktop_settings_from_disk();
     let mut settings = previous.clone();
     settings.auto_start = enabled;
     settings.auto_start_sunshine = enabled;
@@ -323,23 +343,14 @@ pub fn set_combined_auto_start_enabled(enabled: bool) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     let mut service_changed = false;
     #[cfg(target_os = "windows")]
-    if let Some(mode) = previous_service_mode {
-        let target_mode = if enabled {
-            ServiceStartMode::Auto
-        } else {
-            ServiceStartMode::Demand
-        };
-        if mode != target_mode {
-            configure_sunshine_service_start(target_mode)?;
-            service_changed = true;
-        }
+    if let Some(mode) = previous_service_mode
+        && let Some(target_mode) = desired_service_start_mode(enabled, mode)
+    {
+        configure_sunshine_service_start(target_mode)?;
+        service_changed = true;
     }
 
     let _settings_guard = lock_desktop_settings();
-    let toolbar_shortcut_enabled = load_desktop_settings_from_disk().toolbar_shortcut_enabled;
-    settings.toolbar_shortcut_enabled = toolbar_shortcut_enabled;
-    previous.toolbar_shortcut_enabled = toolbar_shortcut_enabled;
-
     if let Err(error) = save_desktop_settings_to_disk(&settings) {
         #[cfg(target_os = "windows")]
         if service_changed && let Some(mode) = previous_service_mode {
@@ -358,91 +369,6 @@ pub fn set_combined_auto_start_enabled(enabled: bool) -> Result<(), String> {
     }
 
     Ok(())
-}
-
-fn status() -> DesktopSettingsStatus {
-    DesktopSettingsStatus {
-        auto_start_registered: is_auto_start_registered(),
-        settings_path: settings_path()
-            .map(|path| path.to_string_lossy().to_string())
-            .unwrap_or_default(),
-    }
-}
-
-#[tauri::command]
-pub fn get_desktop_settings() -> DesktopSettingsResponse {
-    DesktopSettingsResponse {
-        settings: load_desktop_settings_from_disk(),
-        status: status(),
-    }
-}
-
-#[tauri::command]
-pub async fn save_desktop_settings(
-    app: AppHandle,
-    mut settings: DesktopSettings,
-) -> Result<DesktopSettingsResponse, String> {
-    {
-        let _settings_guard = lock_desktop_settings();
-        // 桌宠快捷键只由桌宠设置页的独立命令修改，避免普通设置页保存旧快照时覆盖它。
-        settings.toolbar_shortcut_enabled = load_desktop_settings_from_disk().toolbar_shortcut_enabled;
-        normalize(&mut settings);
-        save_desktop_settings_to_disk(&settings)?;
-    }
-    apply_auto_start(&settings)?;
-    crate::tray::refresh_menu(&app);
-    crate::logger::set_log_level(&settings.log_level);
-    apply_dev_mode(&app, settings.dev_mode);
-
-    if settings.auto_start_sunshine {
-        ensure_sunshine_started_async();
-    }
-
-    Ok(DesktopSettingsResponse {
-        settings,
-        status: status(),
-    })
-}
-
-fn toolbar_shortcut_status(app: &AppHandle, enabled: bool) -> ToolbarShortcutStatus {
-    ToolbarShortcutStatus {
-        enabled,
-        registered: crate::app::toolbar_shortcut_is_registered(app),
-    }
-}
-
-/// 读取桌宠快捷键状态；若用户已启用，会顺便重试之前因冲突而失败的注册。
-#[tauri::command]
-pub fn load_toolbar_shortcut_status(app: AppHandle) -> ToolbarShortcutStatus {
-    let _settings_guard = lock_desktop_settings();
-    let settings = load_desktop_settings_from_disk();
-    if let Err(error) = crate::app::sync_toolbar_shortcut(&app, settings.toolbar_shortcut_enabled) {
-        log::warn!("Failed to synchronize toolbar shortcut while loading settings: {error}");
-    }
-    toolbar_shortcut_status(&app, settings.toolbar_shortcut_enabled)
-}
-
-#[tauri::command]
-pub fn set_toolbar_shortcut_enabled(
-    app: AppHandle,
-    enabled: bool,
-) -> Result<ToolbarShortcutStatus, String> {
-    let _settings_guard = lock_desktop_settings();
-    let previous = load_desktop_settings_from_disk();
-    crate::app::sync_toolbar_shortcut(&app, enabled)?;
-
-    let mut settings = previous.clone();
-    settings.toolbar_shortcut_enabled = enabled;
-    if let Err(error) = save_desktop_settings_to_disk(&settings) {
-        if let Err(rollback_error) =
-            crate::app::sync_toolbar_shortcut(&app, previous.toolbar_shortcut_enabled)
-        {
-            log::warn!("Failed to restore toolbar shortcut after save failure: {rollback_error}");
-        }
-        return Err(error);
-    }
-
-    Ok(toolbar_shortcut_status(&app, enabled))
 }
 
 pub fn apply_startup_settings(app: &AppHandle, settings: &DesktopSettings) {
@@ -550,7 +476,6 @@ mod tests {
 
         assert!(settings.notifications);
         assert!(settings.connection_notify);
-        assert!(settings.update_notify);
     }
 
     #[test]
@@ -560,29 +485,10 @@ mod tests {
 
         assert!(settings.notifications);
         assert!(settings.connection_notify);
-        assert!(settings.update_notify);
     }
 
     #[test]
-    fn toolbar_shortcut_is_enabled_by_default_and_for_legacy_settings() {
-        assert!(DesktopSettings::default().toolbar_shortcut_enabled);
-
-        let settings: DesktopSettings = serde_json::from_str(r#"{"autoStart":false}"#)
-            .expect("legacy desktop settings should deserialize");
-        assert!(settings.toolbar_shortcut_enabled);
-    }
-
-    #[test]
-    fn toolbar_shortcut_can_be_disabled_explicitly() {
-        let settings: DesktopSettings =
-            serde_json::from_str(r#"{"toolbarShortcutEnabled":false}"#)
-                .expect("toolbar shortcut setting should deserialize");
-
-        assert!(!settings.toolbar_shortcut_enabled);
-    }
-
-    #[test]
-    fn service_managed_startup_uses_service_mode_only() {
+    fn boot_starting_service_owns_startup() {
         assert!(combined_auto_start_ready(
             Some(ServiceStartMode::Auto),
             false
@@ -591,13 +497,39 @@ mod tests {
             Some(ServiceStartMode::DelayedAuto),
             false
         ));
-        assert!(!combined_auto_start_ready(
+        assert!(!should_register_gui_auto_start(
+            true,
+            Some(ServiceStartMode::Auto)
+        ));
+        assert!(!should_register_gui_auto_start(
+            true,
+            Some(ServiceStartMode::DelayedAuto)
+        ));
+    }
+
+    #[test]
+    fn demand_service_falls_back_to_gui_registration() {
+        // The SCM never starts a Demand/Disabled service at boot, so the Run
+        // entry stays the only startup hook and decides readiness.
+        assert!(should_register_gui_auto_start(
+            true,
+            Some(ServiceStartMode::Demand)
+        ));
+        assert!(should_register_gui_auto_start(
+            true,
+            Some(ServiceStartMode::Disabled)
+        ));
+        assert!(combined_auto_start_ready(
             Some(ServiceStartMode::Demand),
             true
         ));
         assert!(!combined_auto_start_ready(
+            Some(ServiceStartMode::Demand),
+            false
+        ));
+        assert!(!combined_auto_start_ready(
             Some(ServiceStartMode::Disabled),
-            true
+            false
         ));
     }
 
@@ -610,11 +542,35 @@ mod tests {
     }
 
     #[test]
-    fn service_managed_startup_does_not_duplicate_gui_registration() {
-        assert!(!should_register_gui_auto_start(
-            true,
-            Some(ServiceStartMode::Auto)
-        ));
+    fn service_start_mode_changes_only_when_needed() {
+        assert_eq!(
+            desired_service_start_mode(true, ServiceStartMode::Demand),
+            Some(ServiceStartMode::DelayedAuto)
+        );
+        assert_eq!(
+            desired_service_start_mode(true, ServiceStartMode::Disabled),
+            Some(ServiceStartMode::DelayedAuto)
+        );
+        assert_eq!(
+            desired_service_start_mode(true, ServiceStartMode::Auto),
+            None
+        );
+        assert_eq!(
+            desired_service_start_mode(true, ServiceStartMode::DelayedAuto),
+            None
+        );
+        assert_eq!(
+            desired_service_start_mode(false, ServiceStartMode::DelayedAuto),
+            Some(ServiceStartMode::Demand)
+        );
+        assert_eq!(
+            desired_service_start_mode(false, ServiceStartMode::Demand),
+            None
+        );
+        assert_eq!(
+            desired_service_start_mode(false, ServiceStartMode::Disabled),
+            None
+        );
     }
 
     #[test]

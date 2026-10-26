@@ -1,5 +1,3 @@
-@import './theme.less';
-
 .pill-shape() {
 }
 
@@ -250,7 +248,7 @@
 
   .driver-detection-card {
     --detection-accent: var(--accent);
-    --detection-accent-rgb: 216, 160, 160;
+    --detection-accent-rgb: var(--text-rgb);
     --detection-title: var(--text);
     --detection-copy: var(--text-muted);
     --detection-chip-bg: var(--bg-raised);
@@ -319,7 +317,7 @@
 
   .driver-detection-card {
     --detection-accent: var(--accent);
-    --detection-accent-rgb: 58, 126, 213;
+    --detection-accent-rgb: var(--text-rgb);
     --detection-title: var(--text);
     --detection-copy: var(--text-muted);
     --detection-chip-bg: var(--bg-raised);
@@ -1479,13 +1477,9 @@
   line-height: 1.6;
 }
 
-// Segmented page layout: reuse the existing cards and controls while showing
-// only the task the user is currently working on.
+// Embedded display workspace. Every task remains visible in one document flow.
 [data-bs-theme='dark'] {
   .vdd-settings-wrapper {
-    --vdd-tabs-bg: var(--bg-raised);
-    --vdd-tab-active-bg: var(--bg-raised);
-    --vdd-tab-active-text: var(--text);
     --vdd-callout-bg: var(--bg-raised);
     --vdd-callout-border: var(--border);
     --vdd-callout-icon-bg: var(--bg-raised);
@@ -1495,9 +1489,6 @@
 
 [data-bs-theme='light'] {
   .vdd-settings-wrapper {
-    --vdd-tabs-bg: var(--bg-raised);
-    --vdd-tab-active-bg: var(--bg-raised);
-    --vdd-tab-active-text: var(--accent);
     --vdd-callout-bg: var(--bg-raised);
     --vdd-callout-border: var(--border);
     --vdd-callout-icon-bg: var(--bg-raised);
@@ -1532,47 +1523,6 @@
     color: var(--el-text-color-regular);
     border-color: var(--el-border-color);
     background: var(--el-fill-color-light);
-  }
-}
-
-.vdd-section-tabs {
-  display: flex;
-  width: fit-content;
-  max-width: min(100%, 1440px);
-  margin: 0 auto 16px max(0px, calc((100% - 1440px) / 2));
-  padding: 4px;
-  gap: 4px;
-  border: 1px solid var(--el-border-color-lighter);
-  background: var(--vdd-tabs-bg);
-}
-
-.vdd-section-tab {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 36px;
-  padding: 8px 14px;
-  gap: 7px;
-  border: 0;
-  color: var(--el-text-color-secondary);
-  background: transparent;
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-  transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease;
-
-  &:hover {
-    color: var(--vdd-tab-active-text);
-    background: var(--el-fill-color-light);
-  }
-
-  &.active {
-    color: var(--vdd-tab-active-text);
-    background: var(--vdd-tab-active-bg);
-  }
-
-  :deep(.el-icon) {
-    font-size: 15px;
   }
 }
 
@@ -1677,45 +1627,6 @@
   margin: 0;
 }
 
-.form-layout.is-display,
-.form-layout.is-driver {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.form-layout.is-display .form-main {
-  display: flex;
-  width: 100%;
-  flex-direction: column;
-  grid-column: ~"1 / -1";
-  align-items: start;
-
-  > .section-card {
-    width: 100%;
-    box-sizing: border-box;
-  }
-}
-
-.form-layout.is-driver .form-side {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-column: ~"1 / -1";
-  align-items: start;
-
-  > .section-card:last-child {
-    grid-column: ~"1 / -1";
-  }
-}
-
-@media (min-width: 1600px) {
-  .form-layout.is-driver .form-side {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .form-layout.is-driver .form-side > .section-card:last-child {
-    grid-column: auto;
-  }
-}
-
 @media (max-width: 1100px) {
   .form-layout {
     grid-template-columns: 1fr;
@@ -1785,17 +1696,6 @@
     margin-bottom: 14px;
   }
 
-  .vdd-section-tabs {
-    margin-bottom: 14px;
-  }
-
-  .form-layout.is-driver .form-side {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .form-layout.is-driver .form-side > .section-card:last-child {
-    grid-column: 1;
-  }
 }
 
 @media (max-width: 980px) {
@@ -1834,14 +1734,6 @@
     grid-template-columns: 1fr;
   }
 
-  .form-layout.is-display .form-main,
-  .form-layout.is-driver .form-side {
-    grid-template-columns: 1fr;
-  }
-
-  .form-layout.is-driver .form-side > .section-card:last-child {
-    grid-column: 1;
-  }
 }
 
 @media (max-width: 640px) {
@@ -1857,15 +1749,6 @@
 
   .vdd-content {
     padding: 18px;
-  }
-
-  .vdd-section-tabs {
-    width: 100%;
-    overflow-x: auto;
-  }
-
-  .vdd-section-tab {
-    flex: 1 0 auto;
   }
 
   .page-header-actions {
@@ -1992,5 +1875,235 @@
 
   .cert-text {
     font-size: 16px;
+  }
+}
+
+// Canonical embedded-tool geometry. This final layer intentionally replaces
+// the legacy card dashboard without changing VDD behavior.
+.vdd-content {
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.vdd-actions-row {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+  padding: 6px 0;
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.vdd-actions-row .page-header-actions {
+  grid-column: auto;
+}
+
+.page-header-actions {
+  gap: 8px;
+
+  :deep(.el-button) {
+    min-height: 32px;
+    height: 32px;
+    padding: 0 10px;
+  }
+}
+
+.hero-panel,
+.section-card,
+.vdd-prerequisite-card,
+.driver-detection-card {
+  margin: 0 0 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  box-shadow: none;
+}
+
+.overview-panel {
+  gap: 0;
+}
+
+.overview-panel .vdd-header {
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.overview-panel .header-subtitle {
+  margin: 0 0 8px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.overview-panel .cert-badges {
+  display: flex;
+  width: 100%;
+  gap: 0;
+  border: 0;
+}
+
+.overview-panel .cert-badge {
+  min-height: 20px;
+  padding: 0 10px;
+  gap: 5px;
+  border: 0;
+  border-right: 1px solid var(--border-soft);
+  background: transparent;
+}
+
+.overview-panel .cert-badge:first-child {
+  padding-left: 0;
+}
+
+.overview-panel .cert-badge:last-child {
+  border-right: 0;
+}
+
+.overview-panel .cert-text,
+.overview-panel .cert-sub {
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 20px;
+}
+
+.vdd-settings-wrapper .overview-panel .cert-badge .cert-sub {
+  color: var(--text-dim);
+}
+
+.overview-panel .cert-text {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.overview-grid {
+  display: block;
+  margin: 0;
+}
+
+.overview-card {
+  display: grid;
+  min-height: 44px;
+  grid-template-columns: 180px minmax(160px, 0.65fr) minmax(220px, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+  border: 0;
+  border-bottom: 1px solid var(--border-soft);
+  background: transparent;
+  box-shadow: none;
+}
+
+.overview-label,
+.overview-hint {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.overview-value {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.overview-calibration-callout {
+  min-height: 52px;
+  grid-template-columns: 180px minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 8px 0 0;
+  border: 0;
+  background: transparent;
+}
+
+.overview-calibration-icon {
+  display: none;
+}
+
+.overview-calibration-copy {
+  display: contents;
+}
+
+.overview-calibration-copy h3 {
+  align-self: center;
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.overview-calibration-copy p {
+  align-self: center;
+  margin: 0;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.overview-calibration-callout > :deep(.el-button) {
+  min-height: 32px;
+  height: 32px;
+  margin: 0;
+}
+
+.vdd-form {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+.form-layout.is-flat {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.form-layout.is-flat .form-main,
+.form-layout.is-flat .form-side {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.form-layout.is-flat .form-side > .section-card:last-child {
+  grid-column: 1;
+}
+
+.vdd-content :deep(.el-button),
+.vdd-content :deep(.el-input__wrapper),
+.vdd-content :deep(.el-select__wrapper),
+.vdd-content :deep(.el-input-number) {
+  min-height: 32px;
+}
+
+.vdd-content :deep(.el-button--small),
+.vdd-content :deep(.el-tag) {
+  min-height: 28px;
+}
+
+@media (max-width: 720px) {
+  .vdd-content {
+    padding: 12px;
+  }
+
+  .vdd-actions-row {
+    justify-content: flex-start;
+  }
+
+  .overview-card {
+    grid-template-columns: 112px minmax(0, 1fr);
+  }
+
+  .overview-hint {
+    grid-column: 2;
+  }
+
+  .overview-calibration-callout {
+    grid-template-columns: 112px minmax(0, 1fr);
+  }
+
+  .overview-calibration-callout > :deep(.el-button) {
+    grid-column: 2;
+    justify-self: start;
   }
 }

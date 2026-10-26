@@ -63,9 +63,9 @@
 
 <script setup>
 import { ref } from 'vue'
-import { ChatLineSquare, Brush } from '@element-plus/icons-vue'
+import { ChatLineSquare, Brush } from '../../../components/ui/compact/icons.js'
 import { invoke } from '@tauri-apps/api/core'
-import { useI18n } from '../../../desktop/i18n/index.js'
+import { useI18n } from '../../../i18n/index.js'
 import SectionPanel from '../../components/SectionPanel.vue'
 
 const { t } = useI18n()

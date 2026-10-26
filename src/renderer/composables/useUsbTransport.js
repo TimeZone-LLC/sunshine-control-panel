@@ -1,7 +1,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from '../components/ui/compact/feedback.js'
 import { usbip } from '../tauri-adapter.js'
-import { useI18n } from '../desktop/i18n/index.js'
+import { useI18n } from '../i18n/index.js'
 import { useDeviceComponentOperation } from './useDeviceComponentOperation.js'
 
 export function useUsbTransport() {

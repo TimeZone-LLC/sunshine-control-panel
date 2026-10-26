@@ -13,7 +13,7 @@ use tauri::{
 
 #[cfg(target_os = "windows")]
 use crate::desktop_settings;
-use crate::{proxy_server, sunshine, toolbar, tray_config, utils, windows};
+use crate::{proxy_server, sunshine, tray_config, utils, windows};
 
 mod actions;
 mod events;
@@ -246,18 +246,14 @@ struct TrayStrings {
     reset_display: &'static str,
     reset_display_confirm: &'static str,
     restart_user_mode: &'static str,
-    show_toolbar: &'static str,
     prevent_sleep: &'static str,
     rtss_control: &'static str,
     host_performance: &'static str,
     log_console: &'static str,
-    open_desktop: &'static str,
     #[cfg(target_os = "windows")]
     auto_start: &'static str,
     #[cfg(any(debug_assertions, feature = "beta"))]
     web_stream: &'static str,
-    #[cfg(debug_assertions)]
-    debug_page: &'static str,
     about: &'static str,
     shutdown: &'static str,
     shutdown_message: &'static str,
@@ -313,18 +309,14 @@ const EN_STRINGS: TrayStrings = TrayStrings {
     reset_display: "Reset display",
     reset_display_confirm: "This resets persisted display-device state. Continue?",
     restart_user_mode: "Run Sunshine in user mode",
-    show_toolbar: "Show toolbar",
     prevent_sleep: "Prevent system sleep",
     rtss_control: "RTSS control",
     host_performance: "Host performance",
     log_console: "Log console",
-    open_desktop: "Large-screen mode",
     #[cfg(target_os = "windows")]
     auto_start: "Run at startup",
     #[cfg(any(debug_assertions, feature = "beta"))]
     web_stream: "Web streaming",
-    #[cfg(debug_assertions)]
-    debug_page: "Debug page",
     about: "About Sunshine",
     shutdown: "Exit Sunshine",
     shutdown_message: "This will stop the Sunshine service, GUI, and tray. Continue?",
@@ -415,12 +407,6 @@ fn build_owned_system_tray<R: Runtime + 'static>(app: &AppHandle<R>) -> tauri::R
     info!("GUI tray created for the current user session");
 
     Ok(())
-}
-
-fn open_desktop_gui_from_tray<R: Runtime>(app: &AppHandle<R>, source: &str) {
-    if let Err(e) = windows::open_desktop_window(app) {
-        error!("Failed to open desktop GUI from tray {}: {}", source, e);
-    }
 }
 
 fn open_main_panel_from_tray<R: Runtime>(app: &AppHandle<R>, source: &str) {
@@ -604,9 +590,7 @@ mod tests {
     }
 
     #[test]
-    fn primary_desktop_actions_have_clear_english_labels() {
-        assert_eq!(EN_STRINGS.open_desktop, "Large-screen mode");
-        assert_eq!(EN_STRINGS.show_toolbar, "Show toolbar");
+    fn primary_actions_have_clear_english_labels() {
         #[cfg(target_os = "windows")]
         assert_eq!(EN_STRINGS.auto_start, "Run at startup");
         assert_eq!(EN_STRINGS.shutdown, "Exit Sunshine");

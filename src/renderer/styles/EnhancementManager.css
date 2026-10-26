@@ -63,14 +63,6 @@
   background: var(--bg-surface);
 }
 
-.quality-tabs {
-  display: flex;
-  gap: 0;
-  margin-bottom: 12px;
-  border-bottom: 1px solid var(--border);
-}
-
-.quality-tabs button,
 .quality-button,
 .quality-link,
 .shortcut-controls button,
@@ -87,14 +79,6 @@
   cursor: pointer;
 }
 
-.quality-tabs button {
-  margin-bottom: -1px;
-  color: var(--text-muted);
-  border-bottom-color: transparent;
-}
-
-.quality-tabs button.active,
-.quality-tabs button[aria-selected='true'],
 .quality-button.primary {
   color: var(--text);
   border-color: var(--border-strong);
@@ -109,7 +93,6 @@
   border-color: var(--border-strong);
 }
 
-.quality-tabs button:focus-visible,
 .quality-button:focus-visible,
 .quality-link:focus-visible,
 .shortcut-controls button:focus-visible,
@@ -128,6 +111,31 @@
   cursor: default;
 }
 
+.quality-section + .quality-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.quality-section-heading {
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.quality-section-heading h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.quality-section-heading p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .quality-layout,
 .enhancement-stack,
 .component-details,
@@ -137,7 +145,6 @@
   gap: 12px;
 }
 
-.quality-surface,
 .enhancement-card,
 .component-window,
 .live-controls,
@@ -151,13 +158,25 @@
   box-shadow: none;
 }
 
-.quality-surface,
 .enhancement-card,
 .component-window,
 .live-controls,
 .shortcut-group,
 .preview-stage {
   padding: 12px;
+}
+
+.quality-surface {
+  border: 0;
+  background: transparent;
+}
+
+.component-window {
+  padding: 10px 0;
+  border: 0;
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+  background: transparent;
 }
 
 .enhancement-card,

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { rtxHdrMessages } from './rtxHdrMessages.js'
-import { en } from '../desktop/i18n/en.js'
+import { en } from '../i18n/en.js'
 
 test('HDR management is vendor-neutral while the backend keeps its identity', () => {
   assert.ok(en.sidebar.hdrEnhanced.length > 0)

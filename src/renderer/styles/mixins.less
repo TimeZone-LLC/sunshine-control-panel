@@ -1,4 +1,9 @@
-// 响应式断点混入
+// Brutalist LESS mixins.
+//
+// The decorative mixins (glass, tilt, lift, gradient text) are kept as names so
+// existing call sites keep compiling, but they now emit flat, square output.
+
+// Responsive breakpoints
 .respond-to(@breakpoint) when (@breakpoint = sm) {
   @media (min-width: @breakpoint-sm) { & { .respond-content(); } }
 }
@@ -12,14 +17,13 @@
   @media (min-width: @breakpoint-xl) { & { .respond-content(); } }
 }
 
-// 容器混入
 .container() {
   max-width: @container-max-width;
   margin: 0 auto;
   padding: 0 @spacing-md;
 }
 
-// Flexbox 混入
+// Flexbox
 .flex-center() {
   display: flex;
   align-items: center;
@@ -37,78 +41,107 @@
   flex-direction: column;
 }
 
-// 按钮混入
+// Buttons: square, hairline border, transparent fill. Hover changes the
+// background colour and nothing else.
 .btn-base() {
-  display: inline-block;
-  padding: 12px 24px;
-  border-radius: @border-radius-sm;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: @spacing-sm;
+  // gloss control contract: every button, input and select is 32px tall.
+  height: @control-height;
+  padding: 0 @spacing-md;
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: @font-size-base;
+  // IDE buttons are sentence case. No shouting, no letter-spacing.
+  font-weight: @font-weight-normal;
+  text-transform: none;
+  letter-spacing: normal;
   text-decoration: none;
-  font-weight: @font-weight-semibold;
-  transition: all @transition-normal;
-  border: none;
   cursor: pointer;
-  
+  transition: background-color @transition-normal @transition-ease,
+    color @transition-normal @transition-ease,
+    border-color @transition-normal @transition-ease;
+
   &:hover {
-    transform: translateY(-2px);
+    background-color: var(--bg-hover);
+  }
+
+  &:active {
+    background-color: var(--bg-active);
+  }
+
+  // Accessibility is not negotiable: every interactive element keeps a
+  // visible focus state.
+  &:focus-visible {
+    outline: 1px solid var(--border-strong);
+    outline-offset: 0;
+  }
+
+  &:disabled,
+  &[disabled] {
+    border-color: var(--border);
+    color: var(--text-faint);
+    cursor: default;
+    background: transparent;
   }
 }
 
 .btn-primary() {
   .btn-base();
-  background: @primary-color;
-  color: white;
-  
+  // There is no accent hue. "Primary" is a filled neutral block.
+  background: var(--bg-active);
+  border-color: var(--border-strong);
+  color: var(--text);
+
   &:hover {
-    background: @primary-hover;
+    background-color: var(--bg-hover);
   }
+}
+
+.btn-danger() {
+  .btn-base();
+  border-color: var(--error);
+  color: var(--error);
 }
 
 .btn-secondary() {
   .btn-base();
-  background: transparent;
-  color: @primary-color;
-  border: 2px solid @primary-color;
-  
-  &:hover {
-    background: @primary-color;
-    color: white;
-  }
 }
 
-// 卡片混入
+// Cards are a surface plus a hairline. No lift, no glow.
 .card() {
-  background: @background-primary;
-  border-radius: @border-radius-lg;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.1);
-  transition: all @transition-normal;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 0;
   position: relative;
-  overflow: hidden;
-  
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: @gradient-primary;
-    opacity: 0;
-    transition: opacity @transition-normal;
-  }
-  
+  transition: border-color @transition-normal linear;
+
   &:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1), 0 8px 16px rgba(0, 0, 0, 0.1);
-    
-    &::before {
-      opacity: 1;
-    }
+    border-color: var(--border-strong);
   }
 }
 
-// 网格布局混入
+// A dense list row: fixed height, hairline separator, hover fill.
+.row-base() {
+  display: flex;
+  align-items: center;
+  gap: @spacing-sm;
+  min-height: @row-height;
+  padding: 0 @pad-x;
+  border-bottom: 1px solid var(--border);
+  transition: background-color @transition-normal linear;
+
+  &:hover {
+    background-color: var(--bg-hover);
+  }
+}
+
+// Grid
 .grid-auto-fit(@min-width: 250px) {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(@min-width, 1fr));
@@ -119,46 +152,35 @@
   display: grid;
   grid-template-columns: repeat(@columns, 1fr);
   gap: @gap;
-  
+
   @media (max-width: @breakpoint-md) {
     grid-template-columns: 1fr;
   }
 }
 
-// 文本混入
+// Text
 .text-truncate() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.text-gradient(@start-color, @end-color) {
-  background: linear-gradient(135deg, @start-color, @end-color);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+// Section label. Kept under its old name so existing call sites compile, but
+// it no longer shouts: a dim, medium-weight, sentence-case line.
+.label-caps() {
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: @font-weight-medium;
+  font-size: @font-size-sm;
+  color: var(--text-dim);
 }
 
-// 动画混入
-.fade-in(@duration: @transition-normal) {
-  animation: fadeIn @duration ease-in-out;
+// Values, identifiers, paths, code and log output.
+.mono() {
+  font-family: var(--font-mono);
+  font-size: @font-size-sm;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.slide-up(@duration: @transition-normal) {
-  animation: slideUp @duration ease-out;
-}
-
-@keyframes slideUp {
-  from { transform: translateY(30px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-// 响应式隐藏/显示
 .hide-on-mobile() {
   @media (max-width: @breakpoint-md) {
     display: none;
@@ -172,7 +194,6 @@
   }
 }
 
-// 清除浮动
 .clearfix() {
   &::after {
     content: "";
@@ -181,7 +202,6 @@
   }
 }
 
-// 绝对居中
 .absolute-center() {
   position: absolute;
   top: 50%;
@@ -189,30 +209,29 @@
   transform: translate(-50%, -50%);
 }
 
-// 背景图片混入
+// Kept for call-site compatibility. There are no decorative backgrounds in
+// this design system, so this deliberately paints a flat panel surface
+// instead of loading the image it is handed.
 .bg-cover(@url) {
-  background-image: url(@url);
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  background-image: none;
+  background-color: var(--bg-panel);
 }
 
-// 滚动条样式
 .custom-scrollbar() {
   &::-webkit-scrollbar {
-    width: 8px;
+    width: 10px;
+    height: 10px;
   }
-  
+
   &::-webkit-scrollbar-track {
-    background: @background-secondary;
+    background: var(--bg);
   }
-  
+
   &::-webkit-scrollbar-thumb {
-    background: @border-color;
-    border-radius: 4px;
-    
+    background: var(--border);
+
     &:hover {
-      background: @text-secondary;
+      background: var(--border-strong);
     }
   }
 }

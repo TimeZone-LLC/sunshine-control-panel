@@ -1,8 +1,0 @@
-{
-  "$schema": "../gen/schemas/desktop-schema.json",
-  "identifier": "desktop-nr-settings",
-  "description": "Allows only the bundled desktop shell to read NR gamepad shortcut settings.",
-  "windows": ["desktop"],
-  "local": true,
-  "permissions": ["allow-nr-overlay-settings"]
-}

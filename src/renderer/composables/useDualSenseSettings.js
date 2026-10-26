@@ -1,5 +1,5 @@
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage } from '../components/ui/compact/feedback.js'
 import { dualsense } from '../tauri-adapter.js'
 import { dualSenseErrorCode } from './dualsenseErrors.js'
 import {
@@ -10,7 +10,7 @@ import {
   mergeDualSenseStatus,
 } from './dualsenseConfigSync.js'
 import { useDualSenseComponent } from './useDualSenseComponent.js'
-import { useI18n } from '../desktop/i18n/index.js'
+import { useI18n } from '../i18n/index.js'
 
 const CONFIG_SAVE_DEBOUNCE_MS = 300
 

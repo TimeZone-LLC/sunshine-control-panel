@@ -1,5 +1,5 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from '../components/ui/compact/feedback.js'
 import { open } from '@tauri-apps/plugin-dialog'
 import { dualsense, usbip } from '../tauri-adapter.js'
 import { friendlyDualSenseError, safeDualSenseTechnicalError } from './dualsenseErrors.js'
@@ -7,7 +7,7 @@ import { dualSenseConfigReadable, mergeDualSenseStatus } from './dualsenseConfig
 import { installSelectedDualSensePackages } from './dualsenseInstallFlow.js'
 import { dualSenseComponentAction, dualSenseComponentOperational, usbTransportPlan } from './deviceHubStatus.js'
 import { useDeviceComponentOperation } from './useDeviceComponentOperation.js'
-import { useI18n } from '../desktop/i18n/index.js'
+import { useI18n } from '../i18n/index.js'
 
 const STATUS_REFRESH_WAIT_TIMEOUT_MS = 5000
 

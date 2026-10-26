@@ -1,155 +1,92 @@
 <template>
-  <div class="log-console">
-    <!-- 头部 -->
-    <div class="header">
-      <div class="title">
-        <el-icon class="title-icon"><Document /></el-icon>
-        {{ logText.title }}
+  <div class="grid h-full min-h-0 grid-rows-[40px_auto_auto_minmax(0,1fr)_32px] bg-background font-mono text-xs text-foreground">
+    <header class="flex items-center justify-between gap-3 border-b border-border bg-card px-3">
+      <div class="flex min-w-0 items-center gap-3">
+        <h1 class="font-sans text-[13px] font-semibold">{{ logText.title }}</h1>
+        <span v-if="notice" class="truncate text-[11px]" :class="noticeTone === 'danger' ? 'text-destructive' : 'text-muted-foreground'">
+          {{ notice }}
+        </span>
       </div>
-      <div class="controls">
-        <button class="btn" @click="loadLogs">
-          <el-icon><RefreshRight /></el-icon>
-          {{ logText.refresh }}
-        </button>
-        <button class="btn" @click="exportLogs('txt')">
-          <el-icon><Download /></el-icon>
-          {{ logText.exportTxt }}
-        </button>
-        <button class="btn" @click="exportLogs('json')">
-          <el-icon><Download /></el-icon>
-          {{ logText.exportJson }}
-        </button>
-        <button class="btn danger" @click="clearLogs">
-          <el-icon><Delete /></el-icon>
-          {{ logText.clear }}
-        </button>
+      <div class="flex shrink-0 items-center gap-1">
+        <Button variant="outline" size="sm" :disabled="loading" @click="loadLogs">Refresh</Button>
+        <Button variant="outline" size="sm" @click="exportLogs('txt')">Export text</Button>
+        <Button variant="outline" size="sm" @click="exportLogs('json')">Export JSON</Button>
+        <Button variant="destructive" size="sm" @click="clearLogs">Clear</Button>
       </div>
+    </header>
+
+    <div class="flex min-h-8 flex-wrap items-center gap-x-4 gap-y-1 border-b border-border bg-card px-3 py-1 font-sans">
+      <span class="text-muted-foreground">Level</span>
+      <label v-for="level in levels" :key="level" class="flex h-6 items-center gap-1.5 px-1 text-xs hover:bg-accent">
+        <input v-model="filters[level]" type="checkbox" class="size-3 accent-foreground" />
+        <span :class="levelClass(level)">{{ level }}</span>
+      </label>
+      <span class="ml-auto text-muted-foreground">Source</span>
+      <select v-model="filters.file" class="h-6 min-w-44 border border-input bg-background px-1 font-mono text-xs outline-none focus-visible:outline-2 focus-visible:outline-ring">
+        <option value="">All files</option>
+        <option v-for="file in availableFiles" :key="file" :value="file">{{ file }}</option>
+      </select>
     </div>
 
-    <!-- 过滤栏 -->
-    <div class="filter-bar">
-      <div class="filter-group">
-        <span class="filter-label">{{ logText.filterLevel }}:</span>
-        <label class="filter-checkbox">
-          <input type="checkbox" v-model="filters.error" />
-          <span class="filter-label-error">{{ logText.error }}</span>
-        </label>
-        <label class="filter-checkbox">
-          <input type="checkbox" v-model="filters.warn" />
-          <span class="filter-label-warn">{{ logText.warn }}</span>
-        </label>
-        <label class="filter-checkbox">
-          <input type="checkbox" v-model="filters.info" />
-          <span class="filter-label-info">{{ logText.info }}</span>
-        </label>
-        <label class="filter-checkbox">
-          <input type="checkbox" v-model="filters.debug" />
-          <span class="filter-label-debug">{{ logText.debug }}</span>
-        </label>
-        <label class="filter-checkbox">
-          <input type="checkbox" v-model="filters.trace" />
-          <span class="filter-label-trace">{{ logText.trace }}</span>
-        </label>
-      </div>
-      <div class="filter-group">
-        <span class="filter-label">{{ logText.sourceFile }}:</span>
-        <select v-model="filters.file" class="file-filter-select">
-          <option value="">{{ logText.allFiles }}</option>
-          <option v-for="file in availableFiles" :key="file" :value="file">{{ file }}</option>
-        </select>
-      </div>
-    </div>
-
-    <!-- 搜索栏 -->
-    <div class="search-bar">
-      <div class="search-input-wrapper">
-        <el-icon class="search-icon"><Search /></el-icon>
+    <div class="flex min-h-8 items-center gap-2 border-b border-border bg-card px-3 py-1">
+      <div class="flex h-6 min-w-0 flex-1 items-center border border-input bg-background focus-within:outline-2 focus-within:outline-ring">
         <input
           v-model="searchKeyword"
-          type="text"
-          class="search-input"
+          type="search"
+          class="h-full min-w-0 flex-1 bg-transparent px-2 font-mono text-xs outline-none placeholder:text-muted-foreground"
           :placeholder="logText.searchPlaceholder"
           @input="handleSearchInput"
         />
-        <button v-if="searchKeyword" class="search-clear-btn" @click="clearSearch" :title="logText.clearSearch">
-          <el-icon><Close /></el-icon>
-        </button>
+        <Button v-if="searchKeyword" variant="ghost" size="icon" class="size-5 border-0" :aria-label="logText.clearSearch" @click="clearSearch">
+          <X :stroke-width="1.5" />
+        </Button>
       </div>
-      <div v-if="searchKeyword" class="search-info">
-        <span class="search-info-icon">🔍</span>
-        {{ logText.found }} <span class="search-info-count">{{ filteredLogs.length }}</span> {{ logText.matchResults }}
-      </div>
+      <span v-if="searchKeyword" class="shrink-0 text-muted-foreground">
+        {{ filteredLogs.length }} matches
+      </span>
     </div>
 
-    <!-- 日志容器 -->
-    <div class="log-container" ref="logContainer" @scroll="handleLogScroll">
-      <div v-if="filteredLogs.length === 0" class="empty-state">
-        <div class="empty-state-icon-wrapper">
-          <el-icon class="empty-state-icon" :size="56"><Document /></el-icon>
-          <div class="sparkle sparkle-1">✨</div>
-          <div class="sparkle sparkle-2">✨</div>
-          <div class="sparkle sparkle-3">✨</div>
-        </div>
-        <div class="empty-state-text">
-          {{ loading ? logText.loadingLogs : searchKeyword ? logText.noMatch : logText.noLogs }}
-        </div>
+    <div ref="logContainer" class="relative min-h-0 overflow-auto bg-background" @scroll="handleLogScroll">
+      <div v-if="filteredLogs.length === 0" class="grid h-full place-items-center font-sans text-muted-foreground">
+        {{ loading ? logText.loadingLogs : searchKeyword ? logText.noMatch : logText.noLogs }}
       </div>
-      <div v-else class="log-virtual-space" :style="{ height: `${totalHeight}px` }">
-        <div class="log-virtual-window" :style="{ transform: `translateY(${visibleOffset}px)` }">
+      <div v-else class="relative min-h-full" :style="{ height: `${totalHeight}px` }">
+        <div class="absolute inset-x-0 top-0" :style="{ transform: `translateY(${visibleOffset}px)` }">
           <div
             v-for="{ log, virtualIndex } in visibleLogs"
             :key="`${virtualIndex}-${log.timestamp}-${log.message}`"
-            :class="['log-entry', log.level]"
+            class="grid h-6 grid-cols-[150px_48px_minmax(100px,220px)_minmax(0,1fr)] items-center gap-2 overflow-hidden border-b border-border px-3 hover:bg-accent"
+            :class="levelClass(log.level)"
           >
-            <span class="log-timestamp">{{ log.timestamp }}</span>
-            <span :class="['log-level', log.level]">{{ log.level }}</span>
-            <span v-if="log.file" class="log-source">{{ log.file }}<span v-if="log.line">:{{ log.line }}</span></span>
-            <span class="log-message" v-html="highlightMessage(log.message)"></span>
+            <span class="truncate text-muted-foreground">{{ log.timestamp }}</span>
+            <span class="truncate">{{ log.level }}</span>
+            <span class="truncate text-muted-foreground">{{ log.file }}<template v-if="log.line">:{{ log.line }}</template></span>
+            <span class="truncate" v-html="highlightMessage(log.message)"></span>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 统计栏 -->
-    <div class="stats">
-      <div class="stat-item">
-        <span>{{ logText.total }}:</span>
-        <span class="stat-value">{{ stats.total }}</span>
-      </div>
-      <div class="stat-item">
-        <span class="stat-label-error">{{ logText.errors }}:</span>
-        <span class="stat-value">{{ stats.error }}</span>
-      </div>
-      <div class="stat-item">
-        <span class="stat-label-warn">{{ logText.warnings }}:</span>
-        <span class="stat-value">{{ stats.warn }}</span>
-      </div>
-      <div class="stat-item">
-        <span class="stat-label-info">{{ logText.info }}:</span>
-        <span class="stat-value">{{ stats.info }}</span>
-      </div>
-    </div>
+    <footer class="flex items-center gap-5 border-t border-border bg-card px-3 font-sans text-[11px] text-muted-foreground">
+      <span>Total <b class="font-mono font-normal text-foreground">{{ stats.total }}</b></span>
+      <span class="text-destructive">Errors <b class="font-mono font-normal">{{ stats.error }}</b></span>
+      <span class="text-warning">Warnings <b class="font-mono font-normal">{{ stats.warn }}</b></span>
+      <span>Info <b class="font-mono font-normal text-foreground">{{ stats.info }}</b></span>
+    </footer>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick, watchEffect } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watchEffect } from 'vue'
+import { X } from '@lucide/vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { confirm as dialogConfirm, message as dialogMessage } from '@tauri-apps/plugin-dialog'
-import { ElMessage } from 'element-plus'
-import { Document, RefreshRight, Delete, Search, Close, Download } from '@element-plus/icons-vue'
-import { useI18n } from '../desktop/i18n/index.js'
+import { Button } from '@/components/ui/button/index.js'
+import { useI18n } from '../i18n/index.js'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const logText = computed(() => t.value.logConsole)
-
-watchEffect(() => {
-  document.title = logText.value.title
-  document.documentElement.lang = locale.value === 'zh' ? 'zh-CN' : 'en'
-})
-
-// 响应式数据
 const allLogs = ref([])
 const loading = ref(false)
 const logContainer = ref(null)
@@ -157,238 +94,166 @@ const searchKeyword = ref('')
 const committedSearchKeyword = ref('')
 const scrollTop = ref(0)
 const viewportHeight = ref(1)
+const notice = ref('')
+const noticeTone = ref('neutral')
+const levels = ['error', 'warn', 'info', 'debug', 'trace']
+const filters = ref({ error: true, warn: true, info: true, debug: false, trace: false, file: '' })
 
-const LOG_ROW_HEIGHT = 40
+const LOG_ROW_HEIGHT = 24
 const LOG_OVERSCAN = 8
 const SEARCH_DEBOUNCE_MS = 120
 let searchTimer = null
+let noticeTimer = null
+let unsubscribe = null
 
-// 过滤器
-const filters = ref({
-  error: true,
-  warn: true,
-  info: true,
-  debug: false,
-  trace: false,
-  file: '', // 文件来源过滤
+watchEffect(() => {
+  document.title = logText.value.title
 })
 
-// 计算属性：获取所有可用的文件来源
 const logSummary = computed(() => {
   const files = new Set()
-  const counts = {
-    total: allLogs.value.length,
-    error: 0,
-    warn: 0,
-    info: 0,
+  const counts = { total: allLogs.value.length, error: 0, warn: 0, info: 0 }
+  for (const log of allLogs.value) {
+    if (log.file) files.add(log.file)
+    if (log.level in counts) counts[log.level] += 1
   }
-
-  allLogs.value.forEach((log) => {
-    if (log.file) {
-      files.add(log.file)
-    }
-    if (log.level === 'error') counts.error += 1
-    else if (log.level === 'warn') counts.warn += 1
-    else if (log.level === 'info') counts.info += 1
-  })
-
-  return {
-    files: Array.from(files).sort(),
-    stats: counts,
-  }
+  return { files: [...files].sort(), stats: counts }
 })
-
 const availableFiles = computed(() => logSummary.value.files)
+const stats = computed(() => logSummary.value.stats)
 
-// 计算属性：过滤后的日志（同时考虑级别、文件来源和关键词）
 const filteredLogs = computed(() => {
-  const enabledLevels = Object.entries(filters.value)
-    .filter(([key, enabled]) => key !== 'file' && enabled)
-    .map(([level, _]) => level)
-
-  let filtered = allLogs.value.filter((log) => enabledLevels.includes(log.level))
-
-  // 如果选择了文件来源，进行文件过滤
-  if (filters.value.file) {
-    filtered = filtered.filter((log) => log.file === filters.value.file)
-  }
-
-  // 如果有关键词，进行搜索过滤
-  if (committedSearchKeyword.value.trim()) {
-    const keyword = committedSearchKeyword.value.trim().toLowerCase()
-    filtered = filtered.filter((log) => {
-      const message = log.message.toLowerCase()
-      const timestamp = log.timestamp.toLowerCase()
-      const level = log.level.toLowerCase()
-      const file = (log.file || '').toLowerCase()
-      return message.includes(keyword) || timestamp.includes(keyword) || level.includes(keyword) || file.includes(keyword)
-    })
-  }
-
-  return filtered
+  const enabled = levels.filter((level) => filters.value[level])
+  const keyword = committedSearchKeyword.value.trim().toLowerCase()
+  return allLogs.value.filter((log) => {
+    if (!enabled.includes(log.level)) return false
+    if (filters.value.file && log.file !== filters.value.file) return false
+    if (!keyword) return true
+    return [log.message, log.timestamp, log.level, log.file || '']
+      .some((value) => String(value).toLowerCase().includes(keyword))
+  })
 })
 
-// 高亮消息中的关键词
-function highlightMessage(message) {
-  if (!committedSearchKeyword.value.trim()) {
-    return escapeHtml(message)
-  }
+const totalHeight = computed(() => filteredLogs.value.length * LOG_ROW_HEIGHT)
+const visibleStartIndex = computed(() => Math.max(0, Math.floor(scrollTop.value / LOG_ROW_HEIGHT) - LOG_OVERSCAN))
+const visibleEndIndex = computed(() => Math.min(
+  filteredLogs.value.length,
+  Math.ceil((scrollTop.value + viewportHeight.value) / LOG_ROW_HEIGHT) + LOG_OVERSCAN,
+))
+const visibleOffset = computed(() => visibleStartIndex.value * LOG_ROW_HEIGHT)
+const visibleLogs = computed(() => filteredLogs.value.slice(visibleStartIndex.value, visibleEndIndex.value).map((log, index) => ({
+  log,
+  virtualIndex: visibleStartIndex.value + index,
+})))
 
-  const keyword = committedSearchKeyword.value.trim()
-  const regex = new RegExp(`(${escapeRegex(keyword)})`, 'gi')
-  const highlighted = message.replace(regex, '<mark class="highlight">$1</mark>')
-  return highlighted
+function levelClass(level) {
+  if (level === 'error') return 'text-destructive'
+  if (level === 'warn') return 'text-warning'
+  if (level === 'debug' || level === 'trace') return 'text-muted-foreground'
+  return 'text-foreground'
 }
 
-// HTML 转义
 function escapeHtml(text) {
-  const div = document.createElement('div')
-  div.textContent = text
-  return div.innerHTML
+  const element = document.createElement('div')
+  element.textContent = String(text)
+  return element.innerHTML
 }
 
-// 正则表达式转义
-function escapeRegex(str) {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+function highlightMessage(message) {
+  const keyword = committedSearchKeyword.value.trim()
+  if (!keyword) return escapeHtml(message)
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return escapeHtml(message).replace(new RegExp(`(${escaped})`, 'gi'), '<mark class="bg-foreground text-background">$1</mark>')
 }
 
-// 处理搜索输入
+function showNotice(text, tone = 'neutral') {
+  clearTimeout(noticeTimer)
+  notice.value = text
+  noticeTone.value = tone
+  noticeTimer = window.setTimeout(() => { notice.value = '' }, 3500)
+}
+
 function handleSearchInput() {
   clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => {
+  searchTimer = window.setTimeout(() => {
     committedSearchKeyword.value = searchKeyword.value
-    if (logContainer.value) {
-      logContainer.value.scrollTop = 0
-      scrollTop.value = 0
-    }
+    if (logContainer.value) logContainer.value.scrollTop = 0
   }, SEARCH_DEBOUNCE_MS)
 }
 
-// 清除搜索
 function clearSearch() {
+  clearTimeout(searchTimer)
   searchKeyword.value = ''
   committedSearchKeyword.value = ''
-  clearTimeout(searchTimer)
-  if (logContainer.value) {
-    logContainer.value.scrollTop = 0
-    scrollTop.value = 0
-  }
-}
-
-// 计算属性：统计信息
-const stats = computed(() => logSummary.value.stats)
-
-const totalHeight = computed(() => filteredLogs.value.length * LOG_ROW_HEIGHT)
-const visibleStartIndex = computed(() => {
-  const maxStart = Math.max(0, filteredLogs.value.length - 1)
-  return Math.min(maxStart, Math.max(0, Math.floor(scrollTop.value / LOG_ROW_HEIGHT) - LOG_OVERSCAN))
-})
-const visibleEndIndex = computed(() =>
-  Math.min(
-    filteredLogs.value.length,
-    Math.ceil((scrollTop.value + viewportHeight.value) / LOG_ROW_HEIGHT) + LOG_OVERSCAN
-  )
-)
-const visibleOffset = computed(() => visibleStartIndex.value * LOG_ROW_HEIGHT)
-const visibleLogs = computed(() =>
-  filteredLogs.value.slice(visibleStartIndex.value, visibleEndIndex.value).map((log, index) => ({
-    log,
-    virtualIndex: visibleStartIndex.value + index,
-  }))
-)
-
-function updateViewportHeight() {
-  viewportHeight.value = logContainer.value?.clientHeight || 1
+  if (logContainer.value) logContainer.value.scrollTop = 0
 }
 
 function handleLogScroll() {
   scrollTop.value = logContainer.value?.scrollTop || 0
 }
 
-// 加载所有日志
+function updateViewportHeight() {
+  viewportHeight.value = logContainer.value?.clientHeight || 1
+}
+
 async function loadLogs() {
   loading.value = true
   try {
-    const logs = await invoke('get_all_logs')
-    allLogs.value = logs
-    ElMessage.success(logText.value.refreshed.replace('{count}', logs.length))
+    allLogs.value = await invoke('get_all_logs')
+    showNotice(`${allLogs.value.length} entries loaded`)
   } catch (error) {
-    console.error('加载日志失败:', error)
-    ElMessage.error(`${logText.value.refreshFailed}: ${error}`)
+    showNotice(String(error), 'danger')
   } finally {
     loading.value = false
   }
 }
 
-// 清空日志
 async function clearLogs() {
-  if (await dialogConfirm(logText.value.confirmClear, { title: logText.value.clearLogsTitle, kind: 'warning' })) {
-    try {
-      await invoke('clear_logs')
-      allLogs.value = []
-      ElMessage.success(logText.value.logsCleared)
-    } catch (error) {
-      console.error('清空日志失败:', error)
-      await dialogMessage(`${logText.value.clearFailed}: ${error}`, { title: logText.value.dialogError, kind: 'error' })
-    }
+  if (!await dialogConfirm(logText.value.confirmClear, { title: logText.value.clearLogsTitle, kind: 'warning' })) return
+  try {
+    await invoke('clear_logs')
+    allLogs.value = []
+    showNotice(logText.value.logsCleared)
+  } catch (error) {
+    await dialogMessage(String(error), { title: logText.value.dialogError, kind: 'error' })
   }
 }
 
-// 导出日志
 async function exportLogs(format) {
   try {
     const result = await invoke('export_logs', { format })
-    await dialogMessage(result || logText.value.exportSuccess, { title: logText.value.exportComplete, kind: 'info' })
+    showNotice(result || logText.value.exportSuccess)
   } catch (error) {
-    console.error('导出日志失败:', error)
-    if (error && !String(error).includes('用户取消了保存') && !String(error).toLowerCase().includes('cancel')) {
-      await dialogMessage(`${logText.value.exportFailed}: ${error}`, { title: logText.value.dialogError, kind: 'error' })
-    }
+    if (!String(error).toLowerCase().includes('cancel')) showNotice(String(error), 'danger')
   }
 }
 
-// 滚动到底部
 function scrollToBottom() {
   nextTick(() => {
-    if (logContainer.value) {
-      logContainer.value.scrollTop = logContainer.value.scrollHeight
-    }
+    if (logContainer.value) logContainer.value.scrollTop = logContainer.value.scrollHeight
   })
 }
 
-// 监听新日志事件
-let unsubscribe = null
-
 onMounted(async () => {
-  // 初始加载
+  if (!('__TAURI_INTERNALS__' in window || '__TAURI__' in window)) {
+    showNotice('Native log APIs are unavailable in browser preview.')
+    return
+  }
   await loadLogs()
   updateViewportHeight()
   window.addEventListener('resize', updateViewportHeight)
   scrollToBottom()
-
-  // 监听新日志事件
   unsubscribe = await listen('log-entry', (event) => {
-    const newLog = event.payload
-    allLogs.value.push(newLog)
-
-    // 限制日志数量
-    if (allLogs.value.length > 10000) {
-      allLogs.value = allLogs.value.slice(0, 10000)
-    }
-
+    allLogs.value.push(event.payload)
+    if (allLogs.value.length > 10000) allLogs.value = allLogs.value.slice(-10000)
     scrollToBottom()
   })
 })
 
 onUnmounted(() => {
   clearTimeout(searchTimer)
+  clearTimeout(noticeTimer)
   window.removeEventListener('resize', updateViewportHeight)
-  if (unsubscribe) {
-    unsubscribe()
-  }
+  unsubscribe?.()
 })
 </script>
-
-<style scoped lang="less">
-@import './LogConsoleApp.less';
-</style>

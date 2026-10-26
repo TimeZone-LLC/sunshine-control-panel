@@ -208,13 +208,17 @@
 
 <script setup>
 import '../styles/DualSenseSettings.less'
-import { useI18n } from '../desktop/i18n/index.js'
+import { useI18n } from '../i18n/index.js'
 import { useDualSenseSettings } from '../composables/useDualSenseSettings.js'
 import DualSenseComponentPanel from './controllersHub/DualSenseComponentPanel.vue'
 
 const { t } = useI18n()
 const emit = defineEmits(['open-controller-meta', 'manage-components'])
-defineProps({ embedded: { type: Boolean, default: false } })
+const props = defineProps({
+  embedded: { type: Boolean, default: false },
+  settings: { type: Object, default: null },
+})
+const settings = props.settings || useDualSenseSettings()
 const {
   component,
   audioHaptics, genshinCompatibility,
@@ -223,7 +227,7 @@ const {
   tuningSaving, tuningDirty, testCompleted,
   setAudioHaptics, setGenshinCompatibility,
   applyDefaultPreset, applyErmPreset, saveTuning, test,
-} = useDualSenseSettings()
+} = settings
 const {
   status, statusKnown, operation, controlsBusy, componentControlsBusy,
   componentOperational, nextAction, canTestAudioHaptics,

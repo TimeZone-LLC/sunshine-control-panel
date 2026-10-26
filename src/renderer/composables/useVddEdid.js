@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from '../components/ui/compact/feedback.js'
 import { vdd } from '../tauri-adapter.js'
 
 const VALID_EDID_SIZES = [128, 256]

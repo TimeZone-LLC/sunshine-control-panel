@@ -50,10 +50,10 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage } from '../ui/compact/feedback.js'
 import { openExternalUrl, sunshine, virtualMicrophone } from '../../tauri-adapter.js'
 import { canTestMicrophone, microphoneOverviewState, microphoneStatusTone, microphoneUsesUsbip } from '../../composables/deviceHubStatus.js'
-import { useI18n } from '../../desktop/i18n/index.js'
+import { useI18n } from '../../i18n/index.js'
 
 const emit = defineEmits(['manage-components'])
 const { t } = useI18n()

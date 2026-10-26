@@ -6,7 +6,7 @@
     </div>
 
     <div class="tool-content">
-      <!-- 客户端选择 -->
+      <!-- Client selection -->
       <div class="section">
         <label class="section-label">{{ t.bitrateTool.selectClient }}</label>
         <select
@@ -31,15 +31,14 @@
         </button>
       </div>
 
-      <!-- 加载状态（仅首次加载时显示） -->
+      <!-- Loading state, shown only on the first load -->
       <div v-if="isLoading" class="loading-state">
         <p>{{ t.bitrateTool.loading }}</p>
       </div>
 
-      <!-- 无会话提示 -->
+      <!-- No active session -->
       <template v-else-if="activeSessions.length === 0">
         <div class="empty-state">
-          <div class="icon"><Connection /></div>
           <p>{{ t.bitrateTool.noStream }}</p>
           <p class="subtitle">{{ t.bitrateTool.noStreamSub }}</p>
           <p v-if="allSessions.length > 0" class="subtitle warning-text">
@@ -48,10 +47,10 @@
         </div>
       </template>
 
-      <!-- 码率调整界面 -->
+      <!-- Bitrate controls -->
       <template v-else-if="selectedClient">
         <div class="bitrate-controls">
-          <!-- 当前码率显示 -->
+          <!-- Current bitrate -->
           <div class="bitrate-display">
             <span class="bitrate-value">{{ formatBitrate(bitrateValue) }}</span>
             <span class="bitrate-label">{{ t.bitrateTool.targetBitrate }}</span>
@@ -61,7 +60,7 @@
             </div>
           </div>
 
-          <!-- 码率滑块 -->
+          <!-- Bitrate slider -->
           <div class="slider-container">
             <input
               type="range"
@@ -78,7 +77,7 @@
             </div>
           </div>
 
-          <!-- 预设按钮 -->
+          <!-- Presets -->
           <div class="presets">
             <button
               v-for="preset in BITRATE_PRESETS"
@@ -92,7 +91,7 @@
             </button>
           </div>
 
-          <!-- 自定义输入 -->
+          <!-- Custom value -->
           <div class="custom-input">
             <input
               type="number"
@@ -107,7 +106,7 @@
             <span class="input-label">Kbps</span>
           </div>
 
-          <!-- 应用按钮 -->
+          <!-- Apply -->
           <div class="actions">
             <button @click="applyBitrate" class="apply-btn" :disabled="applying || !selectedClient">
               {{ applying ? t.bitrateTool.applying : t.bitrateTool.apply }}
@@ -116,13 +115,12 @@
         </div>
       </template>
 
-      <!-- 未选择客户端提示 -->
+      <!-- No client selected -->
       <div v-else class="empty-state">
-        <div class="icon"><Top /></div>
         <p>{{ t.bitrateTool.selectFirst }}</p>
       </div>
 
-      <!-- 消息提示 -->
+      <!-- Messages -->
       <transition name="message-fade">
         <div v-if="message" :class="['message', messageType]">
           {{ message }}
@@ -135,12 +133,12 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { sunshine } from '../../tauri-adapter.js'
-import { RefreshRight, Connection, Top } from '@element-plus/icons-vue'
-import { useI18n } from '../../desktop/i18n/index.js'
+import { RefreshRight } from '../../components/ui/compact/icons.js'
+import { useI18n } from '../../i18n/index.js'
 
 const { t } = useI18n()
 
-// 常量定义
+// Constants
 const BITRATE_LIMITS = Object.freeze({
   MIN: 1000,
   MAX: 800000,
@@ -161,7 +159,7 @@ defineProps({
 
 defineEmits(['close'])
 
-// 响应式状态
+// Reactive state
 const activeSessions = ref([])
 const allSessions = ref([])
 const selectedClient = ref('')
@@ -172,7 +170,7 @@ const applying = ref(false)
 const message = ref('')
 const messageType = ref('')
 
-// 计算属性
+// Computed
 const isLoading = computed(() => loading.value && !refreshing.value)
 
 const selectedSession = computed(() => {
@@ -182,7 +180,7 @@ const selectedSession = computed(() => {
 
 const currentBitrate = computed(() => selectedSession.value?.bitrate ?? null)
 
-// 工具函数
+// Helpers
 const formatBitrate = (kbps) => (kbps >= 1000 ? `${(kbps / 1000).toFixed(0)} Mbps` : `${kbps} Kbps`)
 
 const isValidBitrate = (value) => value >= BITRATE_LIMITS.MIN && value <= BITRATE_LIMITS.MAX
@@ -203,7 +201,7 @@ const getSessionBitrate = (clientName) => {
   return session?.bitrate ?? DEFAULT_BITRATE
 }
 
-// 会话管理
+// Session management
 const loadSessions = async (isRefresh = false) => {
   if (isRefresh) {
     refreshing.value = true
@@ -224,14 +222,14 @@ const loadSessions = async (isRefresh = false) => {
       return
     }
 
-    // 恢复或选择客户端
+    // Restore or pick a client.
     const clientExists = activeSessions.value.some((s) => s.client_name === previousClient)
     selectedClient.value = previousClient && clientExists ? previousClient : activeSessions.value[0].client_name
 
-    // 设置当前客户端码率到滑块
+    // Seed the slider with the current client's bitrate.
     bitrateValue.value = getSessionBitrate(selectedClient.value)
   } catch (error) {
-    console.error('获取活动会话失败:', error)
+    console.error('Failed to read the active sessions:', error)
     showMessage(t.value.bitrateTool.loadFailed.replace('{error}', error), 'error')
   } finally {
     loading.value = false
@@ -245,7 +243,7 @@ const onClientChange = () => {
   }
 }
 
-// 码率调整
+// Bitrate adjustment
 const applyBitrate = async () => {
   if (!selectedClient.value) {
     showMessage(t.value.bitrateTool.selectFirstError, 'error', 3000)
@@ -268,12 +266,12 @@ const applyBitrate = async () => {
 
   try {
     const result = await sunshine.changeBitrate(selectedClient.value, bitrateValue.value)
-    showMessage(`✅ ${result}`, 'success')
+    showMessage(`${result}`, 'success')
     setTimeout(() => loadSessions(true), REFRESH_DELAY)
   } catch (error) {
-    console.error('码率调整错误:', error)
+    console.error('Bitrate adjustment failed:', error)
     const errorMessage = error.toString()
-    if (errorMessage.includes('身份验证') || errorMessage.includes('401')) {
+    if (errorMessage.toLowerCase().includes('auth') || errorMessage.includes('401')) {
       showMessage(t.value.bitrateTool.authFailed, 'error')
     } else {
       showMessage(t.value.bitrateTool.applyFailed.replace('{error}', error), 'error')
@@ -287,17 +285,21 @@ onMounted(loadSessions)
 </script>
 
 <style lang="less" scoped>
+// Bitrate tool. In-stream overlay: dense rows, one hairline between each,
+// values in monospace. The only colour is --warn / --error on a message that
+// actually reports a failure.
+
 .tool-container {
   width: 100%;
-  color: white;
-  
+  color: var(--text);
+
   &.embedded {
     width: 100%;
-    
+
     .tool-header {
       display: none;
     }
-    
+
     .tool-content {
       padding: 0;
       min-height: 236px;
@@ -306,60 +308,67 @@ onMounted(loadSessions)
 }
 
 .tool-header {
-  padding: 16px 24px;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  height: @row-height;
+  padding: 0 @pad-x;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
   position: relative;
 
   h2 {
     margin: 0;
-    font-size: 20px;
-    font-weight: 600;
-    text-align: center;
+    font-size: @font-size-base;
+    font-weight: @font-weight-medium;
+    text-align: left;
   }
 }
 
 .close-btn {
   position: absolute;
-  top: 12px;
-  right: 16px;
-  width: 32px;
-  height: 32px;
+  top: 0;
+  right: 0;
+  width: @row-height;
+  height: @row-height;
   border: none;
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-  font-size: 28px;
+  border-left: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 16px;
   line-height: 1;
-  border-radius: 50%;
   cursor: pointer;
-  transition: all 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: rotate(90deg);
+    background: var(--bg-hover);
+    color: var(--text);
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--border-strong);
+    outline-offset: -1px;
   }
 }
 
 .tool-content {
-  padding: 20px 30px;
+  padding: @spacing-md @pad-x;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: @spacing-md;
 }
 
 .section {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: @spacing-sm;
   min-width: 0;
 }
 
 .section-label {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: @font-size-base;
+  color: var(--text-dim);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -367,173 +376,157 @@ onMounted(loadSessions)
 .client-select {
   flex: 1;
   min-width: 0;
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
-  color: white;
-  font-size: 14px;
+  height: @row-height;
+  padding: 0 @spacing-sm;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: @font-size-sm;
   cursor: pointer;
-  transition: all 0.2s;
   overflow: hidden;
   text-overflow: ellipsis;
 
-  &:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.3);
+  &:hover:not(:disabled),
+  &:focus {
+    border-color: var(--border-strong);
   }
 
   &:disabled {
-    opacity: 0.6;
+    color: var(--text-faint);
     cursor: not-allowed;
   }
 
   option {
-    background: #2a2a2a;
-    color: white;
+    background: var(--bg-panel);
+    color: var(--text);
   }
 }
 
 .refresh-btn {
-  width: 36px;
-  height: 36px;
+  width: @row-height;
+  height: @row-height;
   flex-shrink: 0;
-  border: none;
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text);
   cursor: pointer;
-  transition: all 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;
 
   &:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.2);
+    background: var(--bg-hover);
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--border-strong);
+    outline-offset: 0;
   }
 
   &:disabled {
-    opacity: 0.6;
+    color: var(--text-faint);
     cursor: not-allowed;
   }
 
+  // The one motion the system keeps: a plain rotation while work is in flight.
   .spinning {
-    animation: spin 1s linear infinite;
+    animation: brutalist-spin 1s linear infinite;
   }
 
   .refresh-icon {
-    width: 18px;
-    height: 18px;
+    width: 14px;
+    height: 14px;
     flex-shrink: 0;
   }
 }
 
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
 
 .loading-state,
 .empty-state {
   text-align: center;
-  padding: 28px 20px;
+  padding: @spacing-lg @spacing-md;
+  color: var(--text-dim);
 }
 
 .empty-state {
-  min-height: 190px;
+  min-height: 120px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-
-  .icon {
-    width: 64px;
-    height: 64px;
-    margin-bottom: 16px;
-    border-radius: 18px;
-    background: rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.88);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-
-    :deep(svg) {
-      width: 34px;
-      height: 34px;
-      flex-shrink: 0;
-    }
-  }
+  gap: @spacing-xs;
 
   p {
-    font-size: 16px;
-    color: rgba(255, 255, 255, 0.9);
-    opacity: 1;
-    margin-bottom: 8px;
+    margin: 0;
+    font-size: @font-size-base;
+    color: var(--text);
   }
 
   .subtitle {
-    font-size: 14px;
-    color: rgba(255, 255, 255, 0.62);
-    opacity: 1;
+    font-size: @font-size-sm;
+    color: var(--text-dim);
   }
 
   .warning-text {
-    margin-top: 8px;
-    color: rgba(255, 152, 0, 0.9);
+    color: var(--warn);
   }
 }
 
 .bitrate-controls {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: @spacing-md;
 }
 
 .bitrate-display {
-  text-align: center;
-  padding: 20px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
+  padding: @spacing-md;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
 }
 
 .bitrate-value {
-  font-size: 48px;
-  font-weight: 700;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
   display: block;
-  margin-bottom: 8px;
-  animation: pulse 2s ease-in-out infinite;
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: @font-weight-medium;
+  line-height: 1.1;
 }
 
 .bitrate-label {
-  font-size: 14px;
-  opacity: 0.8;
+  font-size: @font-size-sm;
+  color: var(--text-dim);
 }
 
-@keyframes pulse {
-  0%,
-  100% {
-    transform: scale(1);
+.current-bitrate {
+  display: flex;
+  justify-content: space-between;
+  gap: @spacing-sm;
+  margin-top: @spacing-sm;
+  padding-top: @spacing-sm;
+  border-top: 1px solid var(--border);
+  font-size: @font-size-sm;
+
+  .current-bitrate-label {
+    color: var(--text-dim);
   }
-  50% {
-    transform: scale(1.02);
+
+  .current-bitrate-value {
+    font-family: var(--font-mono);
+    color: var(--text);
   }
 }
 
 .slider-container {
-  padding: 0 5px;
+  padding: 0;
 }
 
 .bitrate-slider {
   width: 100%;
-  height: 6px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.3);
+  height: 4px;
+  padding: 0;
+  border: 0;
+  background: var(--bg-active);
   outline: none;
   -webkit-appearance: none;
   appearance: none;
@@ -541,36 +534,27 @@ onMounted(loadSessions)
 
   &::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: white;
+    width: 10px;
+    height: 16px;
+    background: var(--text);
     cursor: pointer;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-    transition: transform 0.2s;
-
-    &:hover {
-      transform: scale(1.15);
-    }
   }
 
   &::-moz-range-thumb {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: white;
-    cursor: pointer;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    width: 10px;
+    height: 16px;
+    background: var(--text);
     border: none;
-    transition: transform 0.2s;
+    cursor: pointer;
+  }
 
-    &:hover {
-      transform: scale(1.15);
-    }
+  &:focus-visible {
+    outline: 1px solid var(--border-strong);
+    outline-offset: 2px;
   }
 
   &:disabled {
-    opacity: 0.6;
+    background: var(--bg-hover);
     cursor: not-allowed;
   }
 }
@@ -578,43 +562,48 @@ onMounted(loadSessions)
 .slider-labels {
   display: flex;
   justify-content: space-between;
-  margin-top: 4px;
-  font-size: 12px;
-  opacity: 0.7;
+  margin-top: @spacing-xs;
+  font-family: var(--font-mono);
+  font-size: @font-size-xs;
+  color: var(--text-faint);
 }
 
 .presets {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  justify-content: center;
+  gap: @spacing-xs;
 }
 
 .preset-btn {
-  padding: 6px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-  border-radius: 15px;
+  height: 22px;
+  padding: 0 @spacing-md;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text);
   cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  transition: all 0.2s;
+  font-family: var(--font-mono);
+  font-size: @font-size-sm;
+  font-weight: @font-weight-normal;
 
   &:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.2);
-    border-color: rgba(255, 255, 255, 0.5);
+    background: var(--bg-hover);
   }
 
+  &:focus-visible {
+    outline: 1px solid var(--border-strong);
+    outline-offset: 0;
+  }
+
+  // Selected = a filled cell, not a hue.
   &.active {
-    background: white;
-    color: #4a9eff;
-    border-color: white;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    background: var(--bg-active);
+    color: var(--text);
+    border-color: var(--border-strong);
   }
 
   &:disabled {
-    opacity: 0.6;
+    color: var(--text-faint);
+    border-color: var(--border);
     cursor: not-allowed;
   }
 }
@@ -622,101 +611,98 @@ onMounted(loadSessions)
 .custom-input {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 6px;
+  gap: @spacing-sm;
 }
 
 .bitrate-input {
   flex: 1;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  padding: 6px 10px;
-  color: white;
-  font-size: 14px;
+  height: @row-height;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  padding: 0 @spacing-sm;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: @font-size-sm;
   outline: none;
-  transition: all 0.2s;
 
   &:focus {
-    border-color: rgba(255, 255, 255, 0.4);
-    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--border-strong);
+    outline: 1px solid var(--border-strong);
+    outline-offset: 0;
   }
 
   &:disabled {
-    opacity: 0.6;
+    color: var(--text-faint);
     cursor: not-allowed;
   }
 }
 
 .input-label {
-  font-size: 14px;
-  opacity: 0.8;
+  font-family: var(--font-mono);
+  font-size: @font-size-sm;
+  color: var(--text-dim);
 }
 
 .actions {
-  text-align: center;
+  display: flex;
 }
 
 .apply-btn {
-  padding: 10px 32px;
-  background: white;
-  color: #4a9eff;
-  border: none;
-  border-radius: 25px;
-  font-size: 14px;
-  font-weight: 600;
+  height: @row-height;
+  padding: 0 @spacing-lg;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  font-size: @font-size-base;
+  font-weight: @font-weight-normal;
   cursor: pointer;
-  transition: all 0.2s;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
 
   &:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    background: var(--bg-hover);
   }
 
   &:active:not(:disabled) {
-    transform: translateY(0);
+    background: var(--bg-active);
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--border-strong);
+    outline-offset: 0;
   }
 
   &:disabled {
-    opacity: 0.6;
+    color: var(--text-faint);
+    border-color: var(--border);
     cursor: not-allowed;
   }
 }
 
+// Result line. Success is brightness; warn and error are the only hues, and
+// they only appear when something actually went wrong.
 .message {
-  text-align: center;
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-size: 12px;
+  padding: @pad-y @pad-x;
+  font-size: @font-size-sm;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
 
   &.success {
-    background: rgba(76, 175, 80, 0.9);
+    color: var(--text);
   }
 
   &.warning {
-    background: rgba(255, 152, 0, 0.9);
+    color: var(--warn);
+    border-color: var(--warn);
   }
 
   &.error {
-    background: rgba(244, 67, 54, 0.9);
+    color: var(--error);
+    border-color: var(--error);
   }
 }
 
 .message-fade-enter-active,
 .message-fade-leave-active {
-  transition: all 0.3s ease;
-}
-
-.message-fade-enter-from {
-  opacity: 0;
-  transform: translateY(-10px);
-}
-
-.message-fade-leave-to {
-  opacity: 0;
-  transform: translateY(10px);
+  transition: background-color @transition-normal linear, color @transition-normal linear,
+    border-color @transition-normal linear;
 }
 </style>

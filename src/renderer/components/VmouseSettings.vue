@@ -1,26 +1,24 @@
 <template>
   <div class="vmouse-settings-wrapper">
     <div class="vmouse-header">
-      <h2>
-        <el-icon class="header-icon"><Mouse /></el-icon>
-        {{ t.vmouseSettings.title }}
-      </h2>
+      <h2>{{ t.vmouseSettings.title }}</h2>
     </div>
 
     <div class="vmouse-content">
-      <el-form label-width="130px" class="vmouse-form">
-        <!-- 驱动状态 -->
+      <el-form label-width="170px" class="vmouse-form">
+        <!-- Driver status -->
         <el-form-item :label="t.vmouseSettings.driverStatus">
           <div class="status-row">
-            <el-tag :type="statusTagType" effect="dark" size="large">
+            <span class="status-indicator" :class="status.running ? 'bru-on' : 'bru-off'" aria-hidden="true"></span>
+            <span class="status-state">
               {{ status.installed ? (status.running ? t.vmouseSettings.running : t.vmouseSettings.installed) : t.vmouseSettings.notInstalled }}
-            </el-tag>
+            </span>
             <span class="status-detail" v-if="status.status_text">{{ status.status_text }}</span>
-            <el-button size="small" circle :icon="Refresh" @click="refreshStatus" :loading="refreshing" />
+            <el-button size="small" :icon="Refresh" @click="refreshStatus" :loading="refreshing">Refresh</el-button>
           </div>
         </el-form-item>
 
-        <!-- 启用开关（sunshine.conf 中的 virtual_mouse） -->
+        <!-- Enable switch, bound to virtual_mouse in sunshine.conf -->
         <el-form-item :label="t.vmouseSettings.functionSwitch">
           <el-switch
             v-model="configEnabled"
@@ -32,12 +30,12 @@
           <span class="form-tip">{{ t.vmouseSettings.switchTip }}</span>
         </el-form-item>
 
-        <!-- 驱动路径 -->
+        <!-- Driver path -->
         <el-form-item :label="t.vmouseSettings.driverPath" v-if="status.driver_path">
           <span class="driver-path">{{ status.driver_path }}</span>
         </el-form-item>
 
-        <!-- 说明 -->
+        <!-- Description -->
         <el-form-item :label="t.vmouseSettings.description">
           <div class="description">
             <p>{{ t.vmouseSettings.descText1 }}</p>
@@ -45,14 +43,13 @@
           </div>
         </el-form-item>
 
-        <!-- 安装/卸载按钮 -->
+        <!-- Install and uninstall buttons -->
         <el-form-item class="form-actions">
           <el-button
             v-if="!status.installed"
             type="primary"
             @click="installDriver"
             :loading="installing"
-            size="large"
           >
             <el-icon><Download /></el-icon>
             {{ t.vmouseSettings.installDriver }}
@@ -62,8 +59,6 @@
             type="danger"
             @click="uninstallDriver"
             :loading="uninstalling"
-            size="large"
-            plain
           >
             <el-icon><Delete /></el-icon>
             {{ t.vmouseSettings.uninstallDriver }}
@@ -76,10 +71,10 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Mouse, Refresh, Download, Delete } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from './ui/compact/feedback.js'
+import { Refresh, Download, Delete } from './ui/compact/icons.js'
 import { vmouse } from '../tauri-adapter.js'
-import { useI18n } from '../desktop/i18n/index.js'
+import { useI18n } from '../i18n/index.js'
 
 const { t } = useI18n()
 
@@ -97,18 +92,6 @@ const installing = ref(false)
 const uninstalling = ref(false)
 const configSaving = ref(false)
 
-const statusTagType = ref('info')
-
-const updateStatusTag = () => {
-  if (status.running) {
-    statusTagType.value = 'success'
-  } else if (status.installed) {
-    statusTagType.value = 'warning'
-  } else {
-    statusTagType.value = 'info'
-  }
-}
-
 const refreshStatus = async () => {
   refreshing.value = true
   try {
@@ -116,7 +99,6 @@ const refreshStatus = async () => {
     if (result?.success) {
       Object.assign(status, result.data)
       configEnabled.value = result.data.config_enabled
-      updateStatusTag()
     }
   } catch (error) {
     console.error('Failed to get vmouse status:', error)
@@ -136,7 +118,7 @@ const handleConfigToggle = async (enabled) => {
     }
   } catch (error) {
     ElMessage.error(t.value.vmouseSettings.setFailed.replace('{error}', error.message || error))
-    // 回滚开关
+    // Roll the switch back.
     configEnabled.value = !enabled
   } finally {
     configSaving.value = false
@@ -159,7 +141,7 @@ const installDriver = async () => {
     const result = await vmouse.install()
     if (result?.success) {
       ElMessage.success(result.data)
-      // 等一下再刷新状态
+      // Give the driver a moment before refreshing the status.
       setTimeout(() => refreshStatus(), 2000)
     } else {
       throw new Error(result?.message || t.value.vmouseSettings.installFailed)
@@ -207,185 +189,135 @@ onMounted(() => {
 })
 </script>
 
+
 <style lang="less" scoped>
-@import '../styles/theme.less';
+// Greyscale, IntelliJ settings-dialog density. Every colour, size and spacing
+// value below resolves to a token from app/app.css; nothing local.
 
 .vmouse-settings-wrapper {
   display: flex;
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--font-size);
+  line-height: var(--line-height);
 }
 
-// ========== 深色模式 ==========
-[data-bs-theme='dark'] {
-  .vmouse-header {
-    border-bottom: 1px solid rgba(230, 213, 184, 0.15);
-    background: linear-gradient(135deg, rgba(165, 189, 212, 0.1), rgba(230, 213, 184, 0.05));
-
-    h2 {
-      color: #e6d5b8;
-      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-
-      .header-icon {
-        color: @morandi-red;
-      }
-    }
-  }
-
-  .vmouse-form {
-    background: linear-gradient(135deg, rgba(61, 50, 53, 0.4), rgba(74, 63, 66, 0.3));
-    border: 1px solid rgba(212, 165, 165, 0.2);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(212, 165, 165, 0.1);
-
-    :deep(.el-form-item__label) {
-      color: #e6d5b8;
-    }
-
-    :deep(.el-switch.is-checked .el-switch__core) {
-      background-color: @morandi-red;
-    }
-  }
-
-  .form-tip {
-    color: rgba(230, 213, 184, 0.6);
-  }
-
-  .status-detail {
-    color: rgba(230, 213, 184, 0.7);
-  }
-
-  .driver-path {
-    color: rgba(230, 213, 184, 0.5);
-  }
-
-  .description {
-    color: rgba(230, 213, 184, 0.6);
-  }
-}
-
-// ========== 浅色模式 ==========
-[data-bs-theme='light'] {
-  .vmouse-header {
-    border-bottom: 1px solid rgba(74, 158, 255, 0.2);
-    background: linear-gradient(135deg, rgba(74, 158, 255, 0.1), rgba(122, 184, 255, 0.05));
-
-    h2 {
-      color: #3a7ed5;
-      text-shadow: 0 1px 2px rgba(74, 158, 255, 0.2);
-
-      .header-icon {
-        color: @gura-blue;
-      }
-    }
-  }
-
-  .vmouse-form {
-    background: linear-gradient(135deg, rgba(240, 248, 255, 0.8), rgba(230, 242, 255, 0.6));
-    border: 1px solid rgba(74, 158, 255, 0.2);
-    box-shadow: 0 8px 32px rgba(74, 158, 255, 0.15), 0 2px 8px rgba(74, 158, 255, 0.1);
-
-    :deep(.el-form-item__label) {
-      color: #3a7ed5;
-    }
-
-    :deep(.el-switch.is-checked .el-switch__core) {
-      background-color: @gura-blue;
-    }
-  }
-
-  .form-tip {
-    color: rgba(58, 126, 213, 0.6);
-  }
-
-  .status-detail {
-    color: rgba(58, 126, 213, 0.5);
-  }
-
-  .driver-path {
-    color: rgba(58, 126, 213, 0.4);
-  }
-
-  .description {
-    color: rgba(58, 126, 213, 0.6);
-  }
-}
-
-// ========== 通用样式 ==========
+// ========== Header ==========
 .vmouse-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 24px 32px;
-  transition: all 0.3s ease;
+  flex: 0 0 auto;
+  min-height: var(--row-height);
+  padding: var(--pad-y) var(--pad-x);
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
 
   h2 {
-    display: flex;
-    align-items: center;
-    gap: 12px;
     margin: 0;
-    font-size: 24px;
-    font-weight: 600;
-    transition: all 0.3s ease;
-
-    .header-icon {
-      font-size: 28px;
-      transition: all 0.3s ease;
-    }
+    font-size: var(--font-size);
+    font-weight: 500;
+    color: var(--text);
   }
 }
 
+// ========== Content ==========
 .vmouse-content {
   flex: 1;
   overflow-y: auto;
-  padding: 32px;
-
-  &::-webkit-scrollbar {
-    width: 8px;
-  }
+  padding: 0;
 }
 
 .vmouse-form {
-  max-width: 700px;
-  padding: 25px;
-  border-radius: 12px;
-  transition: all 0.3s ease;
+  max-width: 760px;
+  border-bottom: 1px solid var(--border);
+
+  // Label left, control right, one hairline between rows.
+  :deep(.el-form-item) {
+    align-items: flex-start;
+    margin: 0;
+    padding: var(--pad-y) var(--pad-x);
+    border-top: 1px solid var(--border);
+  }
+
+  :deep(.el-form-item__label) {
+    padding-right: var(--gap);
+    color: var(--text-dim);
+    font-size: var(--font-size);
+    font-weight: 400;
+    line-height: var(--row-height);
+  }
+
+  :deep(.el-form-item__content) {
+    min-height: var(--row-height);
+    line-height: var(--line-height);
+  }
 }
 
+// ========== Status row ==========
 .status-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--gap);
+  flex-wrap: wrap;
+  min-height: var(--row-height);
+}
+
+.status-indicator {
+  flex: 0 0 auto;
+}
+
+.status-state {
+  color: var(--text);
+  font-weight: 500;
 }
 
 .status-detail {
-  font-size: 13px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
 }
 
 .driver-path {
-  font-size: 12px;
-  font-family: monospace;
+  display: block;
+  padding: var(--pad-y) 0;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
   word-break: break-all;
 }
 
+// ========== Copy ==========
 .form-tip {
-  font-size: 12px;
-  margin-left: 12px;
+  margin-left: var(--gap);
+  color: var(--text-dim);
+  font-size: var(--font-size-sm);
 }
 
 .description {
-  font-size: 13px;
-  line-height: 1.6;
+  max-width: 620px;
+  padding: 2px 0;
+  color: var(--text-dim);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
 
   p {
-    margin: 0 0 8px 0;
+    margin: 0 0 6px;
+
     &:last-child {
       margin-bottom: 0;
     }
   }
 }
 
+// ========== Actions ==========
 .form-actions {
-  margin-top: 24px;
+  :deep(.el-form-item__content) {
+    gap: var(--gap);
+  }
 }
 </style>

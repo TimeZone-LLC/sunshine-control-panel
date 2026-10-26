@@ -48,7 +48,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { useI18n } from '../desktop/i18n/index.js'
+import { useI18n } from '../i18n/index.js'
 import { enhancementControlsText } from '../composables/enhancementControls.js'
 import { nrOverlayText } from '../composables/nrOverlayMessages.js'
 import { nrOverlayState } from '../composables/nrOverlayState.js'

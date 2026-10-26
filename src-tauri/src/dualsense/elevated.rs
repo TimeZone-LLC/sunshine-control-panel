@@ -501,13 +501,11 @@ pub(crate) async fn run_elevated_operation(
             return Err("DS5-PKG-004: administrator operation timed out".to_string());
         }
     };
-    let status = crate::elevation::wait_for_exit(
-        &elevated_process,
-        std::time::Duration::from_secs(5),
-    )
-    .await
-    .map_err(|error| format!("DS5-PKG-004: administrator helper wait failed: {error}"))?
-    .ok_or_else(|| "DS5-PKG-004: administrator helper did not exit".to_string())?;
+    let status =
+        crate::elevation::wait_for_exit(&elevated_process, std::time::Duration::from_secs(5))
+            .await
+            .map_err(|error| format!("DS5-PKG-004: administrator helper wait failed: {error}"))?
+            .ok_or_else(|| "DS5-PKG-004: administrator helper did not exit".to_string())?;
     match final_result {
         Some(Ok(data)) if status == 0 => Ok(data),
         Some(Err(error)) => Err(error),

@@ -475,15 +475,15 @@ mod tests {
     fn connection_copy_has_a_clear_title_and_named_detail() {
         assert_eq!(
             connection_content(
-                &super::super::ZH_STRINGS,
+                &super::super::EN_STRINGS,
                 ConnectionChange::Connected {
-                    client_name: Some("客厅电视".to_string()),
+                    client_name: Some("Living Room TV".to_string()),
                     highly_suspected_unknown_client: false,
                 }
             ),
             NotificationContent {
-                title: "客户端已连接".to_string(),
-                body: "「客厅电视」已连接到这台电脑。".to_string(),
+                title: "Client connected".to_string(),
+                body: "\u{201c}Living Room TV\u{201d} connected to this computer.".to_string(),
             }
         );
         assert_eq!(
@@ -502,18 +502,18 @@ mod tests {
     fn suspicious_client_warning_is_appended_to_connection_notification() {
         assert_eq!(
             connection_content(
-                &super::super::ZH_STRINGS,
+                &super::super::EN_STRINGS,
                 ConnectionChange::Connected {
-                    client_name: Some("可疑客户端".to_string()),
+                    client_name: Some("Unknown Client".to_string()),
                     highly_suspected_unknown_client: true,
                 }
             ),
             NotificationContent {
-                title: "客户端已连接".to_string(),
+                title: "Client connected".to_string(),
                 body: concat!(
-                    "「可疑客户端」已连接到这台电脑。\n",
-                    "警告：您很可能正在受到未知侵权客户端的侵害。",
-                    "该判断基于客户端网络特征，可能存在误判。"
+                    "\u{201c}Unknown Client\u{201d} connected to this computer.\n",
+                    "Warning: You are very likely being affected by an unknown ",
+                    "infringing client. This heuristic assessment may be inaccurate."
                 )
                 .to_string(),
             }

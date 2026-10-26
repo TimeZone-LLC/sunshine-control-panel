@@ -33,15 +33,6 @@ static HEARTBEAT_MAP: Lazy<Mutex<HashMap<String, HeartbeatState>>> =
 /// treat it as crashed while it sits in this set.
 static SUSPENDED_WEBVIEWS: Lazy<Mutex<HashSet<String>>> = Lazy::new(|| Mutex::new(HashSet::new()));
 
-#[derive(Default)]
-struct ToolWindowMoveSave {
-    version: u64,
-    position: Option<PhysicalPosition<i32>>,
-}
-
-static TOOL_WINDOW_MOVE_SAVE: Lazy<Mutex<ToolWindowMoveSave>> =
-    Lazy::new(|| Mutex::new(ToolWindowMoveSave::default()));
-
 /// 心跳超时阈值（秒）：超过此时间未收到心跳则认为渲染进程可能崩溃
 const HEARTBEAT_STALE_SECS: u64 = 30;
 /// Cold WebView2 startup and the first local-proxy navigation can be slower
@@ -52,10 +43,7 @@ const MAIN_WINDOW_ID: &str = "main";
 const ABOUT_WINDOW_ID: &str = "about";
 const LOG_CONSOLE_WINDOW_ID: &str = "log_console";
 const PIN_WINDOW_ID: &str = "pin_pairing";
-const DESKTOP_WINDOW_ID: &str = "desktop";
-const TOOL_WINDOW_ID: &str = "tool_window";
-#[cfg(debug_assertions)]
-const DEBUG_PAGE_WINDOW_ID: &str = "debug_page";
+const NR_OVERLAY_WINDOW_ID: &str = "nr_overlay";
 
 #[cfg(target_os = "windows")]
 pub fn register_agent_restart() {
@@ -85,35 +73,6 @@ pub fn unregister_agent_restart() {
 
 #[cfg(not(target_os = "windows"))]
 pub fn unregister_agent_restart() {}
-
-fn schedule_tool_window_position_save(app: AppHandle, position: PhysicalPosition<i32>) {
-    let version = {
-        let mut state = TOOL_WINDOW_MOVE_SAVE.lock().unwrap();
-        state.version = state.version.wrapping_add(1);
-        state.position = Some(position);
-        state.version
-    };
-
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_millis(350)).await;
-
-        let position = {
-            let state = TOOL_WINDOW_MOVE_SAVE.lock().unwrap();
-            if state.version != version {
-                return;
-            }
-            state.position
-        };
-
-        if let Some(position) = position {
-            crate::toolbar::save_tool_window_position_internal(
-                &app,
-                position.x as f64,
-                position.y as f64,
-            );
-        }
-    });
-}
 
 fn clamp_axis(value: i32, min: i32, max: i32) -> i32 {
     if max < min {
@@ -276,7 +235,10 @@ pub fn disable_context_menu<R: Runtime>(window: &WebviewWindow<R>) {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         match window_clone.eval(DISABLE_CONTEXT_MENU_SCRIPT) {
             Ok(_) => debug!("Disabled the context menu in the production build"),
-            Err(e) => debug!("Failed to inject the context-menu suppression script: {}", e),
+            Err(e) => debug!(
+                "Failed to inject the context-menu suppression script: {}",
+                e
+            ),
         }
     });
 }
@@ -379,8 +341,7 @@ fn native_window_move_active(window: &tauri::Window) -> Result<bool, String> {
 
 #[tauri::command]
 pub fn resize_tool_window(window: tauri::Window, width: f64, height: f64) -> Result<bool, String> {
-    let nr = window.label() == "nr_overlay";
-    if window.label() != TOOL_WINDOW_ID && !nr {
+    if window.label() != NR_OVERLAY_WINDOW_ID {
         return Err("resize_tool_window can only be called from an overlay".to_string());
     }
     if !width.is_finite() || !height.is_finite() {
@@ -391,14 +352,14 @@ pub fn resize_tool_window(window: tauri::Window, width: f64, height: f64) -> Res
     }
     let scale_factor = window.scale_factor().map_err(|e| e.to_string())?;
     let current_size = window.inner_size().map_err(|e| e.to_string())?;
-    let min_height: f64 = if nr { 32.0 } else { 180.0 };
+    let min_height: f64 = 32.0;
     let max_height = window
         .current_monitor()
         .ok()
         .flatten()
         .map(|monitor| (monitor.size().height as f64 / scale_factor - 32.0).max(min_height))
         .unwrap_or(900.0);
-    let target_width = width.clamp(if nr { 120.0 } else { 320.0 }, 560.0);
+    let target_width = width.clamp(120.0, 560.0);
     let target_height = height.clamp(min_height, max_height);
     if (current_size.width as f64 / scale_factor - target_width).abs() >= 1.0
         || (current_size.height as f64 / scale_factor - target_height).abs() >= 1.0
@@ -411,22 +372,15 @@ pub fn resize_tool_window(window: tauri::Window, width: f64, height: f64) -> Res
                 target_height,
             )))
             .map_err(|e| e.to_string())?;
-        if nr {
-            window
-                .set_position(tauri::PhysicalPosition::new(
-                    position.x + current_size.width as i32
-                        - (target_width * scale_factor).round() as i32,
-                    position.y,
-                ))
-                .map_err(|e| e.to_string())?;
-        }
+        window
+            .set_position(tauri::PhysicalPosition::new(
+                position.x + current_size.width as i32
+                    - (target_width * scale_factor).round() as i32,
+                position.y,
+            ))
+            .map_err(|e| e.to_string())?;
     }
-    constrain_tool_window_to_visible_area(
-        &window,
-        target_width,
-        target_height,
-        if nr { 0.0 } else { 16.0 },
-    )?;
+    constrain_tool_window_to_visible_area(&window, target_width, target_height, 0.0)?;
     Ok(true)
 }
 
@@ -439,7 +393,10 @@ fn reload_webview_via_com<R: Runtime>(window: &WebviewWindow<R>) {
         unsafe {
             if let Ok(core_webview) = controller.CoreWebView2() {
                 match core_webview.Reload() {
-                    Ok(_) => log::info!("Triggered a reload to recover the WebView renderer [{}]", label),
+                    Ok(_) => log::info!(
+                        "Triggered a reload to recover the WebView renderer [{}]",
+                        label
+                    ),
                     Err(e) => log::warn!("Failed to reload the WebView [{}]: {:?}", label, e),
                 }
             }
@@ -487,8 +444,8 @@ pub fn start_heartbeat_monitor(app: AppHandle) {
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(30)).await;
 
-            // 只检查可见的主要窗口（main / desktop）
-            for label in &[MAIN_WINDOW_ID, DESKTOP_WINDOW_ID] {
+            // The slim control panel has one primary window.
+            for label in &[MAIN_WINDOW_ID] {
                 // 挂起中的 WebView JS 定时器被冻结，心跳缺失是预期行为，
                 // 不能按崩溃恢复（否则会在挂起期间强制重载页面）。
                 if SUSPENDED_WEBVIEWS.lock().unwrap().contains(*label) {
@@ -655,7 +612,7 @@ pub fn open_about_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
         tauri::WebviewWindowBuilder::new(
             app,
             ABOUT_WINDOW_ID,
-            tauri::WebviewUrl::App("about/index.html".into()),
+            tauri::WebviewUrl::App("sunshine-frame.html?mode=about".into()),
         )
         .title("About Sunshine Control Panel")
         .inner_size(540.0, 620.0)
@@ -681,7 +638,7 @@ pub fn open_log_console<R: Runtime>(app: &AppHandle<R>) {
         tauri::WebviewWindowBuilder::new(
             app,
             LOG_CONSOLE_WINDOW_ID,
-            tauri::WebviewUrl::App("console/index.html".into()),
+            tauri::WebviewUrl::App("sunshine-frame.html?mode=console".into()),
         )
         .title("Log console")
         .inner_size(1000.0, 700.0)
@@ -715,7 +672,7 @@ pub fn open_pin_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std
     let window = tauri::WebviewWindowBuilder::new(
         app,
         PIN_WINDOW_ID,
-        tauri::WebviewUrl::App("pin/index.html".into()),
+        tauri::WebviewUrl::App("sunshine-frame.html?mode=pin".into()),
     )
     .title("PIN pairing")
     .fullscreen(true)
@@ -736,35 +693,12 @@ pub fn open_pin_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         let _ = window.show();
+        let _ = window.set_focus();
     });
 
     debug!("Created the PIN pairing window");
     crate::power::refresh_ecoqos_state(app);
     Ok(())
-}
-
-/// 打开调试页面窗口（仅开发环境）
-#[cfg(debug_assertions)]
-pub fn open_debug_page<R: Runtime>(app: &AppHandle<R>) {
-    match get_or_create_window(app, DEBUG_PAGE_WINDOW_ID, |app| {
-        tauri::WebviewWindowBuilder::new(
-            app,
-            DEBUG_PAGE_WINDOW_ID,
-            tauri::WebviewUrl::App("console/drag-drop-demo.html".into()),
-        )
-        .title("Debug page - drag test")
-        .inner_size(1200.0, 800.0)
-        .resizable(true)
-        .maximizable(true)
-        .minimizable(true)
-        .decorations(true)
-        .disable_drag_drop_handler()
-        .center()
-        .build()
-    }) {
-        Ok(_) => debug!("Opened the debug page window"),
-        Err(e) => error!("{}", e),
-    }
 }
 
 /// 创建主窗口
@@ -847,76 +781,6 @@ fn create_main_window_internal<R: Runtime>(
     disable_context_menu(&window);
     info!("Created the {visibility_desc} main window");
     crate::power::refresh_ecoqos_state(app);
-    Ok(())
-}
-
-/// 创建桌面 UI 窗口
-pub fn create_desktop_window<R: Runtime>(
-    app: &AppHandle<R>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    create_desktop_window_internal(app, true)
-}
-
-pub fn create_desktop_window_hidden<R: Runtime>(
-    app: &AppHandle<R>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    create_desktop_window_internal(app, false)
-}
-
-fn create_desktop_window_internal<R: Runtime>(
-    app: &AppHandle<R>,
-    visible: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
-    info!("Creating the desktop UI window");
-
-    begin_webview_heartbeat(DESKTOP_WINDOW_ID);
-
-    let window = tauri::WebviewWindowBuilder::new(
-        app,
-        DESKTOP_WINDOW_ID,
-        tauri::WebviewUrl::App("desktop/index.html".into()),
-    )
-    .title("Sunshine Desktop")
-    .inner_size(1600.0, 900.0)
-    .min_inner_size(1024.0, 600.0)
-    .center()
-    .decorations(false)
-    .transparent(false)
-    .shadow(false)
-    .visible(visible)
-    .fullscreen(true)
-    .disable_drag_drop_handler()
-    .initialization_script(WEBVIEW_VISIBILITY_INIT_SCRIPT)
-    .build()
-    .map_err(|e| {
-        end_webview_heartbeat(DESKTOP_WINDOW_ID);
-        format!("Failed to create the desktop window: {e}")
-    })?;
-
-    #[cfg(target_os = "windows")]
-    apply_dwm_square_corners(&window);
-
-    // 禁用自动填充和密码保存提示
-    #[cfg(target_os = "windows")]
-    configure_webview_security(&window);
-
-    disable_context_menu(&window);
-    info!("Created the desktop UI window");
-    crate::power::refresh_ecoqos_state(app);
-    Ok(())
-}
-
-/// 打开桌面 UI 窗口（单例模式）
-pub fn open_desktop_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
-    if let Some(window) = app.get_webview_window(DESKTOP_WINDOW_ID) {
-        let _ = window.unminimize();
-        let _ = window.show();
-        let _ = window.set_focus();
-        debug!("Activated the desktop UI window");
-        crate::power::refresh_ecoqos_state(app);
-    } else {
-        create_desktop_window(app).map_err(|e| e.to_string())?;
-    }
     Ok(())
 }
 
@@ -1232,11 +1096,6 @@ fn set_webview_window_visibility<R: Runtime>(ww: &WebviewWindow<R>, visible: boo
 /// 处理窗口事件
 pub fn handle_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
     match event {
-        tauri::WindowEvent::Moved(position) => {
-            if window.label() == TOOL_WINDOW_ID {
-                schedule_tool_window_position_save(window.app_handle().clone(), *position);
-            }
-        }
         tauri::WindowEvent::CloseRequested { .. } => {
             end_webview_heartbeat(window.label());
             // 窗口正在销毁：清掉挂起标记即可，无需 Resume。
@@ -1249,31 +1108,13 @@ pub fn handle_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
                     set_webview_visibility(window, false);
                     crate::tray::mark_main_panel_loading();
                 }
-                "toolbar" => {
-                    if let Ok(position) = window.outer_position() {
-                        crate::toolbar::save_toolbar_position_internal(
-                            &window.app_handle(),
-                            position.x as f64,
-                            position.y as f64,
-                        );
-                    }
-                }
-                TOOL_WINDOW_ID => {
-                    if let Ok(position) = window.outer_position() {
-                        crate::toolbar::save_tool_window_position_internal(
-                            &window.app_handle(),
-                            position.x as f64,
-                            position.y as f64,
-                        );
-                    }
-                }
                 _ => {}
             }
         }
         tauri::WindowEvent::Focused(focused) => {
-            // 仅对有 visibility init script 的窗口处理（main 和 desktop）
+            // Only the primary window uses the visibility initialization script.
             let label = window.label();
-            if label != MAIN_WINDOW_ID && label != DESKTOP_WINDOW_ID {
+            if label != MAIN_WINDOW_ID {
                 return;
             }
 

@@ -85,11 +85,11 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { ArrowDown, Close } from '@element-plus/icons-vue'
+import { ArrowDown, Close } from '../../components/ui/compact/icons.js'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { currentMonitor, getCurrentWindow } from '@tauri-apps/api/window'
-import { useI18n } from '../../desktop/i18n/index.js'
+import { useI18n } from '../../i18n/index.js'
 import { nrShortcutLabel, enhancementControlsText, enhancementError } from '../../composables/enhancementControls.js'
 import { nrOverlayText } from '../../composables/nrOverlayMessages.js'
 import { nrOverlayState, overlayOpacity, nrProcessingSize, nrPipelines, nrOutputLabel } from '../../composables/nrOverlayState.js'

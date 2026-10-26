@@ -1,5 +1,5 @@
 import { computed, nextTick, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage } from '../components/ui/compact/feedback.js'
 
 const normalizeValues = (values = []) => values
   .map((value) => String(value).trim())

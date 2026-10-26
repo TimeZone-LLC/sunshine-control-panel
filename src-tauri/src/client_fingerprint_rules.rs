@@ -117,7 +117,7 @@ async fn fetch_candidate(url: &str, etag: Option<&str>) -> Result<FetchResult, S
     })
 }
 
-async fn updater_loop() {
+async fn refresh_loop() {
     tokio::time::sleep(Duration::from_secs(5)).await;
 
     let mut accepted_etag: Option<String> = None;
@@ -179,7 +179,7 @@ async fn updater_loop() {
 }
 
 pub fn start() {
-    tauri::async_runtime::spawn(updater_loop());
+    tauri::async_runtime::spawn(refresh_loop());
 }
 
 #[cfg(test)]

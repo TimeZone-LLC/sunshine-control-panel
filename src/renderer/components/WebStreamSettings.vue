@@ -1,113 +1,65 @@
 <template>
   <div class="webstream-settings-wrapper">
     <div class="webstream-header">
-      <h2>
-        <el-icon class="header-icon"><Connection /></el-icon>
-        {{ t.webStream.title }}
-      </h2>
+      <h2>{{ t.webStream.title }}</h2>
     </div>
 
     <div class="webstream-content">
       <div class="webstream-form">
-        <!-- 描述 -->
-        <p class="section-desc">
-          {{ t.webStream.desc }}
-          <el-link type="primary" href="https://github.com/MrCreativ3001/moonlight-web-stream" target="_blank">
-            Moonlight Web
-          </el-link>
-        </p>
+        <!-- Description -->
+        <p class="section-desc">{{ t.webStream.desc }}</p>
 
-        <!-- 状态区域 -->
+        <!-- Status -->
         <div class="status-section">
           <div class="status-row">
             <div class="status-info">
-              <span class="status-dot" :class="status.running ? 'dot-running' : 'dot-stopped'" />
+              <span class="status-dot" :class="status.running ? 'bru-on' : 'bru-off'" aria-hidden="true" />
               <span class="status-label">{{ status.running ? t.webStream.statusRunning : (status.installed ? t.webStream.statusStopped : t.webStream.statusNotInstalled) }}</span>
               <span v-if="status.version" class="status-version">v{{ status.version }}</span>
             </div>
-            <div class="status-actions">
+            <div v-if="status.installed" class="status-actions">
               <el-button
-                v-if="!status.installed"
+                v-if="!status.running"
                 type="primary"
-                :loading="downloading"
-                @click="handleInstall"
-                round
+                :loading="starting"
+                @click="handleStart"
               >
-                <el-icon><Download /></el-icon>
-                {{ t.webStream.install }}
+                {{ t.webStream.start }}
               </el-button>
-              <template v-else>
-                <el-button
-                  v-if="!status.running"
-                  type="primary"
-                  :loading="starting"
-                  @click="handleStart"
-                  round
-                >
-                  <el-icon><VideoPlay /></el-icon>
-                  {{ t.webStream.start }}
-                </el-button>
-                <el-button
-                  v-else
-                  type="danger"
-                  :loading="stopping"
-                  @click="handleStop"
-                  round
-                >
-                  <el-icon><VideoPause /></el-icon>
-                  {{ t.webStream.stop }}
-                </el-button>
-                <el-button @click="handleCheckUpdate" round>
-                  <el-icon><Refresh /></el-icon>
-                  {{ t.webStream.checkUpdate }}
-                </el-button>
-              </template>
+              <el-button
+                v-else
+                type="danger"
+                :loading="stopping"
+                @click="handleStop"
+              >
+                {{ t.webStream.stop }}
+              </el-button>
             </div>
           </div>
-
-          <!-- 下载进度 -->
-          <el-progress
-            v-if="downloading"
-            :percentage="downloadProgress"
-            :stroke-width="6"
-            class="download-progress"
-          />
         </div>
 
-        <!-- 访问链接 -->
+        <!-- Access links -->
         <div v-if="status.running" class="access-section">
-          <div class="section-title">
-            <el-icon><Link /></el-icon>
-            <span>{{ t.webStream.accessLink }}</span>
-          </div>
+          <div class="section-title">{{ t.webStream.accessLink }}</div>
           <div class="access-url-row">
             <el-input :model-value="status.access_url" readonly class="url-input">
               <template #prepend>URL</template>
             </el-input>
-            <el-button type="primary" @click="copyUrl" round>
-              <el-icon><CopyDocument /></el-icon>
-              {{ t.webStream.copy }}
-            </el-button>
-            <el-button @click="openInBrowser" round>
-              <el-icon><Position /></el-icon>
-              {{ t.webStream.open }}
-            </el-button>
+            <el-button type="primary" @click="copyUrl">{{ t.webStream.copy }}</el-button>
+            <el-button @click="openInBrowser">{{ t.webStream.open }}</el-button>
           </div>
           <p class="form-tip">
             {{ t.webStream.accessTip.replace('{port}', status.port) }}
           </p>
         </div>
 
-        <!-- 配置区域 -->
+        <!-- Configuration -->
         <template v-if="status.installed">
           <div class="section-divider">
-            <span class="section-divider-text">
-              <el-icon><Setting /></el-icon>
-              <span>{{ t.webStream.serviceConfig }}</span>
-            </span>
+            <span class="section-divider-text">{{ t.webStream.serviceConfig }}</span>
           </div>
 
-          <el-form :model="config" label-width="140px" class="config-form">
+          <el-form :model="config" label-width="170px" class="config-form">
             <el-form-item :label="t.webStream.bindAddress">
               <el-input v-model="config.web_server.bind_address" placeholder="0.0.0.0:8080" />
               <span class="form-tip" v-html="t.webStream.bindAddressTip.replace('{allIp}', '<code>0.0.0.0:port</code>').replace('{localhost}', '<code>127.0.0.1:port</code>')"></span>
@@ -128,8 +80,7 @@
                 <el-input v-model="certPemPath" placeholder="./server/cert.pem" />
               </el-form-item>
               <el-form-item>
-                <el-button @click="handleGenerateCert" :loading="generatingCert" round>
-                  <el-icon><Key /></el-icon>
+                <el-button @click="handleGenerateCert" :loading="generatingCert">
                   {{ t.webStream.generateCert }}
                 </el-button>
                 <span class="form-tip">{{ t.webStream.generateCertTip }}</span>
@@ -173,10 +124,10 @@
 
             <div class="form-actions">
               <el-form-item>
-                <el-button type="primary" @click="handleSaveConfig" :loading="saving" round>
+                <el-button type="primary" @click="handleSaveConfig" :loading="saving">
                   {{ t.webStream.saveConfig }}
                 </el-button>
-                <el-button @click="loadConfig" round>
+                <el-button @click="loadConfig">
                   {{ t.webStream.reload }}
                 </el-button>
                 <span v-if="configDirty" class="unsaved-hint">{{ t.webStream.unsavedChanges }}</span>
@@ -185,31 +136,27 @@
           </el-form>
         </template>
 
-        <!-- 安装路径 -->
+        <!-- Installation path -->
         <div v-if="status.installed" class="install-path">
-          <el-icon><Folder /></el-icon>
-          <span>{{ t.webStream.installPath.replace('{path}', status.install_path) }}</span>
+          {{ t.webStream.installPath.replace('{path}', status.install_path) }}
         </div>
       </div>
     </div>
   </div>
 </template>
 
+
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import {
-  Connection, Download, VideoPlay, VideoPause, Refresh,
-  Link, CopyDocument, Position, Setting, Folder, Key,
-} from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from './ui/compact/feedback.js'
 import { moonlightWeb } from '../tauri-adapter.js'
-import { useI18n } from '../desktop/i18n/index.js'
+import { useI18n } from '../i18n/index.js'
 
 const { t } = useI18n()
 
 const emit = defineEmits(['close'])
 
-// 状态
+// State
 const status = reactive({
   installed: false,
   running: false,
@@ -225,11 +172,9 @@ const config = reactive({
   default_settings: null,
 })
 
-// UI 状态
+// UI state
 const starting = ref(false)
 const stopping = ref(false)
-const downloading = ref(false)
-const downloadProgress = ref(0)
 const saving = ref(false)
 const configDirty = ref(false)
 const generatingCert = ref(false)
@@ -241,10 +186,10 @@ const defaultBitrate = ref(20000)
 const defaultFps = ref(60)
 const defaultTransport = ref('auto')
 
-// 状态轮询
+// Status polling
 let pollTimer = null
 
-// ========== 生命周期 ==========
+// ========== Lifecycle ==========
 
 onMounted(async () => {
   await refreshStatus()
@@ -252,32 +197,18 @@ onMounted(async () => {
     await loadConfig()
   }
   startPolling()
-
-  // 监听下载进度事件
-  try {
-    const { listen } = await import('@tauri-apps/api/event')
-    const unlisten = await listen('moonlight-web-download-progress', (event) => {
-      downloadProgress.value = event.payload.progress || 0
-    })
-    // 组件销毁时取消监听
-    onUnmounted(() => {
-      unlisten()
-    })
-  } catch (e) {
-    console.warn('Cannot listen to download progress event:', e)
-  }
 })
 
 onUnmounted(() => {
   stopPolling()
 })
 
-// 监听配置变化标记脏状态
+// Mark the form dirty when the configuration changes.
 watch([() => config.web_server.bind_address, httpsEnabled, certKeyPath, certPemPath, defaultVideoCodec, defaultBitrate, defaultFps, defaultTransport], () => {
   configDirty.value = true
 })
 
-// ========== 方法 ==========
+// ========== Methods ==========
 
 async function refreshStatus() {
   try {
@@ -293,19 +224,19 @@ async function loadConfig() {
     const c = await moonlightWeb.getConfig()
     Object.assign(config, c)
 
-    // 确保 bind_address 不为空
+    // Make sure bind_address is not empty.
     if (!config.web_server?.bind_address) {
       config.web_server.bind_address = '0.0.0.0:8080'
     }
 
-    // 解析 HTTPS 状态
+    // Resolve the HTTPS state.
     httpsEnabled.value = !!config.web_server?.certificate
     if (config.web_server?.certificate) {
       certKeyPath.value = config.web_server.certificate.private_key_pem || './server/key.pem'
       certPemPath.value = config.web_server.certificate.certificate_pem || './server/cert.pem'
     }
 
-    // 解析默认设置
+    // Resolve the default settings.
     const ds = config.default_settings || {}
     defaultVideoCodec.value = ds.videoCodec || 'h264'
     defaultBitrate.value = ds.bitrate || 20000
@@ -355,82 +286,15 @@ async function handleStop() {
   }
 }
 
-async function handleInstall() {
-  downloading.value = true
-  downloadProgress.value = 0
-  try {
-    // 先检查最新版
-    const release = await moonlightWeb.checkRelease()
-    if (!release.download_url) {
-      ElMessage.error(t.value.webStream.noWindowsDownload)
-      return
-    }
-
-    await ElMessageBox.confirm(
-      t.value.webStream.downloadConfirm.replace('{version}', release.version).replace('{filename}', release.download_name),
-      t.value.webStream.installTitle,
-      { confirmButtonText: t.value.webStream.downloadInstall, cancelButtonText: t.value.webStream.cancelBtn }
-    )
-
-    await moonlightWeb.download(release.download_url, release.version)
-    ElMessage.success(t.value.webStream.installComplete)
-    await refreshStatus()
-    if (status.installed) {
-      await loadConfig()
-    }
-  } catch (e) {
-    if (e !== 'cancel') {
-      ElMessage.error(t.value.webStream.installFailed.replace('{error}', e))
-    }
-  } finally {
-    downloading.value = false
-  }
-}
-
-async function handleCheckUpdate() {
-  try {
-    const release = await moonlightWeb.checkRelease()
-    const currentVersion = status.version?.replace(/^v/, '') || '0.0.0'
-    const latestVersion = release.version?.replace(/^v/, '') || '0.0.0'
-
-    if (latestVersion === currentVersion) {
-      ElMessage.info(t.value.webStream.alreadyLatest)
-    } else {
-      await ElMessageBox.confirm(
-        t.value.webStream.newVersionFound.replace('{version}', release.version).replace('{current}', status.version),
-        t.value.webStream.updateAvailable,
-        { confirmButtonText: t.value.webStream.downloadUpdate, cancelButtonText: t.value.webStream.laterBtn }
-      )
-
-      downloading.value = true
-      downloadProgress.value = 0
-
-      // 停止服务后再更新
-      if (status.running) {
-        await moonlightWeb.stop()
-      }
-      await moonlightWeb.download(release.download_url, release.version)
-      ElMessage.success(t.value.webStream.updateComplete)
-      await refreshStatus()
-    }
-  } catch (e) {
-    if (e !== 'cancel') {
-      ElMessage.error(t.value.webStream.checkUpdateFailed.replace('{error}', e))
-    }
-  } finally {
-    downloading.value = false
-  }
-}
-
 async function handleGenerateCert() {
   generatingCert.value = true
   try {
     const result = await moonlightWeb.generateCert()
     certKeyPath.value = result.private_key_pem
     certPemPath.value = result.certificate_pem
-    // 生成后自动保存配置
+    // Save the configuration after generating.
     await handleSaveConfig()
-    // 如果服务正在运行，提示重启
+    // Prompt for a restart when the service is running.
     if (status.running) {
       try {
         await ElMessageBox.confirm(
@@ -459,10 +323,10 @@ async function handleGenerateCert() {
 async function handleSaveConfig() {
   saving.value = true
   try {
-    // 基于已加载的完整配置进行更新，保留所有上游字段
+    // Update on top of the full configuration so upstream fields survive.
     const saveConfig = JSON.parse(JSON.stringify(config))
 
-    // 更新用户可编辑的字段
+    // Update the user-editable fields.
     saveConfig.web_server.bind_address = config.web_server.bind_address
 
     if (httpsEnabled.value) {
@@ -512,371 +376,80 @@ async function openInBrowser() {
 }
 </script>
 
+
 <style scoped lang="less">
-@import '../styles/theme.less';
+// Greyscale, IntelliJ settings-dialog density. Every value below resolves to a
+// token from app/app.css - no local palette, no per-theme blocks.
 
 .webstream-settings-wrapper {
   display: flex;
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--font-size);
+  line-height: var(--line-height);
 }
 
-// ========== 深色模式 ==========
-[data-bs-theme='dark'] {
-  .webstream-header {
-    border-bottom: 1px solid rgba(230, 213, 184, 0.15);
-    background: linear-gradient(135deg, rgba(212, 165, 165, 0.1), rgba(230, 213, 184, 0.05));
-
-    h2 {
-      color: #e6d5b8;
-      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-
-      .header-icon {
-        color: @morandi-red;
-      }
-    }
-  }
-
-  .webstream-form {
-    background: linear-gradient(135deg, rgba(61, 50, 53, 0.4), rgba(74, 63, 66, 0.3));
-    border: 1px solid rgba(212, 165, 165, 0.2);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(212, 165, 165, 0.1);
-
-    :deep(.el-form-item__label) {
-      color: #e6d5b8;
-    }
-
-    :deep(.el-input__inner),
-    :deep(.el-input-number__decrease),
-    :deep(.el-input-number__increase) {
-      background: rgba(230, 213, 184, 0.1);
-      border-color: rgba(230, 213, 184, 0.2);
-      color: #e6d5b8;
-
-      &:hover {
-        border-color: rgba(230, 213, 184, 0.4);
-      }
-
-      &:focus {
-        border-color: @morandi-red;
-      }
-    }
-
-    :deep(.el-select__wrapper) {
-      background: rgba(230, 213, 184, 0.1);
-      border-color: rgba(230, 213, 184, 0.2);
-
-      &:hover {
-        border-color: rgba(230, 213, 184, 0.4);
-      }
-
-      &.is-focused {
-        border-color: @morandi-red;
-      }
-    }
-
-    :deep(.el-switch.is-checked .el-switch__core) {
-      background-color: @morandi-red;
-    }
-  }
-
-  .section-divider {
-    .section-divider-text {
-      color: rgba(230, 213, 184, 0.7);
-    }
-
-    &::after {
-      background: rgba(230, 213, 184, 0.15);
-    }
-  }
-
-  .section-desc {
-    color: rgba(230, 213, 184, 0.7);
-  }
-
-  .form-tip {
-    color: rgba(230, 213, 184, 0.6);
-  }
-
-  .status-section {
-    background: rgba(230, 213, 184, 0.05);
-    border-color: rgba(212, 165, 165, 0.2);
-  }
-
-  .access-section {
-    background: rgba(230, 213, 184, 0.05);
-    border-color: rgba(212, 165, 165, 0.2);
-
-    .section-title {
-      color: #e6d5b8;
-    }
-  }
-
-  .status-label {
-    color: #e6d5b8;
-  }
-
-  .status-version {
-    color: rgba(230, 213, 184, 0.6);
-  }
-
-  .install-path {
-    color: rgba(230, 213, 184, 0.5);
-  }
-
-  .unsaved-hint {
-    color: @morandi-yellow;
-  }
-
-  .form-actions .el-button:not(.el-button--primary):not(.el-button--danger) {
-    background: rgba(212, 165, 165, 0.2);
-    border-color: rgba(212, 165, 165, 0.3);
-    color: #e6d5b8;
-
-    &:hover {
-      background: rgba(212, 165, 165, 0.3);
-      border-color: @morandi-red;
-    }
-  }
-
-  .webstream-content {
-    &::-webkit-scrollbar-track {
-      background: rgba(230, 213, 184, 0.05);
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: rgba(212, 165, 165, 0.3);
-
-      &:hover {
-        background: rgba(212, 165, 165, 0.5);
-      }
-    }
-  }
-}
-
-// ========== 浅色模式 ==========
-[data-bs-theme='light'] {
-  .webstream-header {
-    border-bottom: 1px solid rgba(74, 158, 255, 0.2);
-    background: linear-gradient(135deg, rgba(74, 158, 255, 0.1), rgba(122, 184, 255, 0.05));
-
-    h2 {
-      color: #3a7ed5;
-      text-shadow: 0 1px 2px rgba(74, 158, 255, 0.2);
-
-      .header-icon {
-        color: @gura-blue;
-      }
-    }
-  }
-
-  .webstream-form {
-    background: linear-gradient(135deg, rgba(240, 248, 255, 0.8), rgba(230, 242, 255, 0.6));
-    border: 1px solid rgba(74, 158, 255, 0.2);
-    box-shadow: 0 8px 32px rgba(74, 158, 255, 0.15), 0 2px 8px rgba(74, 158, 255, 0.1);
-
-    :deep(.el-form-item__label) {
-      color: #3a7ed5;
-    }
-
-    :deep(.el-input__inner),
-    :deep(.el-input-number__decrease),
-    :deep(.el-input-number__increase) {
-      background: rgba(255, 255, 255, 0.8);
-      border-color: rgba(74, 158, 255, 0.3);
-      color: #3a7ed5;
-
-      &:hover {
-        border-color: rgba(74, 158, 255, 0.5);
-      }
-
-      &:focus {
-        border-color: @gura-blue;
-      }
-    }
-
-    :deep(.el-select__wrapper) {
-      background: rgba(255, 255, 255, 0.8);
-      border-color: rgba(74, 158, 255, 0.3);
-
-      &:hover {
-        border-color: rgba(74, 158, 255, 0.5);
-      }
-
-      &.is-focused {
-        border-color: @gura-blue;
-      }
-    }
-
-    :deep(.el-switch.is-checked .el-switch__core) {
-      background-color: @gura-blue;
-    }
-  }
-
-  .section-divider {
-    .section-divider-text {
-      color: rgba(58, 126, 213, 0.7);
-    }
-
-    &::after {
-      background: rgba(74, 158, 255, 0.2);
-    }
-  }
-
-  .section-desc {
-    color: rgba(58, 126, 213, 0.7);
-  }
-
-  .form-tip {
-    color: rgba(58, 126, 213, 0.6);
-  }
-
-  .status-section {
-    background: rgba(74, 158, 255, 0.05);
-    border-color: rgba(74, 158, 255, 0.2);
-  }
-
-  .access-section {
-    background: rgba(74, 158, 255, 0.05);
-    border-color: rgba(74, 158, 255, 0.2);
-
-    .section-title {
-      color: #3a7ed5;
-    }
-  }
-
-  .status-label {
-    color: #3a7ed5;
-  }
-
-  .status-version {
-    color: rgba(58, 126, 213, 0.6);
-  }
-
-  .install-path {
-    color: rgba(58, 126, 213, 0.5);
-  }
-
-  .unsaved-hint {
-    color: #e6a23c;
-  }
-
-  .form-actions .el-button:not(.el-button--primary):not(.el-button--danger) {
-    background: rgba(74, 158, 255, 0.1);
-    border-color: rgba(74, 158, 255, 0.3);
-    color: #3a7ed5;
-
-    &:hover {
-      background: rgba(74, 158, 255, 0.2);
-      border-color: @gura-blue;
-    }
-  }
-
-  .webstream-content {
-    &::-webkit-scrollbar-track {
-      background: rgba(74, 158, 255, 0.05);
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: rgba(74, 158, 255, 0.3);
-
-      &:hover {
-        background: rgba(74, 158, 255, 0.5);
-      }
-    }
-  }
-}
-
-// ========== 通用样式 ==========
+// ========== Header ==========
 .webstream-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 24px 32px;
-  transition: all 0.3s ease;
+  flex: 0 0 auto;
+  min-height: var(--row-height);
+  padding: var(--pad-y) var(--pad-x);
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
 
   h2 {
-    display: flex;
-    align-items: center;
-    gap: 12px;
     margin: 0;
-    font-size: 24px;
-    font-weight: 600;
-    transition: all 0.3s ease;
-
-    .header-icon {
-      font-size: 28px;
-      transition: all 0.3s ease;
-    }
+    font-size: var(--font-size);
+    font-weight: 500;
+    color: var(--text);
   }
 }
 
+// ========== Content ==========
 .webstream-content {
   flex: 1;
   overflow-y: auto;
-  padding: 32px;
-
-  &::-webkit-scrollbar {
-    width: 8px;
-  }
+  padding: var(--pad-x);
 }
 
 .webstream-form {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 32px;
-  border-radius: 16px;
-  backdrop-filter: blur(10px);
-  transition: all 0.3s ease;
+  max-width: 820px;
+}
 
-  :deep(.el-form-item__label) {
-    font-weight: 600;
-    font-size: 14px;
-  }
-
-  :deep(.el-select__wrapper) {
-    box-shadow: none;
-  }
+// ========== Copy ==========
+.section-desc {
+  margin: 0 0 var(--pad-x);
+  color: var(--text-dim);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
 }
 
 .section-divider {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin: 24px 0 16px;
+  min-height: var(--row-height);
+  margin: 16px 0 0;
+  border-bottom: 1px solid var(--border);
 
   .section-divider-text {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 14px;
-    font-weight: 600;
-    white-space: nowrap;
-    color: var(--el-text-color-secondary);
-  }
-
-  &::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--el-border-color-lighter);
+    color: var(--text-dim);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
   }
 }
 
-.section-desc {
-  margin: 0 0 20px 0;
-  font-size: 14px;
-  line-height: 1.6;
-  transition: all 0.3s ease;
-}
-
+// ========== Status ==========
 .status-section {
-  padding: 16px 20px;
-  border-radius: 12px;
-  border: 1px solid;
-  margin-bottom: 24px;
-  transition: all 0.3s ease;
+  padding: var(--pad-y) var(--pad-x);
+  margin-bottom: var(--pad-x);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
 }
 
 .status-row {
@@ -884,113 +457,115 @@ async function openInBrowser() {
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--gap);
+  min-height: var(--row-height);
 }
 
 .status-info {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--gap);
 }
 
 .status-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  display: inline-block;
   flex-shrink: 0;
-
-  &.dot-running {
-    background-color: #67c23a;
-    box-shadow: 0 0 8px rgba(103, 194, 58, 0.6);
-    animation: pulse 2s infinite;
-  }
-
-  &.dot-stopped {
-    background-color: #909399;
-  }
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
 }
 
 .status-label {
-  font-size: 15px;
-  font-weight: 600;
-  transition: all 0.3s ease;
+  color: var(--text);
+  font-weight: 500;
 }
 
 .status-version {
-  font-size: 12px;
-  font-style: italic;
-  transition: all 0.3s ease;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
 }
 
 .status-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
-.download-progress {
-  margin-top: 12px;
-}
-
+// ========== Access links ==========
 .access-section {
-  padding: 16px 20px;
-  border-radius: 12px;
-  border: 1px solid;
-  margin-bottom: 24px;
-  transition: all 0.3s ease;
+  padding: var(--pad-y) var(--pad-x);
+  margin-bottom: var(--pad-x);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
 
   .section-title {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 15px;
-    font-weight: 600;
-    margin-bottom: 12px;
-    transition: all 0.3s ease;
+    margin-bottom: var(--pad-y);
+    color: var(--text-dim);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
   }
 }
 
 .access-url-row {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
 
   .url-input {
     flex: 1;
+
+    :deep(.el-input__inner) {
+      font-family: var(--font-mono);
+    }
+  }
+}
+
+// ========== Form ==========
+.config-form {
+  // Label left, control right, one hairline between rows.
+  :deep(.el-form-item) {
+    align-items: flex-start;
+    margin: 0;
+    padding: var(--pad-y) 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  :deep(.el-form-item__label) {
+    padding-right: var(--gap);
+    color: var(--text-dim);
+    font-size: var(--font-size);
+    font-weight: 400;
+    line-height: var(--row-height);
+  }
+
+  :deep(.el-form-item__content) {
+    min-height: var(--row-height);
   }
 }
 
 .form-tip {
-  font-size: 12px;
-  font-style: italic;
-  margin-top: 4px;
-  transition: all 0.3s ease;
+  margin-top: 2px;
+  color: var(--text-dim);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
 
   code {
-    font-style: normal;
-    padding: 1px 4px;
-    border-radius: 3px;
-    font-family: monospace;
+    padding: 0 3px;
+    color: var(--text);
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-xs);
   }
 }
 
 .setting-content {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--gap);
 }
 
 .two-column-layout {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  margin-bottom: 20px;
+  gap: 0 24px;
 
   :deep(.el-form-item) {
     margin-bottom: 0;
@@ -998,63 +573,33 @@ async function openInBrowser() {
 }
 
 .form-actions {
-  margin-top: 32px;
-  text-align: center;
+  margin-top: var(--pad-x);
+
+  :deep(.el-form-item) {
+    border-bottom: 0;
+  }
 
   :deep(.el-form-item__content) {
-    justify-content: center;
-    gap: 16px;
-  }
-}
-
-// 主按钮主题样式
-[data-bs-theme='dark'] .form-actions .el-button.el-button--primary {
-  background: linear-gradient(135deg, @morandi-red, @morandi-yellow);
-  border: none;
-  color: #2d2628;
-  box-shadow: 0 4px 16px rgba(212, 165, 165, 0.4);
-
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(212, 165, 165, 0.6);
-  }
-}
-
-[data-bs-theme='light'] .form-actions .el-button.el-button--primary {
-  background: linear-gradient(135deg, @gura-blue, @gura-light-blue);
-  border: none;
-  color: white;
-  box-shadow: 0 4px 16px rgba(74, 158, 255, 0.4);
-
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(74, 158, 255, 0.6);
-  }
-}
-
-.form-actions .el-button {
-  min-width: 120px;
-  font-weight: 600;
-  border-radius: 12px;
-  transition: all 0.3s ease;
-
-  &:active {
-    transform: translateY(0);
+    gap: var(--gap);
   }
 }
 
 .unsaved-hint {
-  font-size: 13px;
-  font-weight: 500;
-  transition: all 0.3s ease;
+  color: var(--warn);
+  font-size: var(--font-size-sm);
 }
 
 .install-path {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  padding: 16px 0 0;
-  transition: all 0.3s ease;
+  padding: var(--pad-x) 0 0;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 768px) {
+  .two-column-layout {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

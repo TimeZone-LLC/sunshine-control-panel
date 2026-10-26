@@ -88,8 +88,7 @@ found:
 FunctionEnd
 
 Function .onInit
-  ; The existing in-app updater invokes Inno-style /VERYSILENT. Accept it as
-  ; an alias for NSIS /S so changing installer technology stays compatible.
+  ; Accept the common Inno-style /VERYSILENT flag as an alias for NSIS /S.
   ${GetParameters} $Parameters
   ClearErrors
   ${GetOptions} $Parameters "/VERYSILENT" $0
@@ -158,8 +157,8 @@ install_new_gui:
   Delete "$GuiPath.previous"
   Delete "$StylusPluginPath.previous"
 
-  ; Interactive installs restore the tray agent immediately. Silent installs
-  ; are driven by the in-app updater, which restarts the GUI itself.
+  ; Interactive installs restore the tray agent immediately. A parent process
+  ; controls startup after silent component installs.
   IfSilent install_done
   ExecShell "open" "$WINDIR\explorer.exe" '$\"$GuiPath$\" --hidden' SW_SHOWNORMAL
 install_done:

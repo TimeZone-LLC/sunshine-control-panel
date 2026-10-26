@@ -86,9 +86,9 @@
 
 <script setup>
 import { onMounted } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessageBox } from '../ui/compact/feedback.js'
 import { useInputDrivers } from '../../composables/useInputDrivers.js'
-import { useI18n } from '../../desktop/i18n/index.js'
+import { useI18n } from '../../i18n/index.js'
 
 const { t } = useI18n()
 
@@ -119,4 +119,3 @@ async function confirmToggle(tool) {
 
 onMounted(refreshAll)
 </script>
-

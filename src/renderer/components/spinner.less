@@ -1,0 +1,29 @@
+// The one loading spinner in the panel.
+//
+// gloss keeps a single piece of motion: a hairline ring turning at a constant
+// linear rate. Nothing square, nothing pulsing, nothing that changes size or
+// opacity. Every loading state in every window calls this mixin, so the
+// treatment is declared once here and cannot drift view by view.
+//
+// This file declares a mixin and nothing else. Importing it emits no CSS until
+// it is called, so components can pull it in without shipping duplicate rules.
+// The @keyframes it rides on live in app/app.css and are emitted once.
+
+.gloss-spinner(@size: 14px) {
+  box-sizing: border-box;
+  display: inline-block;
+  flex-shrink: 0;
+  width: @size;
+  height: @size;
+  margin: 0;
+  padding: 0;
+  // 1px hairline, the same structural weight as every border in the system.
+  // The muted arc is the only part that reads as "moving".
+  border: 1px solid var(--border);
+  border-top-color: var(--text-dim);
+  // The single deliberate exception to the square geometry: a ring has to be
+  // round to rotate legibly.
+  border-radius: 50%;
+  background: none;
+  animation: brutalist-spin 0.8s linear infinite;
+}

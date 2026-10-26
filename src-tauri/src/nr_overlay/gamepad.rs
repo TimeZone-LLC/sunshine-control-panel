@@ -1,4 +1,4 @@
-use crate::controller_input::{parse, read, Chord};
+use crate::controller_input::{Chord, parse, read};
 use std::time::{Duration, Instant};
 fn binding_error(error: String) -> String {
     if error == "controller_shortcut_duplicate" {

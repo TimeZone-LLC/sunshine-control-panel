@@ -19,9 +19,7 @@ pub fn refresh_ecoqos_state<R: Runtime>(app: &AppHandle<R>) {
     #[cfg(target_os = "windows")]
     {
         let mut enabled = ECOQOS_ENABLED.lock().unwrap_or_else(|e| e.into_inner());
-        let enable = app.webview_windows().is_empty()
-            && !crate::game_session::is_game_session_active()
-            && !crate::tray::is_tray_session_active();
+        let enable = app.webview_windows().is_empty() && !crate::tray::is_tray_session_active();
 
         if *enabled != enable {
             *enabled = enable;

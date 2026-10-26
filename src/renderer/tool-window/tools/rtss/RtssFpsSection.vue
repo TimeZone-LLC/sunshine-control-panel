@@ -54,9 +54,9 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { Aim } from '@element-plus/icons-vue'
+import { Aim } from '../../../components/ui/compact/icons.js'
 import { invoke } from '@tauri-apps/api/core'
-import { useI18n } from '../../../desktop/i18n/index.js'
+import { useI18n } from '../../../i18n/index.js'
 import SectionPanel from '../../components/SectionPanel.vue'
 import ToggleSwitch from '../../components/ToggleSwitch.vue'
 
@@ -75,7 +75,7 @@ async function loadState() {
     const state = await invoke('rtss_get_limiter_status')
     limiterEnabled.value = state === 1
   } catch (e) {
-    console.warn('获取帧率限制状态失败:', e)
+    console.warn('Failed to read the framerate limiter state:', e)
   }
 }
 
@@ -124,22 +124,21 @@ defineExpose({ loadState })
 
 <style lang="less" scoped>
 .fps-display {
-  text-align: center;
+  text-align: left;
   padding: 2px 0 0;
 }
 
 .fps-value {
-  font-size: 36px;
-  font-weight: 700;
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: @font-weight-medium;
   font-variant-numeric: tabular-nums;
-  background: linear-gradient(135deg, #93c5fd, #c4b5fd);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--text);
 }
 
 .fps-label {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-dim);
   margin-left: 4px;
 }
 
@@ -149,34 +148,40 @@ defineExpose({ loadState })
 
 .fps-slider {
   width: 100%;
-  height: 8px;
+  height: 4px;
+  padding: 0;
+  border: 0;
   -webkit-appearance: none;
-  background: rgba(255, 255, 255, 0.18);
-  border-radius: 8px;
+  appearance: none;
+  background: var(--bg-active);
   outline: none;
   cursor: pointer;
 
   &::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: white;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    width: 10px;
+    height: 16px;
+    background: var(--text);
     cursor: pointer;
-    transition: transform 0.15s;
-
-    &:hover { transform: scale(1.15); }
   }
 
-  &:disabled { opacity: 0.4; cursor: not-allowed; }
+  &::-moz-range-thumb {
+    width: 10px;
+    height: 16px;
+    background: var(--text);
+    border: none;
+    cursor: pointer;
+  }
+
+  &:focus-visible { outline: 1px solid var(--border-strong); outline-offset: 2px; }
+  &:disabled { background: var(--bg-hover); cursor: not-allowed; }
 }
 
 .slider-labels {
   display: flex;
   justify-content: space-between;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--text-faint);
   margin-top: 4px;
   padding: 0 2px;
 }
@@ -184,58 +189,60 @@ defineExpose({ loadState })
 .presets {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
-  justify-content: center;
+  gap: @spacing-xs;
 }
 
 .preset-btn {
-  padding: 4px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.8);
+  height: 22px;
+  padding: 0 @spacing-md;
+  font-family: var(--font-mono);
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--text-dim);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
 
-  &:hover { background: rgba(255, 255, 255, 0.14); color: white; }
-  &.active { background: rgba(147, 197, 253, 0.25); border-color: #93c5fd; color: #c4b5fd; }
+  &:hover { background: var(--bg-hover); color: var(--text); }
+  &:focus-visible { outline: 1px solid var(--border-strong); outline-offset: 0; }
+  &.active { background: var(--bg-active); border-color: var(--border-strong); color: var(--text); }
 }
 
 .actions {
   display: flex;
-  gap: 8px;
-  justify-content: center;
+  gap: @spacing-sm;
 }
 
 .apply-btn {
-  padding: 6px 20px;
-  border: none;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #60a5fa, #818cf8);
-  color: white;
-  font-size: 12px;
-  font-weight: 600;
+  height: 22px;
+  padding: 0 @spacing-lg;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text);
+  font-size: @font-size-sm;
+  font-weight: @font-weight-normal;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
 
-  &:hover { opacity: 0.9; transform: translateY(-1px); }
-  &:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  &:hover:not(:disabled) { background: var(--bg-hover); }
+  &:focus-visible { outline: 1px solid var(--border-strong); outline-offset: 0; }
+  &:disabled { color: var(--text-faint); border-color: var(--border); cursor: not-allowed; }
 }
 
 .reset-btn {
-  padding: 6px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 12px;
-  font-weight: 500;
+  height: 22px;
+  padding: 0 @spacing-md;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: @font-size-sm;
+  font-weight: @font-weight-normal;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
 
-  &:hover { background: rgba(255, 255, 255, 0.14); color: white; }
-  &:disabled { opacity: 0.4; cursor: not-allowed; }
+  &:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
+  &:focus-visible { outline: 1px solid var(--border-strong); outline-offset: 0; }
+  &:disabled { color: var(--text-faint); cursor: not-allowed; }
 }
 </style>

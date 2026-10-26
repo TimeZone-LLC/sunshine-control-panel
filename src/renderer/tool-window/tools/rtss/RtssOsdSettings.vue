@@ -70,9 +70,9 @@
 
 <script setup>
 import { reactive, onMounted } from 'vue'
-import { Setting } from '@element-plus/icons-vue'
+import { Setting } from '../../../components/ui/compact/icons.js'
 import { invoke } from '@tauri-apps/api/core'
-import { useI18n } from '../../../desktop/i18n/index.js'
+import { useI18n } from '../../../i18n/index.js'
 import SectionPanel from '../../components/SectionPanel.vue'
 import ToggleSwitch from '../../components/ToggleSwitch.vue'
 

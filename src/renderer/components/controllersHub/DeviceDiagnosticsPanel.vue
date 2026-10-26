@@ -13,15 +13,17 @@
         </article>
       </div>
       <div v-else class="chub-cards">
+        <!-- ControllerMeta -->
         <article class="chub-card">
-          <div class="chub-card-head"><strong>{{ t.sidebar.hdrEnhanced }}</strong></div>
+          <div class="chub-card-head">
+            <strong>{{ t.sidebar.hdrEnhanced }}</strong>
+          </div>
           <p class="chub-hint">{{ t.hdrEnhanced.hint }}</p>
           <div class="chub-card-actions">
             <el-button size="small" type="primary" @click="emit('open-hdr-enhanced')">{{ t.hdrEnhanced.open }}</el-button>
           </div>
         </article>
 
-        <!-- ControllerMeta -->
         <article class="chub-card">
           <div class="chub-card-head">
             <strong>{{ t.controllersHub.peripherals.meta.title }}</strong>
@@ -67,7 +69,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { controllerMeta } from '../../tauri-adapter.js'
-import { useI18n } from '../../desktop/i18n/index.js'
+import { useI18n } from '../../i18n/index.js'
 
 const emit = defineEmits(['open-controller-meta', 'open-stylus-input-probe', 'open-hdr-enhanced'])
 const { t } = useI18n()
@@ -92,4 +94,3 @@ async function refreshAll() {
 }
 onMounted(refreshAll)
 </script>
-

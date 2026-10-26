@@ -40,9 +40,9 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage } from '../ui/compact/feedback.js'
 import { usbip } from '../../tauri-adapter.js'
-import { useI18n } from '../../desktop/i18n/index.js'
+import { useI18n } from '../../i18n/index.js'
 
 defineProps({ transportReady: Boolean })
 const { t } = useI18n()
@@ -97,4 +97,3 @@ onMounted(load)
 .forwarding-row, .forwarding-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 12px 0; }
 .forwarding-actions { justify-content: flex-start; }
 </style>
-

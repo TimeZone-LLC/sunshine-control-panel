@@ -93,7 +93,6 @@ pub(super) fn tray_notification_label(s: &TrayStrings, state: &sunshine::TraySta
 /// configuration remains in the main panel.
 pub(super) fn build_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let s = get_tray_strings();
-    let current_locale = get_current_locale();
     let (tray_state, connection, recovery_in_progress) = {
         let runtime = TRAY_RUNTIME_STATE.lock().unwrap();
         runtime.menu_snapshot()
@@ -163,7 +162,6 @@ pub(super) fn build_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<M
     )?;
     let primary_separator = PredefinedMenuItem::separator(app)?;
 
-    let open_desktop = MenuItem::with_id(app, "open_desktop", s.open_desktop, true, None::<&str>)?;
     #[cfg(target_os = "windows")]
     let auto_start = CheckMenuItem::with_id(
         app,
@@ -243,7 +241,6 @@ pub(super) fn build_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<M
         ],
     )?;
 
-    let show_toolbar = MenuItem::with_id(app, "show_toolbar", s.show_toolbar, true, None::<&str>)?;
     let host_performance = MenuItem::with_id(
         app,
         "host_performance",
@@ -256,51 +253,15 @@ pub(super) fn build_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<M
     let web_stream = MenuItem::with_id(app, "web_stream", s.web_stream, true, None::<&str>)?;
     let tools_separator = PredefinedMenuItem::separator(app)?;
     let log_console = MenuItem::with_id(app, "log_console", s.log_console, true, None::<&str>)?;
-    #[cfg(debug_assertions)]
-    let debug_page = MenuItem::with_id(app, "debug_page", s.debug_page, true, None::<&str>)?;
 
     #[allow(unused_mut)]
     let mut tools_items: Vec<&dyn tauri::menu::IsMenuItem<R>> =
-        vec![&show_toolbar, &host_performance, &rtss_control];
+        vec![&host_performance, &rtss_control];
     #[cfg(any(debug_assertions, feature = "beta"))]
     tools_items.push(&web_stream);
     tools_items.push(&tools_separator);
     tools_items.push(&log_console);
-    #[cfg(debug_assertions)]
-    tools_items.push(&debug_page);
     let tools_submenu = Submenu::with_id_and_items(app, "tools", s.tools_menu, true, &tools_items)?;
-
-    let lang_zh = CheckMenuItem::with_id(
-        app,
-        "lang_zh",
-        "中文",
-        true,
-        current_locale == "zh",
-        None::<&str>,
-    )?;
-    let lang_en = CheckMenuItem::with_id(
-        app,
-        "lang_en",
-        "English",
-        true,
-        current_locale == "en",
-        None::<&str>,
-    )?;
-    let lang_ja = CheckMenuItem::with_id(
-        app,
-        "lang_ja",
-        "日本語",
-        true,
-        current_locale == "ja",
-        None::<&str>,
-    )?;
-    let lang_submenu = Submenu::with_id_and_items(
-        app,
-        "language",
-        s.language,
-        true,
-        &[&lang_zh, &lang_en, &lang_ja],
-    )?;
 
     #[cfg(target_os = "windows")]
     let prevent_sleep = CheckMenuItem::with_id(
@@ -357,30 +318,22 @@ pub(super) fn build_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<M
         &[&reset_config, &clear_cache],
     )?;
     let settings_separator = PredefinedMenuItem::separator(app)?;
-    let mut settings_items: Vec<&dyn tauri::menu::IsMenuItem<R>> = vec![&lang_submenu];
+    let mut settings_items: Vec<&dyn tauri::menu::IsMenuItem<R>> = Vec::new();
     #[cfg(target_os = "windows")]
     settings_items.push(&prevent_sleep);
     #[cfg(target_os = "windows")]
     settings_items.push(&restart_user_mode);
-    settings_items.push(&settings_separator);
+    if !settings_items.is_empty() {
+        settings_items.push(&settings_separator);
+    }
     settings_items.push(&import_config);
     settings_items.push(&export_config);
     settings_items.push(&advanced_submenu);
     let settings_submenu =
         Submenu::with_id_and_items(app, "settings", s.settings_menu, true, &settings_items)?;
 
-    let check_update = MenuItem::with_id(app, "check_update", s.check_update, true, None::<&str>)?;
     let about = MenuItem::with_id(app, "about", s.about, true, None::<&str>)?;
-    let help_submenu = Submenu::with_id_and_items(
-        app,
-        "help",
-        s.help_menu,
-        true,
-        &[
-            &check_update,
-            &about,
-        ],
-    )?;
+    let help_submenu = Submenu::with_id_and_items(app, "help", s.help_menu, true, &[&about])?;
 
     let final_separator = PredefinedMenuItem::separator(app)?;
     let restart = MenuItem::with_id(
@@ -408,7 +361,6 @@ pub(super) fn build_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<M
     }
     items.push(&primary_separator);
     items.push(&open_main_panel);
-    items.push(&open_desktop);
     #[cfg(target_os = "windows")]
     items.push(&auto_start);
     items.push(&interfaces_submenu);

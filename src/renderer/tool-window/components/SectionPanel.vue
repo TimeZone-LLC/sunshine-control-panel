@@ -24,45 +24,46 @@ defineProps({
 
 <style lang="less" scoped>
 .section-panel {
-  background: rgba(0, 0, 0, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
   overflow: hidden;
 }
 
 .section-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.06);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  gap: @spacing-sm;
+  height: @row-height;
+  padding: 0 @pad-x;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
 }
 
 .section-icon {
-  font-size: 15px;
+  font-size: @font-size-sm;
+  color: var(--text-dim);
   flex-shrink: 0;
 }
 
 .section-title {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: @font-size-base;
+  font-weight: @font-weight-medium;
   flex: 1;
-  color: rgba(255, 255, 255, 0.95);
-  letter-spacing: 0.3px;
+  color: var(--text);
+  letter-spacing: normal;
 }
 
 .section-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: @spacing-sm;
   flex-shrink: 0;
 }
 
 .section-body {
-  padding: 10px 14px;
+  padding: @pad-y @pad-x;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: @spacing-sm;
 }
 </style>

@@ -1,5 +1,5 @@
 <template>
-  <!-- 状态指示 -->
+  <!-- Status indicator -->
   <div class="status-bar" :class="{ online: status.running, offline: !status.running }">
     <span class="status-dot"></span>
     <span v-if="loading">{{ t.rtssTool.checking }}</span>
@@ -7,12 +7,12 @@
       RTSS v{{ status.version }} · {{ t.rtssTool.running }}
     </span>
     <span v-else>{{ t.rtssTool.notRunning }}</span>
-    <button class="refresh-btn" @click="$emit('refresh')" :disabled="loading" :title="t.rtssTool.refresh">↻</button>
+    <button type="button" class="refresh-btn" :disabled="loading" :title="t.rtssTool.refresh" :aria-label="t.rtssTool.refresh" @click="$emit('refresh')">↻</button>
   </div>
 
-  <!-- rtss-cli 检测 -->
+  <!-- rtss-cli detection -->
   <div v-if="status.running && !status.cli_path" class="warning-box">
-    <div class="warning-text">⚠️ {{ t.rtssTool.cliNotFound }}</div>
+    <div class="warning-text">{{ t.rtssTool.cliNotFound }}</div>
     <button class="download-btn" @click="downloadCli" :disabled="downloading">
       {{ downloading ? t.rtssTool.downloading : t.rtssTool.autoDownload }}
     </button>
@@ -22,7 +22,7 @@
 <script setup>
 import { ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { useI18n } from '../../../desktop/i18n/index.js'
+import { useI18n } from '../../../i18n/index.js'
 
 const { t } = useI18n()
 
@@ -39,20 +39,12 @@ async function downloadCli() {
   try {
     const path = await invoke('rtss_download_cli')
     emit('message', t.value.rtssTool.cliDownloaded, 'success')
-    // 刷新状态以检测新下载的 cli
+    // Refresh so a freshly downloaded CLI is detected.
     emit('refresh')
   } catch (e) {
     emit('message', String(e), 'error')
   } finally {
     downloading.value = false
-  }
-}
-
-function openCliDownload() {
-  try {
-    invoke('open_external_url', { url: 'https://github.com/xanderfrangos/rtss-cli/releases' })
-  } catch (e) {
-    console.error(e)
   }
 }
 </script>
@@ -62,21 +54,19 @@ function openCliDownload() {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 14px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 500;
-  background: rgba(0, 0, 0, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 8px 12px;
+  font-size: @font-size-sm;
+  font-weight: @font-weight-normal;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
 
-  &.online .status-dot { background: #4ade80; box-shadow: 0 0 8px rgba(74, 222, 128, 0.6); }
-  &.offline .status-dot { background: #f87171; box-shadow: 0 0 8px rgba(248, 113, 113, 0.6); }
+  &.online .status-dot { background: var(--on); }
+  &.offline .status-dot { background: var(--error); }
 }
 
 .status-dot {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
   flex-shrink: 0;
 }
 
@@ -84,22 +74,20 @@ function openCliDownload() {
   margin-left: auto;
   background: none;
   border: none;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-dim);
   font-size: 16px;
   cursor: pointer;
   padding: 2px 6px;
-  border-radius: 6px;
-  transition: all 0.2s;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
 
-  &:hover { color: white; background: rgba(255, 255, 255, 0.1); }
-  &:disabled { opacity: 0.4; cursor: not-allowed; }
+  &:hover { color: var(--text); background: var(--bg-hover); }
+  &:disabled { color: var(--text-faint); cursor: not-allowed; }
 }
 
 .warning-box {
-  padding: 8px 14px;
-  background: rgba(251, 191, 36, 0.12);
-  border: 1px solid rgba(251, 191, 36, 0.35);
-  border-radius: 10px;
+  padding: 8px 12px;
+  background: var(--bg-hover);
+  border: 1px solid var(--warn);
   font-size: 12px;
   line-height: 1.4;
   display: flex;
@@ -110,23 +98,23 @@ function openCliDownload() {
 
 .warning-text {
   flex: 1;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text);
 }
 
 .download-btn {
-  padding: 5px 12px;
-  border: none;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #f59e0b, #d97706);
-  color: white;
-  font-size: 11px;
-  font-weight: 600;
+  height: @control-height;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-active);
+  color: var(--text);
+  font-size: @font-size-sm;
+  font-weight: @font-weight-normal;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
   white-space: nowrap;
   flex-shrink: 0;
 
-  &:hover { opacity: 0.9; transform: translateY(-1px); }
-  &:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  &:hover { background: var(--bg-hover); }
+  &:disabled { color: var(--text-faint); border-color: var(--border); cursor: not-allowed; }
 }
 </style>
